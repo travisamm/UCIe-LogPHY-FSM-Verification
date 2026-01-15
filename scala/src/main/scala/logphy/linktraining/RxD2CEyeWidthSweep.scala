@@ -153,7 +153,7 @@ class RxD2CEyeWidthSweepRequester(afeParams: AfeParams, sbParams: SidebandParams
 
       io.patternReaderIo.req.valid := sbMsgExchanger.io.resp.valid    
       sbMsgExchanger.io.req.valid := sbMsgExchanger.io.msgReceived           
-      sbMsgExchanger.io.req.bits := SBMsgCreate(SBM.LFSR_CLEAR_ERROR_REQ, "PHY", "PHY", true)        
+      sbMsgExchanger.io.req.bits := SBMsgCreate(SBM.LFSR_CLEAR_ERROR_RESP, "PHY", "PHY", true)        
 
       when(sbMsgExchanger.io.done) {
         gotLFSRClearReq := false.B
