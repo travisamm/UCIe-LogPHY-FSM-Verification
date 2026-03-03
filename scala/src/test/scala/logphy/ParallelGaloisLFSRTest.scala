@@ -1,4 +1,4 @@
-package edu.berkeley.cs.uciedigital.logphy
+package edu.berkeley.cs.uciedigital.utils
 
 import chisel3._
 import chisel3.util._
