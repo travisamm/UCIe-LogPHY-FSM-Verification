@@ -13,3 +13,47 @@ object SpeedMode extends ChiselEnum {
   val speed48 = Value(0x6.U(3.W))
   val speed64 = Value(0x7.U(3.W))
 }
+
+object RDIState extends ChiselEnum {
+  val reset = Value(0x0.U(4.W))
+  val active = Value(0x1.U(4.W))
+  val activePmNak = Value(0x3.U(4.W))
+  val l1 = Value(0x4.U(4.W))
+  val l2 = Value(0x8.U(4.W))
+  val linkReset = Value(0x9.U(4.W))
+  val linkError = Value(0xa.U(4.W))
+  val retrain = Value(0xb.U(4.W))
+  val disabled = Value(0xc.U(4.W))
+}
+
+object RDIStateReq extends ChiselEnum {
+  val nop = Value(0x0.U(4.W))
+  val active = Value(0x1.U(4.W))
+  val l1 = Value(0x4.U(4.W))
+  val l2 = Value(0x8.U(4.W))
+  val linkReset = Value(0x9.U(4.W))
+  val retrain = Value(0xb.U(4.W))
+  val disabled = Value(0xc.U(4.W))
+}
+
+object FDIState extends ChiselEnum {
+  val reset = Value(0x0.U(4.W))
+  val active = Value(0x1.U(4.W))
+  val activePmNak = Value(0x3.U(4.W))
+  val l1 = Value(0x4.U(4.W))
+  val l2 = Value(0x8.U(4.W))
+  val linkReset = Value(0x9.U(4.W))
+  val linkError = Value(0xa.U(4.W))
+  val retrain = Value(0xb.U(4.W))
+  val disabled = Value(0xc.U(4.W))
+}
+
+object FDIStateReq extends ChiselEnum {
+  val nop = Value(0x0.U(4.W))
+  val active = Value(0x1.U(4.W))
+  val l1 = Value(0x4.U(4.W))
+  val l2 = Value(0x8.U(4.W))
+  val linkReset = Value(0x9.U(4.W))
+  val retrain = Value(0xb.U(4.W))
+  val disabled = Value(0xc.U(4.W))
+}
