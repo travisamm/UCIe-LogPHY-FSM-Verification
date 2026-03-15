@@ -6,31 +6,32 @@ import chisel3.util._
 
 /*
   Description: 
-    Simple that module takes care of conducting the pl_clk_req/lp_clk_ack handshake 
+    Simple that module takes care of conducting the pl_clk_req/lp_clk_ack handshake
     in a centralized place. Interfacing with the module is done through the `ctrl` signals.
+
+    Note: LogPHY is the requester in this handshake.
 */
 
-class RDIClkHsHandlerCtrlIO extends Bundle {
+class RDIClkHsRequesterCtrlIO extends Bundle {
   val startHandshake = Input(Bool())
   val releaseReq = Input(Bool())
   val doneHandshake = Output(Bool())            
   val inIdle = Output(Bool())
 }
 
-class RDIClockHandshakeHandler() extends Module {
+class RDIClockHandshakeRequester() extends Module {
+  val io = IO(new Bundle {
+    val ctrl = new RDIClkHsRequesterCtrlIO()
+    val rdi = new Bundle {
+      val plClkReq = Output(Bool())
+      val lpClkAck = Input(Bool())
+    }          
+  })
 
   // Module specific state
   object State extends ChiselEnum {
     val sIDLE, sWAIT_ACK_ASSERT, sACTIVE_HOLD, sWAIT_ACK_DEASSERT = Value
   }
-
-  val io = IO(new Bundle {
-    val ctrl = new RDIClkHsHandlerCtrlIO()
-    val rdi = new Bundle {
-      val plClkReq = Output(Bool())
-      val lpClkAck = Input(Bool())
-    }          
-  })  
 
   val currentState = RegInit(State.sIDLE)
   val nextState = WireInit(currentState)
@@ -75,9 +76,9 @@ class RDIClockHandshakeHandler() extends Module {
   }
 }
 
-object MainRDIClockHandshakeHandler extends App {
+object MainRDIClockHandshakeRequester extends App {
   ChiselStage.emitSystemVerilogFile(
-    new RDIClockHandshakeHandler(),
+    new RDIClockHandshakeRequester(),
     args = Array("-td", "./generatedVerilog/logphy"),
     firtoolOpts = Array(
       "-O=debug",
