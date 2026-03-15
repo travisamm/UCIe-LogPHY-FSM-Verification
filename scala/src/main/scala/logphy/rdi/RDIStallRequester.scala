@@ -34,7 +34,7 @@ class RDIStallRequester() extends Module {
 
   val currentState = RegInit(State.sIDLE)
   val nextState = WireDefault(currentState)
-  currentState  := nextState
+  currentState := nextState
 
   // Defaults
   // Note on Rule 8: Because these are driven directly by `currentState` (which is a flip-flop), 

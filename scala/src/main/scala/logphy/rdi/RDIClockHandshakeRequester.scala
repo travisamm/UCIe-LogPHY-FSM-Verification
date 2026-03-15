@@ -35,7 +35,7 @@ class RDIClockHandshakeRequester() extends Module {
 
   val currentState = RegInit(State.sIDLE)
   val nextState = WireInit(currentState)
-  currentState  := nextState
+  currentState := nextState
 
   io.rdi.plClkReq := false.B
   io.ctrl.doneHandshake := false.B  // doneHandshake goes high when lpClkAck goes HIGH
