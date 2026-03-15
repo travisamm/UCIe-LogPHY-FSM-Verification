@@ -6,7 +6,7 @@ import chisel3.util._
 
 /*
   Description: 
-    This module handles the Physical Layer (Requester) side of the pl_stallreq/lp_stallack 
+    This module handles the LogPHY (Requester) side of the pl_stallreq/lp_stallack 
     handshake. It enforces the strict 4-phase sequence required by UCIe to cleanly halt
     flit transmission before state transitions.
 */
