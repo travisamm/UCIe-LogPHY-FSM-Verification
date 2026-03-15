@@ -1,7 +1,7 @@
 package edu.berkeley.cs.uciedigital.logphy
 
-import edu.berkeley.cs.uciedigital.interfaces._
 import chisel3._
+import circt.stage.ChiselStage
 import chisel3.util._
 
 /*
@@ -9,6 +9,13 @@ import chisel3.util._
     Simple that module takes care of conducting the pl_clk_req/lp_clk_ack handshake 
     in a centralized place. Interfacing with the module is done through the `ctrl` signals.
 */
+
+class RDIClkHsHandlerCtrlIO extends Bundle {
+  val startHandshake = Input(Bool())
+  val releaseReq = Input(Bool())
+  val doneHandshake = Output(Bool())            
+  val inIdle = Output(Bool())
+}
 
 class RDIClockHandshakeHandler() extends Module {
 
@@ -18,12 +25,7 @@ class RDIClockHandshakeHandler() extends Module {
   }
 
   val io = IO(new Bundle {
-    val ctrl = new Bundle {
-      val startHandshake = Input(Bool())
-      val releaseReq = Input(Bool())
-      val doneHandshake = Output(Bool())            
-      val inIdle = Output(Bool())
-    }      
+    val ctrl = new RDIClkHsHandlerCtrlIO()
     val rdi = new Bundle {
       val plClkReq = Output(Bool())
       val lpClkAck = Input(Bool())
@@ -61,6 +63,9 @@ class RDIClockHandshakeHandler() extends Module {
       }
     }
     is(State.sWAIT_ACK_DEASSERT) {
+      // TODO: If D2D has a bug and lpClkAck just stays asserted then this will get stuck
+      // Either make sure D2D implementation is watertight, or insert a timeout here.
+
       // Rule 3: pl_clk_req MUST de-assert before lp_clk_ack
       io.rdi.plClkReq := false.B
       when(!io.rdi.lpClkAck) {
@@ -68,4 +73,18 @@ class RDIClockHandshakeHandler() extends Module {
       }      
     }
   }
+}
+
+object MainRDIClockHandshakeHandler extends App {
+  ChiselStage.emitSystemVerilogFile(
+    new RDIClockHandshakeHandler(),
+    args = Array("-td", "./generatedVerilog/logphy"),
+    firtoolOpts = Array(
+      "-O=debug",
+      "-g",
+      "--disable-all-randomization",
+      "--strip-debug-info",
+      "--lowering-options=disallowLocalVariables"
+    ),
+  )
 }
