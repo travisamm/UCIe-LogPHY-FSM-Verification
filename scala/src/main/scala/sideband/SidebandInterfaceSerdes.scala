@@ -46,7 +46,7 @@ class SidebandInterfaceSerializer(sbMsgWidth: Int, ncWidth: Int) extends Module 
 
   when(inProgress) {
     when(!isLastBeat) {
-      dataReg := dataReg >> ncWidth
+      dataReg := dataReg >> ncWidth   // Using ncWidth.U may generate a barrel shifter instead of rewiring
       beatCounter := beatCounter + 1.U
     }.otherwise {
       when(io.in.valid) {   // Immediately loads back-to-back valid packet
