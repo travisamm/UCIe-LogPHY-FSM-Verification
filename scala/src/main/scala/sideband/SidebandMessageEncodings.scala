@@ -44,7 +44,20 @@ object SBMsgOpcode extends ChiselEnum {
     */
     val BackToBackPriorityPacket = Value("b11110".U(5.W))
     val SinglePriorityPacket = Value("b11111".U(5.W))
+
+    val OpsWithoutData = Seq(
+      CompletionWithoutData,
+      MessageWithoutData,
+      ManagementPortMsgWithoutData
+    )
+
+    val OpsThatDontUseDPField = Seq(
+      ManagementPortMsgWithData,
+      BackToBackPriorityPacket,
+      SinglePriorityPacket,
+    ) ++ OpsWithoutData
 }
+
 
 object SBM {
   
@@ -321,14 +334,21 @@ object SBM {
   // ==============================================================================================
   // Helpers
   // ==============================================================================================
-  def isComplete(opcode: UInt) = (opcode === SBMsgOpcode.CompletionWithoutData.asUInt | 
-                                  opcode === SBMsgOpcode.CompletionWith32bData.asUInt | 
-                                  opcode === SBMsgOpcode.CompletionWith64bData.asUInt)
+  def isRegAccessComplete(opcode: UInt) = (opcode === SBMsgOpcode.CompletionWithoutData.asUInt | 
+                                           opcode === SBMsgOpcode.CompletionWith32bData.asUInt | 
+                                           opcode === SBMsgOpcode.CompletionWith64bData.asUInt)
 
-  def isMessage(opcode: UInt) = (opcode === SBMsgOpcode.MessageWithoutData.asUInt | 
-                                 opcode === SBMsgOpcode.MessageWith64bData.asUInt)
+  def isReqRespMessage(opcode: UInt) = (opcode === SBMsgOpcode.MessageWithoutData.asUInt | 
+                                        opcode === SBMsgOpcode.MessageWith64bData.asUInt)
 
-  def isRequest(opcode: UInt) = ~opcode(4)
+  def isRegAccessRequest(opcode: UInt) = ~opcode(4)  // 
+}
+
+object SBSourceDestination {
+  val Stack0ProtocolLayer = "b000".U(3.W)
+  val Stack1ProtocolLayer = "b100".U(3.W)
+  val D2D = "b001".U(3.W)
+  val PHY = "b010".U(3.W)
 }
 
 // ==============================================================================================
@@ -344,8 +364,8 @@ object SBMsgCreate {
     data: UInt = 0.U(64.W)
   ): UInt = {
     val srcid: UInt = src match {
-      case "Stack0_Protocol_Layer" => "b000".U(3.W)
-      case "Stack1_Protocol_Layer" => "b100".U(3.W)
+      case "Stack0ProtocolLayer" => "b000".U(3.W)
+      case "Stack1ProtocolLayer" => "b100".U(3.W)
       case "D2D" => "b001".U(3.W)
       case "PHY" => "b010".U(3.W)
     }
