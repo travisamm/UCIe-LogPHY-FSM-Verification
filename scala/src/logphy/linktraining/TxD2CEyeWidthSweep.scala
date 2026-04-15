@@ -90,6 +90,9 @@ class TxD2CEyeWidthSweepRequester(afeParams: AfeParams, sbParams: SidebandParams
   }
   io.txInitEyeWidthSweepResults.valid := false.B
   io.txInitEyeWidthSweepResults.bits := txInitEyeWidthSweepResults
+  io.done := false.B
+  io.patternWriterIo.req.valid := false.B
+  io.patternWriterIo.req.bits.patternType := patternTypeReg
 
   // If start is HIGH, then patternType can either be VALTRAIN or LFSR
   assert(((!io.start) || ((io.patternType === PatternSelect.VALTRAIN) ||

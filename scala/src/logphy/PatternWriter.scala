@@ -88,6 +88,10 @@ class PatternWriter(afeParams: AfeParams) extends Module {
   */
   val lfsrNumBits = 4096
   val lfsrNumCycles = lfsrNumBits / afeParams.mbSerializerRatio
+
+  // Must be declared before first use on the line below
+  val inProgress = RegInit(false.B)
+
   io.txLfsrCtrl.valid := false.B
   io.txLfsrCtrl.bits.increment := false.B
   io.txLfsrCtrl.bits.resetLfsr := io.interfaceIo.req.valid && !inProgress
@@ -104,13 +108,12 @@ class PatternWriter(afeParams: AfeParams) extends Module {
     fwClkNPatternVec(i) := fwClkNPattern(i % fwClkPatternWidth)
   }
 
-  val largestCycleCount = Seq(clkRepairPatternNumCycles, valTrainNumCycles, 
+  val largestCycleCount = Seq(clkRepairPatternNumCycles, valTrainNumCycles,
                               perLaneNumCycles, lfsrNumCycles).max
   val cycleCount = RegInit(0.U(log2Ceil(largestCycleCount).W))
   val maxCycleCount = RegInit((largestCycleCount - 1).U(log2Ceil(largestCycleCount).W))
-    
+
   // Status reg
-  val inProgress = RegInit(false.B)  
   val doneSending = WireInit(false.B)
   val patternTypeReg = RegInit(PatternSelect.CLKREPAIR)
 
