@@ -351,6 +351,12 @@ object SBSourceDestination {
   val PHY = "b010".U(3.W)
 }
 
+object LayerId {
+  val protocol = 0
+  val d2d = 1
+  val logPhy = 2
+}
+
 // ==============================================================================================
 // A factory function to create a messages
 // ==============================================================================================

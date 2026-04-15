@@ -2,9 +2,6 @@
   Description: 
     SidebandInterfaceNode encapsulates interface serdes, and any flow-control and data integrity
     logic associated with transmitting or receiving sideband messages over the RDI/FDI interface.
- 
-    TX: fromSwitch --> toIntf
-    RX: toSwitch <-- fromIntf
 */
 
 package edu.berkeley.cs.uciedigital.sideband
@@ -44,10 +41,10 @@ class SidebandInterfaceNode(sbMsgWidth: Int, ncWidth: Int, numCredits: Int,
 
   // TX Path: txIn --> SkidBuffer --> Parity Set --> Serializer --> txOut
   val serializer = Module(new SidebandInterfaceSerializer(sbMsgWidth, ncWidth))
-
-  // Minimizes potentially large combinational path for ready signal
-  val skidBuffer = Module(new SkidBuffer(sbMsgWidth)) 
   val txCreditCounter = RegInit(numCredits.U((log2Ceil(numCredits) + 1).W))
+
+  // Minimizes potentially large combinational path for serializer ready signal
+  val skidBuffer = Module(new SkidBuffer(sbMsgWidth)) 
   
   // Serialize only if enough credits. RegisterAccessCompletition messages always get serialized
   val isEnoughCredits = txCreditCounter =/= 0.U 
@@ -60,7 +57,7 @@ class SidebandInterfaceNode(sbMsgWidth: Int, ncWidth: Int, numCredits: Int,
   // Parity Set Logic -- set parity before serializing
   // NOTE: Assumption is that if data bits need to be zeroed out they will be, so DP == 0
   val headerPSet = WireDefault(skidBuffer.io.out.bits(63, 0))
-  val bitsToProtectPSet = WireDefault(headerPSet(61, 0)) // Skip DP(63), CP(62)
+  val bitsToProtectPSet = WireDefault(headerPSet(61, 0))      // Skip DP(63), CP(62)
   val calculatedCPPset = WireDefault(bitsToProtectPSet.xorR)
 
   // Can safely skip DP bit when calculating CP bit for messages that don't use DP because 

@@ -28,11 +28,13 @@ import chisel3.util._
 
 class SidebandPriorityQueue(sbMsgWidth: Int, depths: SidebandPriorityQueueDepths) extends Module {
   val io = IO(new Bundle {
-    val in = Flipped(Decoupled(UInt(sbMsgWidth.W)))
-    val out = Decoupled(UInt(sbMsgWidth.W))    
+    val enq = Flipped(Decoupled(UInt(sbMsgWidth.W)))
+    val deq = Decoupled(UInt(sbMsgWidth.W))    
   })
 
   // Put depths in a sequence, ordered from highest priority to lowest
+  // To change priority, can just change depth ordering here. Make to also change order in the
+  // EnqueueArbiter module below.
   val priorityDepths = Seq(
     depths.messageRequestOrResponse,
     depths.regAccessCompletion,
@@ -45,7 +47,7 @@ class SidebandPriorityQueue(sbMsgWidth: Int, depths: SidebandPriorityQueueDepths
 
   // Enqueue
   val enqArbiter = Module(new EnqueueArbiter(sbMsgWidth, queues.length))
-  enqArbiter.io.in <> io.in
+  enqArbiter.io.in <> io.enq
 
   for (i <- queues.indices) {
     queues(i).io.enq <> enqArbiter.io.out(i)
@@ -58,7 +60,7 @@ class SidebandPriorityQueue(sbMsgWidth: Int, depths: SidebandPriorityQueueDepths
     deqArbiter.io.in(i) <> queues(i).io.deq
   }
 
-  io.out <> deqArbiter.io.out
+  io.deq <> deqArbiter.io.out
 }
 
 // ============================================================================
@@ -86,8 +88,8 @@ class EnqueueArbiter(sbMsgWidth: Int, numQueues: Int) extends Module {
   io.out(3).valid := io.in.valid && isOther
 
   io.in.ready := (isAccComplete && io.out(0).ready)     ||
-                 (isReqRespMessage  && io.out(1).ready) ||
-                 (isAccRequest  && io.out(2).ready)     ||
+                 (isReqRespMessage && io.out(1).ready)  ||
+                 (isAccRequest && io.out(2).ready)      ||
                  (isOther && io.out(3).ready)
 }
 
