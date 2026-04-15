@@ -13,7 +13,7 @@ import chisel3._
 case class RdiParams(nBytes: Int, ncWidth: Int) 
 
 class Rdi(params: RdiParams) extends Bundle {
-  val lclk = Bool() // Always an input; directionless to work with Flipped(...)
+  val lclk = Input(Bool())
   val lpIrdy = Input(Bool())
   val lpValid = Input(Bool())
   val lpData = Input(UInt((nBytes * 8).W))
