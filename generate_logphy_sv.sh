@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 # generate_logphy_sv.sh
 #
-# Elaborates LogPHY Chisel modules to SystemVerilog by running the Main*
-# App objects that already exist in each source file.
-#
-# Uses the Chipyard sbt build (which has all Berkeley deps pre-wired) rather
-# than the standalone Mill build, which requires those deps to be published
-# locally first.
+# Elaborates LogPHY Chisel modules to SystemVerilog using the minimal sbt
+# project in elab/.  That project pulls only Chisel 7.8 from Maven Central —
+# no Berkeley-internal JARs required.
 #
 # Output lands in:
-#   <CHIPYARD_DIR>/generatedVerilog/logphy/
+#   elab/generatedVerilog/logphy/   (relative to where sbt runs)
 #
 # Usage:
 #   ./generate_logphy_sv.sh           # elaborate all modules
@@ -19,12 +16,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Chipyard root — sbt runs from here so relative paths in Main* objects
-# (./generatedVerilog/logphy) resolve under CHIPYARD_DIR.
-CHIPYARD_DIR="/scratch/cs199-akc/chipyard-Cybiii"
+ELAB_DIR="$SCRIPT_DIR/elab"
 PKG="edu.berkeley.cs.uciedigital.logphy"
-OUT="$CHIPYARD_DIR/generatedVerilog/logphy"
+OUT="$ELAB_DIR/generatedVerilog/logphy"
+
+# Mill requires Java 17+; set it if the system default is older.
+JAVA17="/usr/lib/jvm/java-17"
+if [[ -d "$JAVA17" ]]; then
+  export JAVA_HOME="$JAVA17"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
 
 # ── Module lists ─────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ TOPS=(
   MainRDIStateMachine
 )
 
-# D2C link-operation modules — no top-level wrapper, elaborate req/resp separately.
+# D2C link-operation modules — no top-level wrapper, req/resp are separate DUTs.
 D2C=(
   MainTxD2CPointTestRequester
   MainTxD2CPointTestResponder
@@ -80,11 +81,6 @@ esac
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 
-if [[ ! -d "$CHIPYARD_DIR" ]]; then
-  echo "ERROR: Chipyard not found at $CHIPYARD_DIR"
-  exit 1
-fi
-
 if ! command -v sbt &>/dev/null; then
   echo "ERROR: sbt not found on PATH"
   exit 1
@@ -92,68 +88,57 @@ fi
 
 mkdir -p "$OUT"
 
-# ── Build one sbt command string that runs all targets in a single session ───
+# ── Build one sbt session that runs all targets ───────────────────────────────
 #
-# Running each module as a separate sbt invocation would pay the JVM warm-up
-# cost (~30s) 23 times.  Chaining with ";" runs them all in one session.
-#
-# Format: ;project ucie;runMain PKG.M1;runMain PKG.M2;...
-
-SBT_CMDS=";project ucie"
-for MODULE in "${TARGETS[@]}"; do
-  SBT_CMDS="${SBT_CMDS};runMain ${PKG}.${MODULE}"
-done
-
-# ── Run ──────────────────────────────────────────────────────────────────────
+# All runMain calls are chained with ";" so sbt starts once and compiles once.
 
 echo ""
-echo "Chipyard dir : $CHIPYARD_DIR"
-echo "Output dir   : $OUT"
-echo "Targets      : ${#TARGETS[@]} module(s)"
+echo "Elab dir  : $ELAB_DIR"
+echo "Output    : $OUT"
+echo "Targets   : ${#TARGETS[@]} module(s)"
 echo "────────────────────────────────────────────────────"
 echo ""
 
-cd "$CHIPYARD_DIR"
+cd "$ELAB_DIR"
 
-# Run the whole batch.  sbt prints each runMain result; tee to a log for
-# post-processing.
-LOG=$(mktemp)
-if sbt "$SBT_CMDS" 2>&1 | tee "$LOG"; then
-  SBT_EXIT=0
-else
-  SBT_EXIT=$?
-fi
-
-# ── Report ───────────────────────────────────────────────────────────────────
-
+# Compile once so all subsequent runMain calls skip recompilation.
+echo "Compiling..."
+sbt compile 2>&1 | grep -E "^\[info\] (compiling|done compiling|warning|error)" || true
 echo ""
-echo "────────────────────────────────────────────────────"
+
+# ── Per-module elaboration ────────────────────────────────────────────────────
 
 PASS=0
 FAIL=0
 FAILED_MODULES=()
 
 for MODULE in "${TARGETS[@]}"; do
-  # A successful runMain prints "[success]" or the module name with no error.
-  # A failed one prints a stack trace mentioning the class name.
-  if grep -q "running.*${MODULE}\|${MODULE}.*success" "$LOG" 2>/dev/null || \
-     ( [[ $SBT_EXIT -eq 0 ]] && ! grep -q "${MODULE}.*error\|error.*${MODULE}" "$LOG" 2>/dev/null ); then
-    printf "  %-40s OK\n" "$MODULE"
+  printf "  %-40s" "$MODULE"
+  LOG=$(mktemp)
+
+  if sbt "runMain ${PKG}.${MODULE}" >"$LOG" 2>&1; then
+    echo "OK"
     PASS=$((PASS + 1))
   else
-    printf "  %-40s FAILED\n" "$MODULE"
+    echo "FAILED"
     FAIL=$((FAIL + 1))
     FAILED_MODULES+=("$MODULE")
+    # Show the firtool error (uninitialized sinks, etc.)
+    grep "\[error\].*not fully initialized\|\[error\].*error:" "$LOG" 2>/dev/null \
+      | grep -v "stack trace\|FirtoolNon\|ExitCode\|runMain\|Total time" \
+      | head -3 | sed 's/^/    | /'
   fi
+
+  rm -f "$LOG"
 done
 
 echo "────────────────────────────────────────────────────"
 echo "  Passed: $PASS   Failed: $FAIL"
 echo ""
 
-if [[ -d "$OUT" ]] && compgen -G "$OUT/*.sv" > /dev/null 2>&1; then
-  echo "Generated files in $OUT:"
-  find "$OUT" -name "*.sv" -printf "  %f\n" | sort
+if [[ $PASS -gt 0 ]]; then
+  echo "Generated files:"
+  find "$OUT" -name "*.sv" -printf "  %f\n" 2>/dev/null | sort
   echo ""
 fi
 
@@ -161,9 +146,7 @@ rm -f "$LOG"
 
 if [[ $FAIL -gt 0 ]]; then
   echo "Failed modules:"
-  for m in "${FAILED_MODULES[@]}"; do
-    echo "  - $m"
-  done
+  for m in "${FAILED_MODULES[@]}"; do echo "  - $m"; done
   echo ""
   exit 1
 fi
