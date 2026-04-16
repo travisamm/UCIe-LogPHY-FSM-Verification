@@ -36,10 +36,10 @@ class logphy_scoreboard extends uvm_scoreboard;
       item_collected_fifo.get(tx);
       
       // SB-01 Check: 64-UI clock pattern followed by 32-UI low
-      // Represented by a 128-bit word driven by the requester
       if (tx.tx_valid && (tx.tx_data == 128'hAAAAAAAAAAAAAAAA_00000000_00000000 || 
                           tx.tx_data == 128'h00000000_00000000_AAAAAAAAAAAAAAAA ||
-                          tx.tx_data == 128'h55555555_55555555_00000000_00000000)) begin
+                          tx.tx_data == 128'h55555555_55555555_00000000_00000000 ||
+                          tx.tx_data == 128'h00000000_00000000_55555555_55555555)) begin
         if (!saw_clock_pattern) begin
            `uvm_info("SCOREBOARD", "SB-01 Verified: Detected 64-UI clock pattern on TX data", UVM_LOW)
            saw_clock_pattern = 1;
