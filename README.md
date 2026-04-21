@@ -13,8 +13,8 @@ You can request a copy of the UCIe specification [here](https://www.uciexpress.o
 >git submodule update --init --recursive
 >./mill __.publishLocal
 >```
->> [!NOTE]
->> To run UVM testbenches, use 'make run TEST=[test_name]' (e.g. test_sbinit_sanity) inside of the ucie/uvm directory.
+> [!NOTE]
+> To run UVM testbenches, use 'make run TEST=[test_name]' (e.g. test_sbinit_sanity) inside of the ucie/uvm directory.
 
 To run the RTL tests, make sure Scala is installed.
 
