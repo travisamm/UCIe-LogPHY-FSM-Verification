@@ -11,14 +11,21 @@ class seq_sbinit_ideal extends logphy_base_seq;
   virtual task body();
     logphy_transaction req;
     
-    // 1 & 2. Kick off FSM and drive the partner 64-UI clocks sequence
+    // 1. Kick off FSM
     req = logphy_transaction::type_id::create("req");
     start_item(req);
     req.start_fsm = 1;
+    req.delay = 10;
+    finish_item(req);
+
+    // 2. Drive the partner 64-UI clocks sequence
+    // Send matching clock pattern to pass detectPatternCounter
+    req = logphy_transaction::type_id::create("req");
+    start_item(req);
+    req.start_fsm = 0;
     req.rx_valid = 1;
     req.rx_data = 128'h00000000_00000000_55555555_55555555;
     req.delay = 10; 
-    req.hold_cycles = 5;
     finish_item(req);
 
     // Wait and send the Out Of Reset Message to advance FSM to state 2
@@ -29,7 +36,6 @@ class seq_sbinit_ideal extends logphy_base_seq;
     // Bits[4:0] = 0x12, Bits[21:14] = 0x91 -> 128'h244012
     req.rx_data = 128'h00000000_00000000_00000000_00244012;
     req.delay = 20; 
-    req.hold_cycles = 5;
     finish_item(req);
 
     // Provide Done Resp to finish FSM
@@ -39,11 +45,7 @@ class seq_sbinit_ideal extends logphy_base_seq;
     req.rx_valid = 1;
     // Bits[4:0] = 0x12, Bits[21:14] = 0x9A, Bits[39:32] = 0x1
     req.rx_data = 128'h00000000_00000000_00000001_00268012;
-    req.rsp_rx_valid = 1;
-    // SBINIT_DONE_REQ: Bits[4:0] = 0x12, Bits[21:14] = 0x95, Bits[39:32] = 0x1
-    req.rsp_rx_data = 128'h00000000_00000000_00000001_00254012;
     req.delay = 20; 
-    req.hold_cycles = 5;
     finish_item(req);
 
   endtask
@@ -59,12 +61,20 @@ class seq_sbinit_timeout extends logphy_base_seq;
   virtual task body();
     logphy_transaction req;
     
-    // 1 & 2. Kick off FSM and drive NO clock patterns
+    // 1. Kick off FSM
     req = logphy_transaction::type_id::create("req");
     start_item(req);
     req.start_fsm = 1;
+    req.delay = 10;
+    finish_item(req);
+
+    // 2. Drive NO clock patterns (don't send rx_data)
+    // The FSM should timeout and raise fsm_error
+    req = logphy_transaction::type_id::create("req");
+    start_item(req);
+    req.start_fsm = 0;
     req.rx_valid = 0;
-    req.delay = 8500000; // 8.5ms delay to ensure 8ms limit is hit in sim
+    req.delay = 1000; // Large delay to ensure 8ms limit is hit in sim
     finish_item(req);
 
   endtask

@@ -36,22 +36,18 @@ class logphy_driver extends uvm_driver #(logphy_transaction);
   endtask
 
   task drive_item(logphy_transaction req);
-    if (req.delay > 0) begin
+    repeat(req.delay) @(posedge vif.clock);
+    
+    if (req.start_fsm) begin
+      vif.fsmCtrl_start = 1;
+      @(posedge vif.clock);
+      vif.fsmCtrl_start = 0;
+    end else begin
+      vif.requesterSbLaneIo_rx_valid = req.rx_valid;
+      vif.requesterSbLaneIo_rx_bits_data = req.rx_data;
+      @(posedge vif.clock);
       vif.requesterSbLaneIo_rx_valid = 0;
-      vif.responderSbLaneIo_rx_valid = 0;
-      repeat(req.delay) @(posedge vif.clock);
     end
-    
-    vif.fsmCtrl_start = req.start_fsm;
-    vif.requesterSbLaneIo_rx_valid = req.rx_valid;
-    vif.requesterSbLaneIo_rx_bits_data = req.rx_data;
-    vif.responderSbLaneIo_rx_valid = req.rsp_rx_valid;
-    vif.responderSbLaneIo_rx_bits_data = req.rsp_rx_data;
-    
-    repeat(req.hold_cycles > 0 ? req.hold_cycles : 1) @(posedge vif.clock);
-    
-    vif.requesterSbLaneIo_rx_valid = 0;
-    vif.responderSbLaneIo_rx_valid = 0;
   endtask
 
 endclass

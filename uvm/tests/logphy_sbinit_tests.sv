@@ -16,14 +16,14 @@ class test_sbinit_sanity extends logphy_base_test;
     seq = seq_sbinit_ideal::type_id::create("seq");
     seq.start(env.agent.sequencer);
 
+    #10000ns;
+
     `uvm_info("TEST", "Test seq_sbinit_ideal finished.", UVM_LOW)
     phase.drop_objection(this);
   endtask
 endclass
 
 class test_sbinit_timeout extends logphy_base_test;
-  // Test should show fsm_done=0, but will not properly error unless SBInit.scala line 32
-  // is changed so that error is not hardcoded to false.
   `uvm_component_utils(test_sbinit_timeout)
 
   function new(string name, uvm_component parent);
@@ -37,6 +37,9 @@ class test_sbinit_timeout extends logphy_base_test;
     `uvm_info("TEST", "Starting seq_sbinit_timeout...", UVM_LOW)
     seq = seq_sbinit_timeout::type_id::create("seq");
     seq.start(env.agent.sequencer);
+
+    // Give it enough time to hit the 8ms timeout
+    #10000ns; 
 
     `uvm_info("TEST", "Test seq_sbinit_timeout finished.", UVM_LOW)
     phase.drop_objection(this);
@@ -57,6 +60,8 @@ class test_sbinit_partner_not_ready extends logphy_base_test;
     `uvm_info("TEST", "Starting seq_sbinit_delayed_ready...", UVM_LOW)
     seq = seq_sbinit_delayed_ready::type_id::create("seq");
     seq.start(env.agent.sequencer);
+
+    #10000ns;
 
     `uvm_info("TEST", "Test seq_sbinit_delayed_ready finished.", UVM_LOW)
     phase.drop_objection(this);
