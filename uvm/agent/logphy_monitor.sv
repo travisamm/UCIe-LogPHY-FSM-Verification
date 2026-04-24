@@ -21,9 +21,11 @@ class logphy_monitor extends uvm_monitor;
   task run_phase(uvm_phase phase);
     logphy_transaction tx;
     logic [127:0] prev_tx_data;
+    logic [127:0] prev_rx_data;
     
     // Initialize
     prev_tx_data = 128'h0;
+    prev_rx_data = 128'h0;
 
     forever begin
       @(posedge vif.clock);
@@ -42,6 +44,19 @@ class logphy_monitor extends uvm_monitor;
         prev_tx_data = vif.requesterSbLaneIo_tx_bits_data;
       end
       
+      // Capture RX data for SB-02 checks
+      if (vif.requesterSbLaneIo_rx_valid && (vif.requesterSbLaneIo_rx_bits_data !== prev_rx_data)) begin
+        tx = logphy_transaction::type_id::create("tx");
+        tx.rx_valid = vif.requesterSbLaneIo_rx_valid;
+        tx.rx_data = vif.requesterSbLaneIo_rx_bits_data;
+        tx.sbRxTxMode = vif.sbRxTxMode;
+        tx.fsm_error = vif.fsmCtrl_error;
+        tx.fsm_done = vif.fsmCtrl_done;
+        
+        item_collected_port.write(tx);
+        prev_rx_data = vif.requesterSbLaneIo_rx_bits_data;
+      end
+
       // Also capture state transitions (error / done)
       if (vif.fsmCtrl_error || vif.fsmCtrl_done) begin
         tx = logphy_transaction::type_id::create("tx");
