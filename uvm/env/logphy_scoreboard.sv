@@ -13,6 +13,10 @@ class logphy_scoreboard extends uvm_scoreboard;
   bit saw_sbinit_done;
   bit sb_02_verified;
   bit sb_03_verified;
+  bit sb_05_verified;
+  bit saw_sbinit_done_req;
+  bit saw_sbinit_done_resp;
+  bit sb_07_verified;
   bit fsm_error_raised;
 
   function new(string name, uvm_component parent);
@@ -36,6 +40,10 @@ class logphy_scoreboard extends uvm_scoreboard;
     saw_sbinit_done = 0;
     sb_02_verified = 0;
     sb_03_verified = 0;
+    sb_05_verified = 0;
+    saw_sbinit_done_req = 0;
+    saw_sbinit_done_resp = 0;
+    sb_07_verified = 0;
     fsm_error_raised = 0;
 
     forever begin
@@ -74,7 +82,26 @@ class logphy_scoreboard extends uvm_scoreboard;
             `uvm_info("SCOREBOARD", "SB-02 Verified: DUT successfully sampled incoming SB data patterns with incoming clock", UVM_LOW)
             sb_02_verified = 1;
          end
-         `uvm_info("SCOREBOARD", "SB-05 Verified: Transitioned to functional sideband mode", UVM_LOW)
+         if (!sb_05_verified) begin
+            `uvm_info("SCOREBOARD", "SB-05 Verified: Transitioned to functional sideband mode", UVM_LOW)
+            sb_05_verified = 1;
+         end
+      end
+
+      // SB-07 Check: Track if we saw done req from DUT
+      if (tx.tx_valid && tx.tx_data == 128'h00000000_00000000_00000001_00254012) begin
+         if (!saw_sbinit_done_req) begin
+            `uvm_info("SCOREBOARD", "SB-07 Partial: DUT sent {SBINIT done req}", UVM_LOW)
+            saw_sbinit_done_req = 1;
+         end
+      end
+
+      // SB-07 Check: Track if TB sent done resp
+      if (tx.rx_valid && tx.rx_data == 128'h00000000_00000000_00000001_00268012) begin
+         if (!saw_sbinit_done_resp) begin
+            `uvm_info("SCOREBOARD", "SB-07 Partial: TB sent {SBINIT done resp}", UVM_LOW)
+            saw_sbinit_done_resp = 1;
+         end
       end
 
       // Track FSM timeout error
@@ -84,6 +111,10 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       if (tx.fsm_done) begin
+         if (saw_sbinit_done_req && saw_sbinit_done_resp && !sb_07_verified) begin
+            `uvm_info("SCOREBOARD", "SB-07 Verified: DUT sent {SBINIT done req} and waited for {SBINIT done resp} before exiting", UVM_LOW)
+            sb_07_verified = 1;
+         end
          `uvm_info("SCOREBOARD", "FSM Done: SBINIT sequence completed", UVM_LOW)
          saw_sbinit_done = 1;
       end
@@ -92,7 +123,7 @@ class logphy_scoreboard extends uvm_scoreboard;
 
   function void check_phase(uvm_phase phase);
     // At the end, report what we collected
-    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02_verified=%0b, sb_03_verified=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
+    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02=%0b, sb_03=%0b, sb_05=%0b, sb_07=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, sb_05_verified, sb_07_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
   endfunction
 
 endclass
