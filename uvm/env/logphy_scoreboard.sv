@@ -89,7 +89,8 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // SB-07 Check: Track if we saw done req from DUT
-      if (tx.tx_valid && tx.tx_data == 128'h00000000_00000000_00000001_00254012) begin
+      // Check opcode=5'h12, msgCode=8'h95, msgSubcode=8'h01
+      if (tx.tx_valid && tx.tx_data[4:0] == 5'h12 && tx.tx_data[21:14] == 8'h95 && tx.tx_data[39:32] == 8'h01) begin
          if (!saw_sbinit_done_req) begin
             `uvm_info("SCOREBOARD", "SB-07 Partial: DUT sent {SBINIT done req}", UVM_LOW)
             saw_sbinit_done_req = 1;
@@ -97,7 +98,8 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // SB-07 Check: Track if TB sent done resp
-      if (tx.rx_valid && tx.rx_data == 128'h00000000_00000000_00000001_00268012) begin
+      // Check opcode=5'h12, msgCode=8'h9A, msgSubcode=8'h01
+      if (tx.rx_valid && tx.rx_data[4:0] == 5'h12 && tx.rx_data[21:14] == 8'h9A && tx.rx_data[39:32] == 8'h01) begin
          if (!saw_sbinit_done_resp) begin
             `uvm_info("SCOREBOARD", "SB-07 Partial: TB sent {SBINIT done resp}", UVM_LOW)
             saw_sbinit_done_resp = 1;
