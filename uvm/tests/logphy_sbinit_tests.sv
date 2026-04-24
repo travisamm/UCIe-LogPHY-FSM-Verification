@@ -1,6 +1,7 @@
 `ifndef LOGPHY_SBINIT_TESTS_SV
 `define LOGPHY_SBINIT_TESTS_SV
 
+// SB-01: UCIe Module must send 64-UI clock pattern (1010...) and 32-UI low on both SB data Tx
 class test_sbinit_sanity extends logphy_base_test;
   `uvm_component_utils(test_sbinit_sanity)
 
@@ -23,7 +24,10 @@ class test_sbinit_sanity extends logphy_base_test;
   endtask
 endclass
 
+// SB-04: If pattern not detected, must continue alternating for total of 8ms then timeout to TRAINERROR
 class test_sbinit_timeout extends logphy_base_test;
+  // Test should show fsm_done=0, but will not properly error until SBInit.scala line 32
+  // is changed so that error is not hardcoded to false.
   `uvm_component_utils(test_sbinit_timeout)
 
   function new(string name, uvm_component parent);
@@ -46,6 +50,7 @@ class test_sbinit_timeout extends logphy_base_test;
   endtask
 endclass
 
+// SB-06: Must send {SBINIT Out of Reset} sideband message continuously until partner detection
 class test_sbinit_partner_not_ready extends logphy_base_test;
   `uvm_component_utils(test_sbinit_partner_not_ready)
 
@@ -68,6 +73,7 @@ class test_sbinit_partner_not_ready extends logphy_base_test;
   endtask
 endclass
 
+// SB-09: Module partner must collapse multiple outstanding {SBINIT done req} messages into single response
 class test_sbinit_multiple_reqs extends logphy_base_test;
   `uvm_component_utils(test_sbinit_multiple_reqs)
 
