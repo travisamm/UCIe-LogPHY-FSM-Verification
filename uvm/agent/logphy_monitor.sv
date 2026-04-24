@@ -22,31 +22,25 @@ class logphy_monitor extends uvm_monitor;
     logphy_transaction tx;
     logic [127:0] prev_tx_data;
     logic [127:0] prev_rx_data;
+    logic         prev_tx_valid;
+    logic         prev_rx_valid;
     
     // Initialize
     prev_tx_data = 128'h0;
     prev_rx_data = 128'h0;
+    prev_tx_valid = 0;
+    prev_rx_valid = 0;
 
     forever begin
       @(posedge vif.clock);
       
       // Sample every cycle or upon interesting events.
       // We will capture transactions when output data changes or FSM state changes to feed the scoreboard
-      if (vif.requesterSbLaneIo_tx_valid && (vif.requesterSbLaneIo_tx_bits_data !== prev_tx_data)) begin
+      if ((vif.requesterSbLaneIo_tx_valid !== prev_tx_valid) || 
+          (vif.requesterSbLaneIo_tx_valid && (vif.requesterSbLaneIo_tx_bits_data !== prev_tx_data))) begin
         tx = logphy_transaction::type_id::create("tx");
         tx.tx_valid = vif.requesterSbLaneIo_tx_valid;
         tx.tx_data = vif.requesterSbLaneIo_tx_bits_data;
-        tx.sbRxTxMode = vif.sbRxTxMode;
-        tx.fsm_error = vif.fsmCtrl_error;
-        tx.fsm_done = vif.fsmCtrl_done;
-        
-        item_collected_port.write(tx);
-        prev_tx_data = vif.requesterSbLaneIo_tx_bits_data;
-      end
-      
-      // Capture RX data for SB-02 checks
-      if (vif.requesterSbLaneIo_rx_valid && (vif.requesterSbLaneIo_rx_bits_data !== prev_rx_data)) begin
-        tx = logphy_transaction::type_id::create("tx");
         tx.rx_valid = vif.requesterSbLaneIo_rx_valid;
         tx.rx_data = vif.requesterSbLaneIo_rx_bits_data;
         tx.sbRxTxMode = vif.sbRxTxMode;
@@ -54,6 +48,24 @@ class logphy_monitor extends uvm_monitor;
         tx.fsm_done = vif.fsmCtrl_done;
         
         item_collected_port.write(tx);
+        prev_tx_valid = vif.requesterSbLaneIo_tx_valid;
+        prev_tx_data = vif.requesterSbLaneIo_tx_bits_data;
+      end
+      
+      // Capture RX data for SB-02 checks
+      if ((vif.requesterSbLaneIo_rx_valid !== prev_rx_valid) || 
+          (vif.requesterSbLaneIo_rx_valid && (vif.requesterSbLaneIo_rx_bits_data !== prev_rx_data))) begin
+        tx = logphy_transaction::type_id::create("tx");
+        tx.tx_valid = vif.requesterSbLaneIo_tx_valid;
+        tx.tx_data = vif.requesterSbLaneIo_tx_bits_data;
+        tx.rx_valid = vif.requesterSbLaneIo_rx_valid;
+        tx.rx_data = vif.requesterSbLaneIo_rx_bits_data;
+        tx.sbRxTxMode = vif.sbRxTxMode;
+        tx.fsm_error = vif.fsmCtrl_error;
+        tx.fsm_done = vif.fsmCtrl_done;
+        
+        item_collected_port.write(tx);
+        prev_rx_valid = vif.requesterSbLaneIo_rx_valid;
         prev_rx_data = vif.requesterSbLaneIo_rx_bits_data;
       end
 
@@ -62,6 +74,8 @@ class logphy_monitor extends uvm_monitor;
         tx = logphy_transaction::type_id::create("tx");
         tx.tx_valid = vif.requesterSbLaneIo_tx_valid;
         tx.tx_data = vif.requesterSbLaneIo_tx_bits_data;
+        tx.rx_valid = vif.requesterSbLaneIo_rx_valid;
+        tx.rx_data = vif.requesterSbLaneIo_rx_bits_data;
         tx.sbRxTxMode = vif.sbRxTxMode;
         tx.fsm_error = vif.fsmCtrl_error;
         tx.fsm_done = vif.fsmCtrl_done;

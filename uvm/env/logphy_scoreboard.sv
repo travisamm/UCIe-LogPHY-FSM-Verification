@@ -12,6 +12,7 @@ class logphy_scoreboard extends uvm_scoreboard;
   bit saw_rx_clock_pattern;
   bit saw_sbinit_done;
   bit sb_02_verified;
+  bit sb_03_verified;
   bit fsm_error_raised;
 
   function new(string name, uvm_component parent);
@@ -34,6 +35,7 @@ class logphy_scoreboard extends uvm_scoreboard;
     saw_rx_clock_pattern = 0;
     saw_sbinit_done = 0;
     sb_02_verified = 0;
+    sb_03_verified = 0;
     fsm_error_raised = 0;
 
     forever begin
@@ -47,6 +49,14 @@ class logphy_scoreboard extends uvm_scoreboard;
         if (!saw_clock_pattern) begin
            `uvm_info("SCOREBOARD", "SB-01 Verified: Detected 64-UI clock pattern on TX data", UVM_LOW)
            saw_clock_pattern = 1;
+        end
+      end else if (saw_clock_pattern && !sb_03_verified) begin
+        // If we saw the clock pattern previously, and now we see something else on TX,
+        // (either tx_valid dropped to 0 or tx_data changed to a non-clock pattern),
+        // and we had provided an RX clock pattern, it means the DUT stopped sending the pattern upon detection.
+        if (saw_rx_clock_pattern) begin
+           `uvm_info("SCOREBOARD", "SB-03 Verified: DUT stopped sending clock pattern after pattern detection", UVM_LOW)
+           sb_03_verified = 1;
         end
       end
 
@@ -82,7 +92,7 @@ class logphy_scoreboard extends uvm_scoreboard;
 
   function void check_phase(uvm_phase phase);
     // At the end, report what we collected
-    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02_verified=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
+    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02_verified=%0b, sb_03_verified=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
   endfunction
 
 endclass

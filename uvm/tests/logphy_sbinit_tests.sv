@@ -3,6 +3,7 @@
 
 // SB-01: UCIe Module must send 64-UI clock pattern (1010...) and 32-UI low on both SB data Tx
 // SB-02: UCIe Module Partner must sample incoming SB data patterns with incoming clock
+// SB-03: On pattern detection, must stop sending after completing current iteration
 class test_sbinit_sanity extends logphy_base_test;
   `uvm_component_utils(test_sbinit_sanity)
 
