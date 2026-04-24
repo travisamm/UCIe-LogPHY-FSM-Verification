@@ -14,9 +14,14 @@ class logphy_scoreboard extends uvm_scoreboard;
   bit sb_02_verified;
   bit sb_03_verified;
   bit sb_05_verified;
+  bit sb_06_verified;
   bit saw_sbinit_done_req;
   bit saw_sbinit_done_resp;
   bit sb_07_verified;
+  bit sb_08_verified;
+  bit tb_sent_out_of_reset;
+  bit tb_sent_early_done_req;
+  bit dut_sent_early_done_resp;
   bit fsm_error_raised;
 
   function new(string name, uvm_component parent);
@@ -41,9 +46,14 @@ class logphy_scoreboard extends uvm_scoreboard;
     sb_02_verified = 0;
     sb_03_verified = 0;
     sb_05_verified = 0;
+    sb_06_verified = 0;
     saw_sbinit_done_req = 0;
     saw_sbinit_done_resp = 0;
     sb_07_verified = 0;
+    sb_08_verified = 0;
+    tb_sent_out_of_reset = 0;
+    tb_sent_early_done_req = 0;
+    dut_sent_early_done_resp = 0;
     fsm_error_raised = 0;
 
     forever begin
@@ -76,7 +86,6 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // Check if RX/TX mode shifts to functional sideband (SB-05)
-      // and verify SB-02 since transitioning means DUT successfully sampled the incoming pattern
       if (saw_clock_pattern && tx.sbRxTxMode == 1) begin
          if (saw_rx_clock_pattern && !sb_02_verified) begin
             `uvm_info("SCOREBOARD", "SB-02 Verified: DUT successfully sampled incoming SB data patterns with incoming clock", UVM_LOW)
@@ -85,6 +94,34 @@ class logphy_scoreboard extends uvm_scoreboard;
          if (!sb_05_verified) begin
             `uvm_info("SCOREBOARD", "SB-05 Verified: Transitioned to functional sideband mode", UVM_LOW)
             sb_05_verified = 1;
+         end
+      end
+
+      // Track TB's Out of Reset (msgCode 0x91)
+      if (tx.rx_valid && tx.rx_data[4:0] == 5'h12 && tx.rx_data[21:14] == 8'h91) begin
+         tb_sent_out_of_reset = 1;
+      end
+
+      // SB-06 Check: Track if DUT sends {SBINIT Out of Reset} (msgCode 0x91)
+      if (tx.tx_valid && tx.tx_data[4:0] == 5'h12 && tx.tx_data[21:14] == 8'h91 && tx.tx_data[39:32] == 8'h00) begin
+         if (!sb_06_verified) begin
+            `uvm_info("SCOREBOARD", "SB-06 Verified: DUT sent {SBINIT Out of Reset} message", UVM_LOW)
+            sb_06_verified = 1;
+         end
+      end
+
+      // Track TB sending EARLY {SBINIT done req} (msgCode 0x95) on responder RX
+      if (tx.rsp_rx_valid && tx.rsp_rx_data[4:0] == 5'h12 && tx.rsp_rx_data[21:14] == 8'h95) begin
+         if (!tb_sent_out_of_reset) begin
+            tb_sent_early_done_req = 1;
+         end
+      end
+
+      // Track DUT incorrectly sending {SBINIT done resp} (msgCode 0x9A) early
+      if (tx.rsp_tx_valid && tx.rsp_tx_data[4:0] == 5'h12 && tx.rsp_tx_data[21:14] == 8'h9A) begin
+         if (tb_sent_early_done_req && !tb_sent_out_of_reset) begin
+            `uvm_error("SCOREBOARD", "SB-08 FAILED: DUT sent {SBINIT done resp} early!")
+            dut_sent_early_done_resp = 1;
          end
       end
 
@@ -117,6 +154,12 @@ class logphy_scoreboard extends uvm_scoreboard;
             `uvm_info("SCOREBOARD", "SB-07 Verified: DUT sent {SBINIT done req} and waited for {SBINIT done resp} before exiting", UVM_LOW)
             sb_07_verified = 1;
          end
+
+         if (tb_sent_early_done_req && !dut_sent_early_done_resp && !sb_08_verified) begin
+            `uvm_info("SCOREBOARD", "SB-08 Verified: DUT correctly ignored early {SBINIT done req}", UVM_LOW)
+            sb_08_verified = 1;
+         end
+
          `uvm_info("SCOREBOARD", "FSM Done: SBINIT sequence completed", UVM_LOW)
          saw_sbinit_done = 1;
       end
@@ -125,7 +168,7 @@ class logphy_scoreboard extends uvm_scoreboard;
 
   function void check_phase(uvm_phase phase);
     // At the end, report what we collected
-    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02=%0b, sb_03=%0b, sb_05=%0b, sb_07=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, sb_05_verified, sb_07_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
+    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02=%0b, sb_03=%0b, sb_05=%0b, sb_06=%0b, sb_07=%0b, sb_08=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, sb_05_verified, sb_06_verified, sb_07_verified, sb_08_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
   endfunction
 
 endclass

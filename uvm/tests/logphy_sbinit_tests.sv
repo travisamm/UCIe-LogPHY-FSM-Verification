@@ -77,6 +77,29 @@ class test_sbinit_partner_not_ready extends logphy_base_test;
   endtask
 endclass
 
+// SB-08: Module partner must ignore received {SBINIT done req} if not ready to proceed
+class test_sbinit_early_req extends logphy_base_test;
+  `uvm_component_utils(test_sbinit_early_req)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_sbinit_early_req seq;
+    phase.raise_objection(this);
+
+    `uvm_info("TEST", "Starting seq_sbinit_early_req...", UVM_LOW)
+    seq = seq_sbinit_early_req::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #10000ns;
+
+    `uvm_info("TEST", "Test seq_sbinit_early_req finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
 // SB-09: Module partner must collapse multiple outstanding {SBINIT done req} messages into single response
 class test_sbinit_multiple_reqs extends logphy_base_test;
   `uvm_component_utils(test_sbinit_multiple_reqs)
