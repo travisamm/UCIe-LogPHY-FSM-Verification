@@ -178,7 +178,54 @@ class seq_sbinit_collapse_reqs extends logphy_base_seq;
   endfunction
 
   virtual task body();
-    // Implementation placeholder for collapsing multiple reqs into one resp
+    logphy_transaction req;
+
+    // 1. Kick off FSM and drive the partner 64-UI clocks sequence
+    req = logphy_transaction::type_id::create("req");
+    start_item(req);
+    req.start_fsm = 1;
+    req.rx_valid = 1;
+    req.rx_data = 128'h00000000_00000000_55555555_55555555;
+    req.delay = 10;
+    req.hold_cycles = 5;
+    finish_item(req);
+
+    // 2. Advance requester into SBINIT done message state. Hold responder
+    // response ready low so multiple partner done reqs are outstanding.
+    req = logphy_transaction::type_id::create("req");
+    start_item(req);
+    req.start_fsm = 0;
+    req.rx_valid = 1;
+    req.rx_data = 128'h00000000_00000000_00000000_00244012;
+    req.rsp_tx_ready = 0;
+    req.delay = 20;
+    req.hold_cycles = 5;
+    finish_item(req);
+
+    // 3. Send multiple partner {SBINIT done req} messages before accepting a
+    // responder {SBINIT done resp}. The responder should collapse these.
+    repeat (3) begin
+      req = logphy_transaction::type_id::create("req");
+      start_item(req);
+      req.start_fsm = 0;
+      req.rsp_rx_valid = 1;
+      req.rsp_rx_data = 128'h00000000_00000000_00000001_00254012;
+      req.rsp_tx_ready = 0;
+      req.delay = 5;
+      req.hold_cycles = 2;
+      finish_item(req);
+    end
+
+    // 4. Release responder ready and finish the requester side.
+    req = logphy_transaction::type_id::create("req");
+    start_item(req);
+    req.start_fsm = 0;
+    req.rx_valid = 1;
+    req.rx_data = 128'h00000000_00000000_00000001_00268012;
+    req.rsp_tx_ready = 1;
+    req.delay = 20;
+    req.hold_cycles = 5;
+    finish_item(req);
   endtask
 endclass
 

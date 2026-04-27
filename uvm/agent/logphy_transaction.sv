@@ -10,6 +10,8 @@ class logphy_transaction extends uvm_sequence_item;
   rand int           hold_cycles = 1;
   rand logic [127:0] rsp_rx_data;
   rand logic         rsp_rx_valid;
+  rand logic         tx_ready = 1;
+  rand logic         rsp_tx_ready = 1;
   logic [127:0]      rsp_tx_data;
   logic              rsp_tx_valid;
 
@@ -28,6 +30,8 @@ class logphy_transaction extends uvm_sequence_item;
     `uvm_field_int(hold_cycles, UVM_ALL_ON)
     `uvm_field_int(rsp_rx_data, UVM_ALL_ON)
     `uvm_field_int(rsp_rx_valid, UVM_ALL_ON)
+    `uvm_field_int(tx_ready, UVM_ALL_ON)
+    `uvm_field_int(rsp_tx_ready, UVM_ALL_ON)
     `uvm_field_int(rsp_tx_data, UVM_ALL_ON)
     `uvm_field_int(rsp_tx_valid, UVM_ALL_ON)
     `uvm_field_int(tx_data, UVM_ALL_ON)
@@ -46,6 +50,8 @@ class logphy_transaction extends uvm_sequence_item;
     rsp_rx_data = 0;
     rsp_tx_data = 0;
     rsp_tx_valid = 0;
+    tx_ready = 1;
+    rsp_tx_ready = 1;
   endfunction
 
 endclass

@@ -36,6 +36,9 @@ class logphy_driver extends uvm_driver #(logphy_transaction);
   endtask
 
   task drive_item(logphy_transaction req);
+    vif.requesterSbLaneIo_tx_ready = req.tx_ready;
+    vif.responderSbLaneIo_tx_ready = req.rsp_tx_ready;
+
     if (req.delay > 0) begin
       vif.requesterSbLaneIo_rx_valid = 0;
       vif.responderSbLaneIo_rx_valid = 0;

@@ -19,10 +19,14 @@ class logphy_scoreboard extends uvm_scoreboard;
   bit saw_sbinit_done_resp;
   bit sb_07_verified;
   bit sb_08_verified;
+  bit sb_09_verified;
   bit tb_sent_out_of_reset;
   bit tb_sent_early_done_req;
   bit dut_sent_early_done_resp;
   bit fsm_error_raised;
+  bit prev_rsp_done_req_active;
+  int unsigned sb_09_done_req_count;
+  int unsigned sb_09_done_resp_count;
 
   localparam bit [7:0] SB_MSG_OPCODE_MSG_WITHOUT_DATA = 8'h12;
   localparam bit [7:0] SBINIT_OUT_OF_RESET_CODE = 8'h91;
@@ -83,10 +87,14 @@ class logphy_scoreboard extends uvm_scoreboard;
     saw_sbinit_done_resp = 0;
     sb_07_verified = 0;
     sb_08_verified = 0;
+    sb_09_verified = 0;
     tb_sent_out_of_reset = 0;
     tb_sent_early_done_req = 0;
     dut_sent_early_done_resp = 0;
     fsm_error_raised = 0;
+    prev_rsp_done_req_active = 0;
+    sb_09_done_req_count = 0;
+    sb_09_done_resp_count = 0;
 
     forever begin
       item_collected_fifo.get(tx);
@@ -152,6 +160,17 @@ class logphy_scoreboard extends uvm_scoreboard;
          end
       end
 
+      if (tb_sent_out_of_reset &&
+          tx.rsp_rx_valid &&
+          is_sb_msg(tx.rsp_rx_data, SBINIT_DONE_REQ_CODE, SBINIT_DONE_SUBCODE) &&
+          !prev_rsp_done_req_active) begin
+         sb_09_done_req_count++;
+         `uvm_info("SCOREBOARD", $sformatf("SB-09 Track: TB sent responder {SBINIT done req} count=%0d", sb_09_done_req_count), UVM_LOW)
+      end
+      prev_rsp_done_req_active = tb_sent_out_of_reset &&
+                                 tx.rsp_rx_valid &&
+                                 is_sb_msg(tx.rsp_rx_data, SBINIT_DONE_REQ_CODE, SBINIT_DONE_SUBCODE);
+
       // Track DUT incorrectly sending {SBINIT done resp} (msgCode 0x9A) early
       if (tx.rsp_tx_valid &&
           is_sb_msg(tx.rsp_tx_data, SBINIT_DONE_RESP_CODE, SBINIT_DONE_SUBCODE)) begin
@@ -159,6 +178,13 @@ class logphy_scoreboard extends uvm_scoreboard;
             `uvm_error("SCOREBOARD", "SB-08 FAILED: DUT sent {SBINIT done resp} early!")
             dut_sent_early_done_resp = 1;
          end
+      end
+
+      if (sb_09_done_req_count > 1 &&
+          tx.rsp_tx_valid && tx.rsp_tx_ready &&
+          is_sb_msg(tx.rsp_tx_data, SBINIT_DONE_RESP_CODE, SBINIT_DONE_SUBCODE)) begin
+         sb_09_done_resp_count++;
+         `uvm_info("SCOREBOARD", $sformatf("SB-09 Track: DUT accepted responder {SBINIT done resp} count=%0d", sb_09_done_resp_count), UVM_LOW)
       end
 
       // SB-07 Check: Track if we saw done req from DUT
@@ -204,7 +230,18 @@ class logphy_scoreboard extends uvm_scoreboard;
 
   function void check_phase(uvm_phase phase);
     // At the end, report what we collected
-    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02=%0b, sb_03=%0b, sb_05=%0b, sb_06=%0b, sb_07=%0b, sb_08=%0b, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, sb_05_verified, sb_06_verified, sb_07_verified, sb_08_verified, saw_sbinit_done, fsm_error_raised), UVM_LOW)
+    if (sb_09_done_req_count > 1) begin
+      if (!saw_sbinit_done) begin
+        `uvm_error("SCOREBOARD", "SB-09 FAILED: FSM did not complete after multiple responder {SBINIT done req} messages")
+      end else if (sb_09_done_resp_count == 1) begin
+        `uvm_info("SCOREBOARD", "SB-09 Verified: DUT collapsed multiple {SBINIT done req} messages into one {SBINIT done resp}", UVM_LOW)
+        sb_09_verified = 1;
+      end else begin
+        `uvm_error("SCOREBOARD", $sformatf("SB-09 FAILED: saw %0d responder done reqs and %0d accepted done resps", sb_09_done_req_count, sb_09_done_resp_count))
+      end
+    end
+
+    `uvm_info("SCOREBOARD", $sformatf("Final stats: saw_clock_pattern=%0b, sb_02=%0b, sb_03=%0b, sb_05=%0b, sb_06=%0b, sb_07=%0b, sb_08=%0b, sb_09=%0b, sb_09_req_count=%0d, sb_09_resp_count=%0d, fsm_done=%0b, error=%0b", saw_clock_pattern, sb_02_verified, sb_03_verified, sb_05_verified, sb_06_verified, sb_07_verified, sb_08_verified, sb_09_verified, sb_09_done_req_count, sb_09_done_resp_count, saw_sbinit_done, fsm_error_raised), UVM_LOW)
   endfunction
 
 endclass

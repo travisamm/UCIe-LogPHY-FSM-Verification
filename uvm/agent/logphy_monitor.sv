@@ -28,6 +28,8 @@ class logphy_monitor extends uvm_monitor;
     logic         prev_rx_valid;
     logic         prev_rsp_rx_valid;
     logic         prev_rsp_tx_valid;
+    logic         prev_tx_ready;
+    logic         prev_rsp_tx_ready;
     
     // Initialize
     prev_tx_data = 128'h0;
@@ -38,6 +40,8 @@ class logphy_monitor extends uvm_monitor;
     prev_rx_valid = 0;
     prev_rsp_rx_valid = 0;
     prev_rsp_tx_valid = 0;
+    prev_tx_ready = 0;
+    prev_rsp_tx_ready = 0;
 
     forever begin
       @(posedge vif.clock);
@@ -51,17 +55,22 @@ class logphy_monitor extends uvm_monitor;
           (vif.responderSbLaneIo_rx_valid && (vif.responderSbLaneIo_rx_bits_data !== prev_rsp_rx_data)) ||
           (vif.responderSbLaneIo_tx_valid !== prev_rsp_tx_valid) || 
           (vif.responderSbLaneIo_tx_valid && (vif.responderSbLaneIo_tx_bits_data !== prev_rsp_tx_data)) ||
+          (vif.requesterSbLaneIo_tx_ready !== prev_tx_ready) ||
+          (vif.responderSbLaneIo_tx_ready !== prev_rsp_tx_ready) ||
+          (vif.responderSbLaneIo_tx_valid && vif.responderSbLaneIo_tx_ready) ||
           vif.fsmCtrl_error || vif.fsmCtrl_done) begin
 
         tx = logphy_transaction::type_id::create("tx");
         tx.tx_valid = vif.requesterSbLaneIo_tx_valid;
         tx.tx_data = vif.requesterSbLaneIo_tx_bits_data;
+        tx.tx_ready = vif.requesterSbLaneIo_tx_ready;
         tx.rx_valid = vif.requesterSbLaneIo_rx_valid;
         tx.rx_data = vif.requesterSbLaneIo_rx_bits_data;
         tx.rsp_rx_valid = vif.responderSbLaneIo_rx_valid;
         tx.rsp_rx_data = vif.responderSbLaneIo_rx_bits_data;
         tx.rsp_tx_valid = vif.responderSbLaneIo_tx_valid;
         tx.rsp_tx_data = vif.responderSbLaneIo_tx_bits_data;
+        tx.rsp_tx_ready = vif.responderSbLaneIo_tx_ready;
         tx.sbRxTxMode = vif.sbRxTxMode;
         tx.fsm_error = vif.fsmCtrl_error;
         tx.fsm_done = vif.fsmCtrl_done;
@@ -75,6 +84,8 @@ class logphy_monitor extends uvm_monitor;
         prev_rsp_rx_data = vif.responderSbLaneIo_rx_bits_data;
         prev_rsp_tx_valid = vif.responderSbLaneIo_tx_valid;
         prev_rsp_tx_data = vif.responderSbLaneIo_tx_bits_data;
+        prev_tx_ready = vif.requesterSbLaneIo_tx_ready;
+        prev_rsp_tx_ready = vif.responderSbLaneIo_tx_ready;
       end
     end
   endtask
