@@ -396,4 +396,3 @@ class RxD2CEyeWidthSweepResponder(afeParams: AfeParams, sbParams: SidebandParams
     }
   }
 }
-
