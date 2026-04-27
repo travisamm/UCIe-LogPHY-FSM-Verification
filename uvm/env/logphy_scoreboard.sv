@@ -24,8 +24,40 @@ class logphy_scoreboard extends uvm_scoreboard;
   bit dut_sent_early_done_resp;
   bit fsm_error_raised;
 
+  localparam bit [7:0] SB_MSG_OPCODE_MSG_WITHOUT_DATA = 8'h12;
+  localparam bit [7:0] SBINIT_OUT_OF_RESET_CODE = 8'h91;
+  localparam bit [7:0] SBINIT_DONE_REQ_CODE = 8'h95;
+  localparam bit [7:0] SBINIT_DONE_RESP_CODE = 8'h9A;
+  localparam bit [7:0] SBINIT_OUT_OF_RESET_SUBCODE = 8'h00;
+  localparam bit [7:0] SBINIT_DONE_SUBCODE = 8'h01;
+
   function new(string name, uvm_component parent);
     super.new(name, parent);
+  endfunction
+
+  // The Chisel compare path consumes the spec field slices, while SBMsgCreate
+  // currently emits an 8-bit opcode layout because VecInit widens the opcode.
+  function bit is_sb_msg_compare_layout(logic [127:0] data,
+                                        bit [7:0] msg_code,
+                                        bit [7:0] msg_subcode);
+    return data[4:0] == SB_MSG_OPCODE_MSG_WITHOUT_DATA[4:0] &&
+           data[21:14] == msg_code &&
+           data[39:32] == msg_subcode;
+  endfunction
+
+  function bit is_sb_msg_create_layout(logic [127:0] data,
+                                       bit [7:0] msg_code,
+                                       bit [7:0] msg_subcode);
+    return data[7:0] == SB_MSG_OPCODE_MSG_WITHOUT_DATA &&
+           data[24:17] == msg_code &&
+           data[42:35] == msg_subcode;
+  endfunction
+
+  function bit is_sb_msg(logic [127:0] data,
+                         bit [7:0] msg_code,
+                         bit [7:0] msg_subcode);
+    return is_sb_msg_compare_layout(data, msg_code, msg_subcode) ||
+           is_sb_msg_create_layout(data, msg_code, msg_subcode);
   endfunction
 
   function void build_phase(uvm_phase phase);
@@ -98,12 +130,14 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // Track TB's Out of Reset (msgCode 0x91)
-      if (tx.rx_valid && tx.rx_data[4:0] == 5'h12 && tx.rx_data[21:14] == 8'h91) begin
+      if (tx.rx_valid &&
+          is_sb_msg(tx.rx_data, SBINIT_OUT_OF_RESET_CODE, SBINIT_OUT_OF_RESET_SUBCODE)) begin
          tb_sent_out_of_reset = 1;
       end
 
       // SB-06 Check: Track if DUT sends {SBINIT Out of Reset} (msgCode 0x91)
-      if (tx.tx_valid && tx.tx_data[4:0] == 5'h12 && tx.tx_data[21:14] == 8'h91 && tx.tx_data[39:32] == 8'h00) begin
+      if (tx.tx_valid &&
+          is_sb_msg(tx.tx_data, SBINIT_OUT_OF_RESET_CODE, SBINIT_OUT_OF_RESET_SUBCODE)) begin
          if (!sb_06_verified) begin
             `uvm_info("SCOREBOARD", "SB-06 Verified: DUT sent {SBINIT Out of Reset} message", UVM_LOW)
             sb_06_verified = 1;
@@ -111,14 +145,16 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // Track TB sending EARLY {SBINIT done req} (msgCode 0x95) on responder RX
-      if (tx.rsp_rx_valid && tx.rsp_rx_data[4:0] == 5'h12 && tx.rsp_rx_data[21:14] == 8'h95) begin
+      if (tx.rsp_rx_valid &&
+          is_sb_msg(tx.rsp_rx_data, SBINIT_DONE_REQ_CODE, SBINIT_DONE_SUBCODE)) begin
          if (!tb_sent_out_of_reset) begin
             tb_sent_early_done_req = 1;
          end
       end
 
       // Track DUT incorrectly sending {SBINIT done resp} (msgCode 0x9A) early
-      if (tx.rsp_tx_valid && tx.rsp_tx_data[4:0] == 5'h12 && tx.rsp_tx_data[21:14] == 8'h9A) begin
+      if (tx.rsp_tx_valid &&
+          is_sb_msg(tx.rsp_tx_data, SBINIT_DONE_RESP_CODE, SBINIT_DONE_SUBCODE)) begin
          if (tb_sent_early_done_req && !tb_sent_out_of_reset) begin
             `uvm_error("SCOREBOARD", "SB-08 FAILED: DUT sent {SBINIT done resp} early!")
             dut_sent_early_done_resp = 1;
@@ -126,8 +162,8 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // SB-07 Check: Track if we saw done req from DUT
-      // Check opcode=5'h12, msgCode=8'h95, msgSubcode=8'h01
-      if (tx.tx_valid && tx.tx_data[4:0] == 5'h12 && tx.tx_data[21:14] == 8'h95 && tx.tx_data[39:32] == 8'h01) begin
+      if (tx.tx_valid &&
+          is_sb_msg(tx.tx_data, SBINIT_DONE_REQ_CODE, SBINIT_DONE_SUBCODE)) begin
          if (!saw_sbinit_done_req) begin
             `uvm_info("SCOREBOARD", "SB-07 Partial: DUT sent {SBINIT done req}", UVM_LOW)
             saw_sbinit_done_req = 1;
@@ -135,8 +171,8 @@ class logphy_scoreboard extends uvm_scoreboard;
       end
 
       // SB-07 Check: Track if TB sent done resp
-      // Check opcode=5'h12, msgCode=8'h9A, msgSubcode=8'h01
-      if (tx.rx_valid && tx.rx_data[4:0] == 5'h12 && tx.rx_data[21:14] == 8'h9A && tx.rx_data[39:32] == 8'h01) begin
+      if (tx.rx_valid &&
+          is_sb_msg(tx.rx_data, SBINIT_DONE_RESP_CODE, SBINIT_DONE_SUBCODE)) begin
          if (!saw_sbinit_done_resp) begin
             `uvm_info("SCOREBOARD", "SB-07 Partial: TB sent {SBINIT done resp}", UVM_LOW)
             saw_sbinit_done_resp = 1;
