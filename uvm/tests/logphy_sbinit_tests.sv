@@ -1,6 +1,16 @@
 `ifndef LOGPHY_SBINIT_TESTS_SV
 `define LOGPHY_SBINIT_TESTS_SV
 
+/*
+RUN SBINIT:
+make sbinit                                         # default: test_sbinit_sanity (SB-01, SB-02, SB-03, SB-05, SB-07)
+make sbinit SBTEST=test_sbinit_timeout              # runs SB-04 (timeout to TRAINERROR if no pattern detected)
+make sbinit SBTEST=test_sbinit_partner_not_ready    # runs SB-06 (sends {SBINIT Out of Reset} until partner ready)
+make sbinit SBTEST=test_sbinit_early_req            # runs SB-08 (sends {SBINIT done req} early and expects it to be ignored)
+make sbinit SBTEST=test_sbinit_multiple_reqs        # runs SB-09 (sends multiple {SBINIT done req} and expects single response)
+make sbinit_regress                                 # runs all SBINIT tests in sequence (will not stop on failure, but will report all results at end)
+*/
+
 // SB-01: UCIe Module must send 64-UI clock pattern (1010...) and 32-UI low on both SB data Tx
 // SB-02: UCIe Module Partner must sample incoming SB data patterns with incoming clock
 // SB-03: On pattern detection, must stop sending after completing current iteration
