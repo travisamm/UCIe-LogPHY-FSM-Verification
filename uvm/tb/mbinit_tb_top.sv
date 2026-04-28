@@ -1,5 +1,17 @@
 `timescale 1ns/1ps
+/*
+Run MBINIT:
+make mbinit                                  # default: test_mbinit_sanity
+make mbinit MBTEST=test_mbinit_sanity
+make mbinit MBTEST=test_mbinit_param_mismatch
+make mbinit MBTEST=test_mbinit_param_only
+make mbinit_regress                          # runs all three above
 
+Run MBTRAIN:
+make mbtrain                                 # default: mbtrain_base_test
+make mbtrain MBTRAINTEST=mbtrain_base_test
+make mbtrain_regress                       # runs mbtrain_base_test and mbtrain_timeout_test
+*/
 module mbinit_tb_top;
   import uvm_pkg::*;
   import mbinit_env_pkg::*;
