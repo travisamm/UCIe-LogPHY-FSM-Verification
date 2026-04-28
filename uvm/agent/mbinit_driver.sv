@@ -31,10 +31,10 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
     vif.mbInitCalDone                  = 0;
     vif.requesterSbLaneIo_rx_valid     = 0;
     vif.requesterSbLaneIo_rx_bits_data = 0;
-    vif.requesterSbLaneIo_tx_ready     = 1;
+    vif.requesterSbLaneIo_tx_ready     = 0;
     vif.responderSbLaneIo_rx_valid     = 0;
     vif.responderSbLaneIo_rx_bits_data = 0;
-    vif.responderSbLaneIo_tx_ready     = 1;
+    vif.responderSbLaneIo_tx_ready     = 0;
     vif.patternWriterIo_req_ready      = 1;
     vif.patternWriterIo_resp_complete  = 0;
     vif.patternReaderIo_req_ready      = 1;
@@ -54,6 +54,14 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
         seq_item_port.get_next_item(req);
         drive_item(req);
         seq_item_port.item_done();
+      end
+
+      // Drive ready as a response to valid so the testbench does not consume a
+      // DUT sideband exchange before the DUT has presented a message.
+      forever begin
+        @(posedge vif.clock);
+        vif.requesterSbLaneIo_tx_ready <= vif.requesterSbLaneIo_tx_valid;
+        vif.responderSbLaneIo_tx_ready <= vif.responderSbLaneIo_tx_valid;
       end
 
       // Auto-stub: Cal — pulse mbInitCalDone when DUT asserts mbInitCalStart
