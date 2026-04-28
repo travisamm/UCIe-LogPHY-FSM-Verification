@@ -5,6 +5,8 @@
 `define MB_OP(d)   d[4:0]
 `define MB_MC(d)   d[21:14]
 `define MB_SC(d)   d[39:32]
+`define MB_SHIFTED_MC(d) d[24:17]
+`define MB_SHIFTED_SC(d) d[42:35]
 
 // Opcodes
 `define MB_OP_NODATA 5'h12
@@ -50,6 +52,8 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit saw_rsp_tx;          // Any responder sideband TX
   bit saw_bad_req_tx;      // Requester TX did not match expected SB fields
   bit saw_bad_rsp_tx;      // Responder TX did not match expected SB fields
+  bit saw_shifted_req_tx;  // TX fields match the known generated shifted layout
+  bit saw_shifted_rsp_tx;  // TX fields match the known generated shifted layout
   bit saw_param_req_tx;    // MP-01: DUT requester sent PARAM_CFG_REQ
   bit saw_param_resp_tx;   // MP-01: DUT responder sent PARAM_CFG_RESP
   bit mp_02_verified;      // MP-02: negotiated max common data rate observed
@@ -237,9 +241,18 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
     if (!decoded && !saw_bad_req_tx) begin
       saw_bad_req_tx = 1;
+      if ((`MB_OP(d) == `MB_OP_64DATA || `MB_OP(d) == `MB_OP_NODATA) &&
+          `MB_SHIFTED_MC(d) == `MB_MC_REQ) begin
+        saw_shifted_req_tx = 1;
+        `uvm_error("MB_SB", $sformatf(
+          "Requester TX appears to use shifted sideband fields: data=%032h op[4:0]=%02h msgCode[24:17]=%02h msgSubcode[42:35]=%02h; UCIe fields are msgCode[21:14]/msgSubcode[39:32]",
+          d, `MB_OP(d), `MB_SHIFTED_MC(d), `MB_SHIFTED_SC(d)))
+      end
+      else begin
       `uvm_error("MB_SB", $sformatf(
         "Requester TX has invalid MBINIT sideband fields: data=%032h op=%02h msgCode=%02h msgSubcode=%02h",
         d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+      end
     end
   endfunction
 
@@ -298,9 +311,18 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
     if (!decoded && !saw_bad_rsp_tx) begin
       saw_bad_rsp_tx = 1;
+      if ((`MB_OP(d) == `MB_OP_64DATA || `MB_OP(d) == `MB_OP_NODATA) &&
+          `MB_SHIFTED_MC(d) == `MB_MC_RESP) begin
+        saw_shifted_rsp_tx = 1;
+        `uvm_error("MB_SB", $sformatf(
+          "Responder TX appears to use shifted sideband fields: data=%032h op[4:0]=%02h msgCode[24:17]=%02h msgSubcode[42:35]=%02h; UCIe fields are msgCode[21:14]/msgSubcode[39:32]",
+          d, `MB_OP(d), `MB_SHIFTED_MC(d), `MB_SHIFTED_SC(d)))
+      end
+      else begin
       `uvm_error("MB_SB", $sformatf(
         "Responder TX has invalid MBINIT sideband fields: data=%032h op=%02h msgCode=%02h msgSubcode=%02h",
         d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+      end
     end
   endfunction
 
@@ -315,6 +337,12 @@ class mbinit_scoreboard extends uvm_scoreboard;
       `uvm_error("MB_SB","No requester sideband TX was observed")
     if (expect_param_messages && !saw_rsp_tx)
       `uvm_error("MB_SB","No responder sideband TX was observed")
+
+    if (saw_shifted_req_tx || saw_shifted_rsp_tx) begin
+      `uvm_error("MB_SB",
+        "Root cause: DUT-generated sideband messages are not encoded at the UCIe field positions used by SBMsgCompare and the verification plan. Skipping downstream MBINIT phase checks.")
+      return;
+    end
 
     if (expect_param_messages) begin
       if (!saw_param_req_tx)
