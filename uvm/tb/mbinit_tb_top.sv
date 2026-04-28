@@ -16,6 +16,7 @@ module mbinit_tb_top;
   import uvm_pkg::*;
   import mbinit_env_pkg::*;
   import mbinit_seq_pkg::*;
+  import mbinit_test_pkg::*;
 
   logic clock;
   logic reset;
