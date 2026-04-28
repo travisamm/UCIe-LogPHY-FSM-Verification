@@ -1,9 +1,11 @@
 package edu.berkeley.cs.uciedigital.d2dadapter
 
 import chisel3._
+import circt.stage.ChiselStage
 import chisel3.util._
 import edu.berkeley.cs.uciedigital.sideband._
 import edu.berkeley.cs.uciedigital.interfaces._
+
 
 class D2DAdapterIO (val fdiParams: FdiParams, val rdiParams: RdiParams) extends Bundle {
     val fdi = Flipped(new Fdi(fdiParams))
@@ -23,6 +25,9 @@ class D2DAdapter(val fdiParams: FdiParams, val rdiParams: RdiParams,
 
     val d2dSideband = Module(new D2DSidebandModule(fdiParams, sbParams))
     val d2dMainband = Module(new D2DMainbandModule(fdiParams, rdiParams, sbParams))
+
+    io.fdi.lclk := DontCare
+    io.rdi.lclk := DontCare
 
     // Default protocol-facing status outputs derived from RDI.
     io.fdi.plSpeedmode := io.rdi.plSpeedmode
@@ -103,4 +108,19 @@ class D2DAdapter(val fdiParams: FdiParams, val rdiParams: RdiParams,
     d2dMainband.io.rdi.plValid := io.rdi.plValid
     d2dMainband.io.rdi.plData := io.rdi.plData
 
+}
+
+
+object MainD2DAdapter extends App {
+  ChiselStage.emitSystemVerilogFile(
+    new D2DAdapter(new FdiParams(64, 32), new RdiParams(), new SidebandParams()),
+    args = Array("-td", "./generatedVerilog/logphy"),
+    firtoolOpts = Array(
+      "-O=debug",
+      "-g",
+      "--disable-all-randomization",
+      "--strip-debug-info",
+      "--lowering-options=disallowLocalVariables"
+    ),
+  )
 }
