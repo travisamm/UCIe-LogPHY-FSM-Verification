@@ -1,6 +1,7 @@
 package edu.berkeley.cs.uciedigital.d2dadapter
 
 import chisel3._
+import chisel3.util._
 import edu.berkeley.cs.uciedigital.sideband._
 import edu.berkeley.cs.uciedigital.interfaces._
 
@@ -13,8 +14,8 @@ class D2DAdapter(val fdiParams: FdiParams, val rdiParams: RdiParams,
                  val sbParams: SidebandParams) extends Module {
     val io = IO(new D2DAdapterIO(fdiParams, rdiParams))
 
-    assert(fdiParams.width == rdiParams.nBytes)
-    assert(fdiParams.sbWidth == rdiParams.ncWidth)
+    assert(fdiParams.nBytes == rdiParams.nBytes)
+    assert(fdiParams.ncWidth == rdiParams.ncWidth)
 
     val linkManager = Module(new AdapterSM(fdiParams, rdiParams, sbParams))
     val fdiStallHandler = Module(new FDIStallHandler())
@@ -90,7 +91,7 @@ class D2DAdapter(val fdiParams: FdiParams, val rdiParams: RdiParams,
 
     d2dMainband.io.fdi.lpIrdy := io.fdi.lpIrdy
     d2dMainband.io.fdi.lpValid := io.fdi.lpValid
-    d2dMainband.io.fdi.lpData := io.fdi.lpData.asBits
+    d2dMainband.io.fdi.lpData := io.fdi.lpData
     io.fdi.plTrdy := d2dMainband.io.fdi.plTrdy
     io.fdi.plValid := d2dMainband.io.fdi.plValid
     io.fdi.plData := d2dMainband.io.fdi.plData.asUInt
@@ -100,6 +101,6 @@ class D2DAdapter(val fdiParams: FdiParams, val rdiParams: RdiParams,
     io.rdi.lpData := d2dMainband.io.rdi.lpData.asUInt
     d2dMainband.io.rdi.plTrdy := io.rdi.plTrdy
     d2dMainband.io.rdi.plValid := io.rdi.plValid
-    d2dMainband.io.rdi.plData := io.rdi.plData.asBits
+    d2dMainband.io.rdi.plData := io.rdi.plData
 
 }

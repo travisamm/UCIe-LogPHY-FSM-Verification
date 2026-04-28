@@ -1,6 +1,7 @@
 package edu.berkeley.cs.uciedigital.d2dadapter
 
 import chisel3._
+import chisel3.util._
 import edu.berkeley.cs.uciedigital.interfaces._
 import edu.berkeley.cs.uciedigital.sideband._
 
@@ -42,17 +43,17 @@ class D2DMainbandModule(
       // Protocol -> Adapter path.
       val lpIrdy = Input(Bool())
       val lpValid = Input(Bool())
-      val lpData = Input(Bits((8 * fdiParams.width).W))
+      val lpData = Input(Bits((8 * fdiParams.nBytes).W))
       val plTrdy = Output(Bool())
 
       // Adapter -> Protocol path.
       val plValid = Output(Bool())
-      val plData = Output(Bits((8 * fdiParams.width).W))
+      val plData = Output(Bits((8 * fdiParams.nBytes).W))
     }
   })
 
   // Base TX buffer: Protocol -> Adapter -> Physical
-  val dataBuffSntReg = Reg(Bits((8 * fdiParams.width).W))
+  val dataBuffSntReg = Reg(Bits((8 * fdiParams.nBytes).W))
   val dataBuffSntFillReg = RegInit(false.B)
   val dataBuffRcvReg = Reg(Bits((8 * rdiParams.nBytes).W))
   val dataBuffRcvFillReg = RegInit(false.B)

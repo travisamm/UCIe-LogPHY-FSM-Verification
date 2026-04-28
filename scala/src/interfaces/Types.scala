@@ -24,16 +24,6 @@ object LinkWidth extends ChiselEnum {
   val x256 = Value("b110".U(3.W))
 }
 
-object LinkWidth extends ChiselEnum {
-  val x4 = Value("b000".U(3.W))
-  val x8 = Value("b001".U(3.W))
-  val x16 = Value("b010".U(3.W))
-  val x32 = Value("b011".U(3.W))
-  val x64 = Value("b100".U(3.W))
-  val x128 = Value("b101".U(3.W))
-  val x256 = Value("b110".U(3.W))
-}
-
 object RDIState extends ChiselEnum {
   val reset = Value("b0000".U(4.W))
   val active = Value("b0001".U(4.W))
