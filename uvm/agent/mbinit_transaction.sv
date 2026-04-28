@@ -9,7 +9,6 @@
 //   rsp_tx_valid / rsp_tx_data → observed responder SB TX
 //   fsm_done, fsm_error
 class mbinit_transaction extends logphy_transaction;
-  `uvm_object_utils(mbinit_transaction)
 
   // --- Additional MBINIT stimulus ---
   // Local PHY settings
