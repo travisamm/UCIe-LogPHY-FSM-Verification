@@ -25,4 +25,5 @@
 ./agent/mbinit_agent_pkg.sv
 ./env/mbinit_env_pkg.sv
 ./seq/mbinit_seq_pkg.sv
+./tests/mbinit_test_pkg.sv
 ./tb/mbinit_tb_top.sv
