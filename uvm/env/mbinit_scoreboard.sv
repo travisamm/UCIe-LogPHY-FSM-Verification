@@ -46,6 +46,10 @@ class mbinit_scoreboard extends uvm_scoreboard;
   uvm_tlm_analysis_fifo #(mbinit_transaction) item_collected_fifo;
 
   // ---- PARAM (MP-01..04, MP-06) ----
+  bit saw_req_tx;          // Any requester sideband TX
+  bit saw_rsp_tx;          // Any responder sideband TX
+  bit saw_bad_req_tx;      // Requester TX did not match expected SB fields
+  bit saw_bad_rsp_tx;      // Responder TX did not match expected SB fields
   bit saw_param_req_tx;    // MP-01: DUT requester sent PARAM_CFG_REQ
   bit saw_param_resp_tx;   // MP-01: DUT responder sent PARAM_CFG_RESP
   bit mp_02_verified;      // MP-02: negotiated max common data rate observed
@@ -127,9 +131,15 @@ class mbinit_scoreboard extends uvm_scoreboard;
       item_collected_fifo.get(tx);
 
       // Requester TX (DUT → remote)
-      if (tx.tx_valid)     decode_req_tx(tx.tx_data);
+      if (tx.tx_valid) begin
+        saw_req_tx = 1;
+        decode_req_tx(tx.tx_data);
+      end
       // Responder TX (DUT → remote)
-      if (tx.rsp_tx_valid) decode_rsp_tx(tx.rsp_tx_data);
+      if (tx.rsp_tx_valid) begin
+        saw_rsp_tx = 1;
+        decode_rsp_tx(tx.rsp_tx_data);
+      end
 
       if (tx.currentState == MB_STATE_CAL)
         saw_state_cal = 1;
@@ -173,13 +183,18 @@ class mbinit_scoreboard extends uvm_scoreboard;
   endtask
 
   function void decode_req_tx(logic [127:0] d);
+    bit decoded;
+    decoded = 0;
+
     // PARAM_CFG_REQ (opcode=0x1B, MC=REQ, SC=0x00)
     if (`MB_OP(d)==`MB_OP_64DATA && `MB_MC(d)==`MB_MC_REQ && `MB_SC(d)==`MB_SC_PARAM) begin
+      decoded = 1;
       if (!saw_param_req_tx) begin
         `uvm_info("MB_SB","MP-01: DUT req sent PARAM_CFG_REQ",UVM_LOW)
         saw_param_req_tx = 1; end
     end
     if (`MB_OP(d)==`MB_OP_NODATA && `MB_MC(d)==`MB_MC_REQ) begin
+      decoded = 1;
       case (`MB_SC(d))
         `MB_SC_CAL: if (!saw_cal_req_tx) begin
           `uvm_info("MB_SB","MC-01: DUT req sent CAL_DONE_REQ",UVM_LOW)
@@ -219,16 +234,28 @@ class mbinit_scoreboard extends uvm_scoreboard;
           saw_rm_end_req_tx=1; end
       endcase
     end
+
+    if (!decoded && !saw_bad_req_tx) begin
+      saw_bad_req_tx = 1;
+      `uvm_error("MB_SB", $sformatf(
+        "Requester TX has invalid MBINIT sideband fields: data=%032h op=%02h msgCode=%02h msgSubcode=%02h",
+        d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+    end
   endfunction
 
   function void decode_rsp_tx(logic [127:0] d);
+    bit decoded;
+    decoded = 0;
+
     // PARAM_CFG_RESP
     if (`MB_OP(d)==`MB_OP_64DATA && `MB_MC(d)==`MB_MC_RESP && `MB_SC(d)==`MB_SC_PARAM) begin
+      decoded = 1;
       if (!saw_param_resp_tx) begin
         `uvm_info("MB_SB","MP-01: DUT rsp sent PARAM_CFG_RESP",UVM_LOW)
         saw_param_resp_tx=1; end
     end
     if (`MB_OP(d)==`MB_OP_NODATA && `MB_MC(d)==`MB_MC_RESP) begin
+      decoded = 1;
       case (`MB_SC(d))
         `MB_SC_CAL: if (!saw_cal_resp_tx) begin
           `uvm_info("MB_SB","MC-02: DUT rsp sent CAL_DONE_RESP",UVM_LOW)
@@ -268,13 +295,26 @@ class mbinit_scoreboard extends uvm_scoreboard;
           saw_rm_end_resp_tx=1; end
       endcase
     end
+
+    if (!decoded && !saw_bad_rsp_tx) begin
+      saw_bad_rsp_tx = 1;
+      `uvm_error("MB_SB", $sformatf(
+        "Responder TX has invalid MBINIT sideband fields: data=%032h op=%02h msgCode=%02h msgSubcode=%02h",
+        d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+    end
   endfunction
 
   function void check_phase(uvm_phase phase);
     `uvm_info("MB_SB", $sformatf(
-      "Summary: param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b",
+      "Summary: req_tx=%0b rsp_tx=%0b bad_req=%0b bad_rsp=%0b param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b",
+      saw_req_tx, saw_rsp_tx, saw_bad_req_tx, saw_bad_rsp_tx,
       saw_param_req_tx, saw_param_resp_tx, mp_02_verified, mp_03_verified,
       saw_cal_req_tx, saw_fsm_done, saw_fsm_error), UVM_LOW)
+
+    if (expect_param_messages && !saw_req_tx)
+      `uvm_error("MB_SB","No requester sideband TX was observed")
+    if (expect_param_messages && !saw_rsp_tx)
+      `uvm_error("MB_SB","No responder sideband TX was observed")
 
     if (expect_param_messages) begin
       if (!saw_param_req_tx)
