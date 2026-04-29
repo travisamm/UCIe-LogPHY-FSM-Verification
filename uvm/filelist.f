@@ -18,6 +18,7 @@
 ./tb/logphy_tb_top.sv
 
 # ---- MBINIT UVM ----
+# (separate target — not included in combined build yet)
 ../elab/generatedVerilog/logphy/MBInitSM.sv
 ../elab/generatedVerilog/logphy/MBInitRequester.sv
 ../elab/generatedVerilog/logphy/MBInitResponder.sv
@@ -27,3 +28,12 @@
 ./seq/mbinit_seq_pkg.sv
 ./tests/mbinit_test_pkg.sv
 ./tb/mbinit_tb_top.sv
+
+# ---- MBTRAIN UVM ----
+../elab/generatedVerilog/logphy/MBTrainSM.sv
+./if/mbtrain_if.sv
+./agent/mbtrain_agent_pkg.sv
+./env/mbtrain_env_pkg.sv
+./seq/mbtrain_seq_pkg.sv
+./tests/mbtrain_test_pkg.sv
+./tb/mbtrain_tb_top.sv
