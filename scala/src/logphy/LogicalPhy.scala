@@ -40,7 +40,6 @@ class LogicalPhyStatusIO extends Bundle {
   val ltState = Output(LTState())
   val currentState = Output(LTSMState())
   val trainingTimedout = Output(Bool())
-  val doLaneReversal = Output(Bool())
   val negotiatedPhyParamSettings = Valid(new PHYParamExchangeIO())
   val sideband = new LogicalPhySidebandStatusIO()
 }
@@ -59,7 +58,7 @@ class LogicalPhyAnalogIO(afeParams: AfeParams, sbParams: SidebandParams) extends
 class LogicalPhy(
   afeParams: AfeParams = new AfeParams(),
   sbParams: SidebandParams = new SidebandParams(),
-  rdiParams: RdiParams = new RdiParams(),
+  rdiParams: RdiParams = RdiParams(64, 32),
   retryW: Int = 10,
   desTimeoutCycles: Int = 512,
   queueDepths: SidebandPriorityQueueDepths = SidebandPriorityQueueDepths()
@@ -108,7 +107,6 @@ class LogicalPhy(
   io.status.ltState := ltsm.io.ltState
   io.status.currentState := ltsm.io.currentState
   io.status.trainingTimedout := ltsm.io.trainingTimedout
-  io.status.doLaneReversal := ltsm.io.doLaneReversal
   io.status.negotiatedPhyParamSettings := ltsm.io.negotiatedPhyParamSettings
 
   phyLaneTrainer.io.phyTrainIo <> ltsm.io.phyTrainIo
@@ -294,7 +292,7 @@ class LogicalPhy(
   dontTouch(rdiController.io.ungateClocks)
 
   // ============================================================================================
-  // Shared TX/RX LFSRs
+  // Scramblers/Descrambler
   // ============================================================================================
   patternWriter.io.txLfsrCtrl.pattern := scrambler.io.lfsrOutput
   patternReader.io.rxLfsrCtrl.pattern := descrambler.io.lfsrOutput
@@ -357,6 +355,8 @@ class LogicalPhy(
     )
   }
 
+  val txLaneReversalEnabled = ltsm.io.doLaneReversal
+
   val descrambledRxBits = Wire(new MainbandLanes(afeParams.mbLanes, afeParams.mbSerializerRatio))
   descrambledRxBits := io.analog.mainband.rx.bits
   for (lane <- 0 until afeParams.mbLanes) {
@@ -372,8 +372,8 @@ class LogicalPhy(
 
   rdiController.io.validFramingError := mainbandLaneController.io.ctrl.validFramingError
 
-  // In Streaming RAW mode, framing corruption in ACTIVE is surfaced on pl_error and
-  // the payload stream is suppressed until retrain completes and LT returns to ACTIVE.
+  // In Streaming RAW mode, framing corruption in ACTIVE triggers pl_error and
+  // the data path is stalled until retrain completes and LTSM returns to ACTIVE.
   val plErrorPulse = isActive && mainbandLaneController.io.ctrl.validFramingError
   val suppressPlValidAfterError = RegInit(false.B)
   val prevIsActive = RegNext(isActive, false.B)
@@ -384,6 +384,8 @@ class LogicalPhy(
     suppressPlValidAfterError := false.B
   }
 
+
+  // Clk Calibrate pattern for training, constant pattern so put here
   val fwClkPPattern = "b01010101".U(8.W)
   val fwClkNPattern = "b10101010".U(8.W)
   val fwClkPBits = Wire(UInt(afeParams.mbSerializerRatio.W))
@@ -391,7 +393,7 @@ class LogicalPhy(
   fwClkPBits := VecInit(Seq.tabulate(afeParams.mbSerializerRatio)(i => fwClkPPattern(i % 8))).asUInt
   fwClkNBits := VecInit(Seq.tabulate(afeParams.mbSerializerRatio)(i => fwClkNPattern(i % 8))).asUInt
 
-  val rxClkCalOverride = ltsm.io.rxClkCalSendFwClkPattern || ltsm.io.rxClkCalSendTrkPattern
+  val rxClkCalOverride = ltsm.io.rxClkCalSendFwClkPattern && ltsm.io.rxClkCalSendTrkPattern
   val trainingPatternTxActive =
     ((ltsm.io.ltState === LTState.sMBINIT) || (ltsm.io.ltState === LTState.sMBTRAIN)) &&
     patternWriter.io.mbTxLaneIo.valid
@@ -402,6 +404,15 @@ class LogicalPhy(
   rxClkCalTxBits.clkN := Mux(ltsm.io.rxClkCalSendFwClkPattern, fwClkNBits, 0.U)
   rxClkCalTxBits.trk := Mux(ltsm.io.rxClkCalSendTrkPattern, fwClkPBits, 0.U)
 
+  // Lane reversal 
+  val selectedTxBits = Wire(new MainbandLanes(afeParams.mbLanes, afeParams.mbSerializerRatio))
+  selectedTxBits := 0.U.asTypeOf(chiselTypeOf(selectedTxBits))
+  val reversedSelectedTxBits = Wire(chiselTypeOf(selectedTxBits))
+  reversedSelectedTxBits := selectedTxBits
+  for (lane <- 0 until afeParams.mbLanes) {
+    reversedSelectedTxBits.data(lane) := selectedTxBits.data((afeParams.mbLanes - 1) - lane)
+  }
+
   io.analog.mainband.tx.bits := 0.U.asTypeOf(new MainbandLanes(
     afeParams.mbLanes,
     afeParams.mbSerializerRatio
@@ -409,17 +420,21 @@ class LogicalPhy(
   io.analog.mainband.tx.valid := false.B
 
   when(isActive) {
-    io.analog.mainband.tx.bits := scrambledTxBits
+    selectedTxBits := scrambledTxBits
     io.analog.mainband.tx.valid := mainbandLaneController.io.mbLanes.tx.valid
   }.elsewhen(rxClkCalOverride) {
-    io.analog.mainband.tx.bits := rxClkCalTxBits
+    selectedTxBits := rxClkCalTxBits
     io.analog.mainband.tx.valid := true.B
-  }.elsewhen(
-    (ltsm.io.ltState === LTState.sMBINIT) || (ltsm.io.ltState === LTState.sMBTRAIN)
-  ) {
-    io.analog.mainband.tx.bits := patternWriter.io.mbTxLaneIo.bits
+  }.elsewhen((ltsm.io.ltState === LTState.sMBINIT) || (ltsm.io.ltState === LTState.sMBTRAIN)) {
+    selectedTxBits := patternWriter.io.mbTxLaneIo.bits
     io.analog.mainband.tx.valid := patternWriter.io.mbTxLaneIo.valid
   }
+
+  io.analog.mainband.tx.bits := Mux(
+    txLaneReversalEnabled,
+    reversedSelectedTxBits,
+    selectedTxBits
+  )
 
   block(Verification) {
     block(Verification.Assert) {
@@ -435,7 +450,7 @@ class LogicalPhy(
   }
 
   // ============================================================================================
-  // Upper-facing RDI outputs
+  // RDI outputs
   // ============================================================================================
   val negotiatedBy8 =
     ltsm.io.negotiatedPhyParamSettings.valid &&

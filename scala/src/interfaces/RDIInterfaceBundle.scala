@@ -10,7 +10,7 @@ package edu.berkeley.cs.uciedigital.interfaces
 
 import chisel3._
 
-case class RdiParams(nBytes: Int = 64, ncWidth: Int = 32) 
+case class RdiParams(nBytes: Int, ncWidth: Int)
 
 class Rdi(params: RdiParams) extends Bundle {
   val lclk = Input(Bool())

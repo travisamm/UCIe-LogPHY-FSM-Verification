@@ -24,6 +24,31 @@ object LinkWidth extends ChiselEnum {
   val x256 = Value("b110".U(3.W))
 }
 
+object FDIProtocol extends ChiselEnum {
+  val pcieNoManagementTransport = Value("b0000".U(4.W))
+  val cxl1NoManagementTransport = Value("b0011".U(4.W))
+  val cxl2NoManagementTransport = Value("b0100".U(4.W))
+  val cxl3NoManagementTransport = Value("b0101".U(4.W))
+  val cxl4NoManagementTransport = Value("b0110".U(4.W))
+  val streamingNoManagementTransport = Value("b0111".U(4.W))
+  val pcieWithManagementTransport = Value("b1000".U(4.W))
+  val managementTransport = Value("b1001".U(4.W))
+  val cxl1WithManagementTransport = Value("b1011".U(4.W))
+  val cxl2WithManagementTransport = Value("b1100".U(4.W))
+  val cxl3WithManagementTransport = Value("b1101".U(4.W))
+  val cxl4WithManagementTransport = Value("b1110".U(4.W))
+  val streamingWithManagementTransport = Value("b1111".U(4.W))
+}
+
+object FDIFlitFormat extends ChiselEnum {
+  val rawFormat = Value("b0001".U(4.W))
+  val format68B = Value("b0010".U(4.W))
+  val standard256BEndHeader = Value("b0011".U(4.W))
+  val standard256BStartHeader = Value("b0100".U(4.W))
+  val latencyOptimized256BNoOptionalBytes = Value("b0101".U(4.W))
+  val latencyOptimized256BWithOptionalBytes = Value("b0110".U(4.W))
+}
+
 object RDIState extends ChiselEnum {
   val reset = Value("b0000".U(4.W))
   val active = Value("b0001".U(4.W))

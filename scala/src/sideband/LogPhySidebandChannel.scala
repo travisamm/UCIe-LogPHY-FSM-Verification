@@ -4,6 +4,7 @@
   Contains a SidebandInterfaceNode to facilitate communication over RDI, SidebandSwitch to route
   packets and SidebandLinkNode to facilitate communication over physical link.
 */
+
 package edu.berkeley.cs.uciedigital.sideband
 
 import chisel3._

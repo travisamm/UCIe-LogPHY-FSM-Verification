@@ -82,17 +82,13 @@ class PhyTrainIO(afeParams: AfeParams) extends Bundle {
 class PhyLaneTrainer(afeParams: AfeParams) extends Module {
   val io = IO(new Bundle {
     val phyTrainIo = new PhyTrainIO(afeParams)    
-
-
-    // Recieves a trigger on which test can be done
-    // Sets the PHY code
-    // and triggers to LTSM to do the handshake
-    // Recieves BER results to check if whether to do another test
-    // Registers that hold the correct encoding lives herea
   })
-
-  // Default-safe stub behavior until PHY-side training control is implemented.
-  // This keeps elaboration legal without inventing training policy here.
+  
+  // Recieves a trigger on which test can be done
+  // Sets the PHY code
+  // and triggers to LTSM to do the handshake
+  // Recieves BER results to check if whether to do another test
+  // Registers that hold the correct encoding lives here
   io.phyTrainIo.mbTrain.txSelfCalDone := false.B
   io.phyTrainIo.mbTrain.rxClkCalDone := false.B
   io.phyTrainIo.mbTrain.req.start := false.B

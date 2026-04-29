@@ -34,7 +34,7 @@ object MainUCIeLFSR extends App {
 
 object MainMainbandLaneController extends App {
   ChiselStage.emitSystemVerilogFile(
-    new MainbandLaneController(new AfeParams(), new RdiParams()),
+    new MainbandLaneController(new AfeParams(), RdiParams(64, 32)),
     args = Array("-td", "./generatedVerilog/logphy"),
     firtoolOpts = Array(
       "-O=debug",
