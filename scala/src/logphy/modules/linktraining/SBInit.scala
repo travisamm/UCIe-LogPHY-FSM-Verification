@@ -180,7 +180,7 @@ class SBInitResponder(sbParams: SidebandParams) extends Module {
     }
 
     // once detected send {SBINIT done resp}, and signal done hold high
-    io.sbLaneIo.tx.valid := msgReceived
+    io.sbLaneIo.tx.valid := msgReceived && !msgSent
     when(msgReceived && io.sbLaneIo.tx.ready) {                
       io.sbLaneIo.tx.bits.data := SBMsgCreate(SBM.SBINIT_DONE_RESP, "PHY", "PHY", true)
       msgSent := true.B
