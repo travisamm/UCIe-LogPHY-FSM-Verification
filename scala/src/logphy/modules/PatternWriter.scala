@@ -94,7 +94,7 @@ class PatternWriter(afeParams: AfeParams) extends Module {
   val lfsrNumCycles = lfsrNumBits / afeParams.mbSerializerRatio
 
   // Must be declared before first use on the line below
-  val inProgress = RegInit(false.B)
+  // val inProgress = RegInit(false.B)
 
   io.txLfsrCtrl.valid := false.B
   io.txLfsrCtrl.increment := false.B
