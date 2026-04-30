@@ -80,3 +80,9 @@ INCA_libs/
 *.log
 *.history
 
+out/
+.metals/
+.vscode/
+
+chippy/
+generatedVerilog/

@@ -16,6 +16,7 @@ object `package` extends ScalaModule, PublishModule {
     mvn"edu.berkeley.cs::diplomacy:0.0.1",
     mvn"edu.berkeley.cs::cde:0.0.1",
     mvn"edu.berkeley.cs::rocketchip:0.0.1",
+    mvn"edu.berkeley.cs::testchipip:0.0.1",
   )
   def scalacPluginMvnDeps = Seq(
     mvn"org.chipsalliance:::chisel-plugin:${chiselVersion}"
@@ -37,6 +38,7 @@ object `package` extends ScalaModule, PublishModule {
     def mvnDeps = Seq(
       mvn"org.scalatest::scalatest:3.2.19",
     )
+    def testParallelism = false
   }
 }
 
