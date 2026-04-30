@@ -2,3 +2,4 @@ generatedVerilog/
 target/
 project/target/
 project/project/
+src/main/scala/edu/berkeley/cs/uciedigital/logphy/GeneratedLogphyElab.scala
