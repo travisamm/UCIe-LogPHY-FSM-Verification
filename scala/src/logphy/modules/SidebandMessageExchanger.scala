@@ -17,9 +17,9 @@ class SidebandMessageExchanger(sbParams: SidebandParams) extends Module {
     // io.req.valid and io.rxRefBitPattern.valid is decoupled because 
     // Responder FSMs need to wait for a request before sending a response
 
-    val req = Flipped(Valid(Input((UInt(sbParams.sbNodeMsgWidth.W)))))
-    val rxRefBitPattern = Flipped(Valid(Input(MixedVec(UInt(5.W), UInt(8.W), UInt(8.W)))))
-    val resp = Output(Valid((UInt(sbParams.sbNodeMsgWidth.W))))
+    val req = Flipped(Valid(UInt(sbParams.sbNodeMsgWidth.W)))
+    val rxRefBitPattern = Flipped(Valid(MixedVec(UInt(5.W), UInt(8.W), UInt(8.W))))
+    val resp = Valid((UInt(sbParams.sbNodeMsgWidth.W)))
     val msgSent = Output(Bool())
     val msgReceived = Output(Bool())
     val sbLaneIo = new SidebandLaneIO(sbParams)
@@ -47,7 +47,7 @@ class SidebandMessageExchanger(sbParams: SidebandParams) extends Module {
   }
 
   val refPattern = 
-        VecInit(io.rxRefBitPattern.bits(0), io.rxRefBitPattern.bits(1), io.rxRefBitPattern.bits(2))
+        MixedVecInit(io.rxRefBitPattern.bits(0), io.rxRefBitPattern.bits(1), io.rxRefBitPattern.bits(2))
   when(!msgReceived && io.sbLaneIo.rx.valid && io.rxRefBitPattern.valid && 
        SBMsgCompare(io.sbLaneIo.rx.bits.data, refPattern)) {
     io.sbLaneIo.rx.ready := true.B
