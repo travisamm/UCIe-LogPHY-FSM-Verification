@@ -20,26 +20,50 @@ class mbtrain_monitor extends uvm_monitor;
 
   task run_phase(uvm_phase phase);
     mbtrain_transaction tx;
-    logic [3:0] prev_state;
-    logic       prev_done;
-    logic       prev_error;
-    logic       prev_req_tx_valid;
-    logic       prev_rsp_tx_valid;
+    logic [3:0]  prev_state;
+    logic        prev_done;
+    logic        prev_error;
+    logic        prev_req_tx_valid;
+    logic        prev_rsp_tx_valid;
+    logic [15:0] prev_txDataTriState;
+    logic        prev_txClkTriState;
+    logic        prev_txValidTriState;
+    logic        prev_txTrackTriState;
+    logic [15:0] prev_rxDataEn;
+    logic        prev_rxClkEn;
+    logic        prev_rxValidEn;
+    logic        prev_rxTrackEn;
 
-    prev_state        = 4'hX;
-    prev_done         = 0;
-    prev_error        = 0;
-    prev_req_tx_valid = 0;
-    prev_rsp_tx_valid = 0;
+    prev_state          = 4'hX;
+    prev_done           = 0;
+    prev_error          = 0;
+    prev_req_tx_valid   = 0;
+    prev_rsp_tx_valid   = 0;
+    prev_txDataTriState = 16'hX;
+    prev_txClkTriState  = 1'bX;
+    prev_txValidTriState= 1'bX;
+    prev_txTrackTriState= 1'bX;
+    prev_rxDataEn       = 16'hX;
+    prev_rxClkEn        = 1'bX;
+    prev_rxValidEn      = 1'bX;
+    prev_rxTrackEn      = 1'bX;
 
     forever begin
       @(posedge vif.clock);
 
-      if ((vif.currentState !== prev_state)                      ||
-          (vif.fsmCtrl_done !== prev_done)                       ||
-          (vif.fsmCtrl_error !== prev_error)                     ||
-          (vif.requesterSbLaneIo_tx_valid !== prev_req_tx_valid) ||
-          (vif.responderSbLaneIo_tx_valid !== prev_rsp_tx_valid)) begin
+      if ((vif.currentState              !== prev_state)          ||
+          (vif.fsmCtrl_done             !== prev_done)            ||
+          (vif.fsmCtrl_error            !== prev_error)           ||
+          (vif.requesterSbLaneIo_tx_valid !== prev_req_tx_valid)  ||
+          (vif.responderSbLaneIo_tx_valid !== prev_rsp_tx_valid)  ||
+          (vif.mbLaneCtrl_txDataTriState !== prev_txDataTriState) ||
+          (vif.mbLaneCtrl_txClkTriState  !== prev_txClkTriState)  ||
+          (vif.mbLaneCtrl_txValidTriState!== prev_txValidTriState)||
+          (vif.mbLaneCtrl_txTrackTriState!== prev_txTrackTriState)||
+          (vif.mbLaneCtrl_rxDataEn       !== prev_rxDataEn)       ||
+          (vif.mbLaneCtrl_rxClkEn        !== prev_rxClkEn)        ||
+          (vif.mbLaneCtrl_rxValidEn      !== prev_rxValidEn)      ||
+          (vif.mbLaneCtrl_rxTrackEn      !== prev_rxTrackEn)) begin
 
         tx = mbtrain_transaction::type_id::create("tx");
         // Inherited observed fields
@@ -57,14 +81,31 @@ class mbtrain_monitor extends uvm_monitor;
         tx.mbTrainRxClkCalStart  = vif.mbTrainRxClkCalStart;
         tx.doElectricalIdleTx    = vif.doElectricalIdleTx;
         tx.doElectricalIdleRx    = vif.doElectricalIdleRx;
+        // Lane control observations (XC-05)
+        tx.mbLaneCtrl_txDataTriState  = vif.mbLaneCtrl_txDataTriState;
+        tx.mbLaneCtrl_txClkTriState   = vif.mbLaneCtrl_txClkTriState;
+        tx.mbLaneCtrl_txValidTriState = vif.mbLaneCtrl_txValidTriState;
+        tx.mbLaneCtrl_txTrackTriState = vif.mbLaneCtrl_txTrackTriState;
+        tx.mbLaneCtrl_rxDataEn        = vif.mbLaneCtrl_rxDataEn;
+        tx.mbLaneCtrl_rxClkEn         = vif.mbLaneCtrl_rxClkEn;
+        tx.mbLaneCtrl_rxValidEn       = vif.mbLaneCtrl_rxValidEn;
+        tx.mbLaneCtrl_rxTrackEn       = vif.mbLaneCtrl_rxTrackEn;
 
         item_collected_port.write(tx);
 
-        prev_state        = vif.currentState;
-        prev_done         = vif.fsmCtrl_done;
-        prev_error        = vif.fsmCtrl_error;
-        prev_req_tx_valid = vif.requesterSbLaneIo_tx_valid;
-        prev_rsp_tx_valid = vif.responderSbLaneIo_tx_valid;
+        prev_state           = vif.currentState;
+        prev_done            = vif.fsmCtrl_done;
+        prev_error           = vif.fsmCtrl_error;
+        prev_req_tx_valid    = vif.requesterSbLaneIo_tx_valid;
+        prev_rsp_tx_valid    = vif.responderSbLaneIo_tx_valid;
+        prev_txDataTriState  = vif.mbLaneCtrl_txDataTriState;
+        prev_txClkTriState   = vif.mbLaneCtrl_txClkTriState;
+        prev_txValidTriState = vif.mbLaneCtrl_txValidTriState;
+        prev_txTrackTriState = vif.mbLaneCtrl_txTrackTriState;
+        prev_rxDataEn        = vif.mbLaneCtrl_rxDataEn;
+        prev_rxClkEn         = vif.mbLaneCtrl_rxClkEn;
+        prev_rxValidEn       = vif.mbLaneCtrl_rxValidEn;
+        prev_rxTrackEn       = vif.mbLaneCtrl_rxTrackEn;
       end
     end
   endtask
