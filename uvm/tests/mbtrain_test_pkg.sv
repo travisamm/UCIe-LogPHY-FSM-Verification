@@ -9,6 +9,7 @@ package mbtrain_test_pkg;
   import mbtrain_seq_pkg::*;
 
   `include "mbtrain_base_test.sv"
+  `include "mbtrain_tests.sv"
 
 endpackage
 `endif

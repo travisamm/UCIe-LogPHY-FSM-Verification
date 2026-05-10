@@ -122,11 +122,11 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
     if (req.delay > 0) begin
       vif.requesterSbLaneIo_rx_valid = 0;
       vif.responderSbLaneIo_rx_valid = 0;
-      vif.fsmCtrl_start              = 0;
       repeat(req.delay) @(posedge vif.clock);
     end
 
-    vif.fsmCtrl_start                  = req.start_fsm;
+    // fsmCtrl_start is a level signal held high until fsmCtrl_done — only assert, never clear
+    if (req.start_fsm) vif.fsmCtrl_start = 1;
     vif.localPhySettings_voltageSwing  = req.local_voltageSwing;
     vif.localPhySettings_maxDataRate   = req.local_maxDataRate;
     vif.localPhySettings_clockMode     = req.local_clockMode;
@@ -141,7 +141,6 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
 
     repeat(req.hold_cycles > 0 ? req.hold_cycles : 1) @(posedge vif.clock);
 
-    vif.fsmCtrl_start              = 0;
     vif.requesterSbLaneIo_rx_valid = 0;
     vif.responderSbLaneIo_rx_valid = 0;
   endtask

@@ -32,6 +32,7 @@ mbinit:
 	  ../elab/generatedVerilog/logphy/MBInitSM.sv \
 	  ../elab/generatedVerilog/logphy/MBInitRequester.sv \
 	  ../elab/generatedVerilog/logphy/MBInitResponder.sv \
+	  ./if/logphy_if.sv \
 	  ./if/mbinit_if.sv \
 	  ./agent/logphy_agent_pkg.sv \
 	  ./agent/mbinit_agent_pkg.sv \
@@ -54,6 +55,7 @@ mbtrain:
 	  +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
 	  -y ../elab/generatedVerilog/logphy +libext+.sv \
 	  ../elab/generatedVerilog/logphy/MBTrainSM.sv \
+	  ./if/logphy_if.sv \
 	  ./if/mbtrain_if.sv \
 	  ./agent/logphy_agent_pkg.sv \
 	  ./agent/mbtrain_agent_pkg.sv \
@@ -64,7 +66,7 @@ mbtrain:
 	  +UVM_TESTNAME=$(MBTRAINTEST)
 
 mbtrain_regress:
-	$(MAKE) mbtrain MBTRAINTEST=mbtrain_base_test
+	$(MAKE) mbtrain MBTRAINTEST=test_mbtrain_sanity
 
 clean:
 	rm -rf *.log *.history INCA_libs xcelium.d
