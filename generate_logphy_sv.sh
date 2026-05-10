@@ -40,7 +40,6 @@ TOPS=(
   MainMBInitSM
   MainMBTrainSM
   MainPhyRetrainSidebandHandshake
-  MainLinkInitSidebandHandshake
   MainTrainErrorRequester
   MainTrainErrorResponder
   MainRDIStateMachine
@@ -63,7 +62,6 @@ UTILS=(
   MainPatternWriter
   MainPatternReader
   MainUCIeLFSR
-  MainSidebandMessageExchanger
   MainRDIStallRequester
   MainRDIWakeHandshakeResponder
   MainRDIClockHandshakeRequester
@@ -161,7 +159,7 @@ module_sources() {
       echo "logphy/modules/linktraining/TrainError.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainRDIStateMachine|MainRDIStateMachineRequester|MainRDIStateMachineResponder|MainRDIController)
-      echo "logphy/modules/rdi/RDIStateMachine.scala:logphy/modules/rdi/RDIController.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/rdi/RDIStateMachine.scala:logphy/modules/rdi/RDIController.scala:logphy/modules/rdi/RDIWakeHandshakeResponder.scala:logphy/modules/rdi/RDIClockHandshakeRequester.scala:logphy/modules/rdi/RDIStallRequester.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainRDIStallRequester)
       echo "logphy/modules/rdi/RDIStallRequester.scala"
@@ -185,25 +183,25 @@ module_sources() {
       echo "logphy/modules/PatternWriter.scala"
       ;;
     MainMBInitSM|MainMBInitRequester|MainMBInitResponder)
-      echo "logphy/modules/linktraining/MBInitSM.scala:logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/MBInitSM.scala:logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/linktraining/TxD2CEyeWidthSweep.scala:logphy/modules/linktraining/RxD2CPointTest.scala:logphy/modules/linktraining/RxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala:logphy/modules/PhyLaneTrainer.scala"
       ;;
     MainMBTrainSM|MainMBTrainRequester|MainMBTrainResponder)
-      echo "logphy/modules/linktraining/MBTrainSM.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/MBTrainSM.scala:logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/linktraining/TxD2CEyeWidthSweep.scala:logphy/modules/linktraining/RxD2CPointTest.scala:logphy/modules/linktraining/RxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala:logphy/modules/PhyLaneTrainer.scala"
       ;;
     MainLinkTrainingSM)
       echo "logphy/modules/linktraining/:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainTxD2CPointTestRequester|MainTxD2CPointTestResponder)
-      echo "logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/PatternWriter.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainTxD2CEyeWidthSweepRequester|MainTxD2CEyeWidthSweepResponder)
-      echo "logphy/modules/linktraining/TxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/TxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainRxD2CPointTestRequester|MainRxD2CPointTestResponder)
-      echo "logphy/modules/linktraining/RxD2CPointTest.scala:logphy/modules/PatternWriter.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/RxD2CPointTest.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainRxD2CEyeWidthSweepRequester|MainRxD2CEyeWidthSweepResponder)
-      echo "logphy/modules/linktraining/RxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/RxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     *)
       echo "ERROR: no source closure for '$1'" >&2

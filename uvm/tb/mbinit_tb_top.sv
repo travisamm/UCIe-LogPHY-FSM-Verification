@@ -27,8 +27,6 @@ module mbinit_tb_top;
   mbinit_if vif(clock, reset);
 
   // Dummy wires for DUT mbLaneCtrlIo outputs (not monitored by TB)
-  wire [15:0] mbLane_txDataTriState;
-  wire        mbLane_txClkTriState, mbLane_txValidTriState, mbLane_txTrackTriState;
   wire [15:0] mbLane_rxDataEn;
   wire        mbLane_rxClkEn, mbLane_rxValidEn, mbLane_rxTrackEn;
 
@@ -76,25 +74,6 @@ module mbinit_tb_top;
     .io_rxWidthChanged              (vif.rxWidthChanged),
 
     // MbLaneCtrl (outputs tied to dummy wires)
-    .io_mbLaneCtrlIo_txDataTriState_0  (mbLane_txDataTriState[0]),
-    .io_mbLaneCtrlIo_txDataTriState_1  (mbLane_txDataTriState[1]),
-    .io_mbLaneCtrlIo_txDataTriState_2  (mbLane_txDataTriState[2]),
-    .io_mbLaneCtrlIo_txDataTriState_3  (mbLane_txDataTriState[3]),
-    .io_mbLaneCtrlIo_txDataTriState_4  (mbLane_txDataTriState[4]),
-    .io_mbLaneCtrlIo_txDataTriState_5  (mbLane_txDataTriState[5]),
-    .io_mbLaneCtrlIo_txDataTriState_6  (mbLane_txDataTriState[6]),
-    .io_mbLaneCtrlIo_txDataTriState_7  (mbLane_txDataTriState[7]),
-    .io_mbLaneCtrlIo_txDataTriState_8  (mbLane_txDataTriState[8]),
-    .io_mbLaneCtrlIo_txDataTriState_9  (mbLane_txDataTriState[9]),
-    .io_mbLaneCtrlIo_txDataTriState_10 (mbLane_txDataTriState[10]),
-    .io_mbLaneCtrlIo_txDataTriState_11 (mbLane_txDataTriState[11]),
-    .io_mbLaneCtrlIo_txDataTriState_12 (mbLane_txDataTriState[12]),
-    .io_mbLaneCtrlIo_txDataTriState_13 (mbLane_txDataTriState[13]),
-    .io_mbLaneCtrlIo_txDataTriState_14 (mbLane_txDataTriState[14]),
-    .io_mbLaneCtrlIo_txDataTriState_15 (mbLane_txDataTriState[15]),
-    .io_mbLaneCtrlIo_txClkTriState    (mbLane_txClkTriState),
-    .io_mbLaneCtrlIo_txValidTriState  (mbLane_txValidTriState),
-    .io_mbLaneCtrlIo_txTrackTriState  (mbLane_txTrackTriState),
     .io_mbLaneCtrlIo_rxDataEn_0  (mbLane_rxDataEn[0]),
     .io_mbLaneCtrlIo_rxDataEn_1  (mbLane_rxDataEn[1]),
     .io_mbLaneCtrlIo_rxDataEn_2  (mbLane_rxDataEn[2]),
