@@ -118,6 +118,40 @@ module patternwriter_valid_framing_sva (
     else $error("SVA FAIL: XC-07 LFSR pattern transmitted without valid framing");
 
 endmodule
+
+// ============================================================
+// SVA: XC-08 — LFSR must follow polynomial per UCIe spec 4.4.1
+// Checks: correct reset seed, never all-zero degenerate state
+// Spec: XC-08
+// ============================================================
+module lfsr_sva (
+  input wire        clock,
+  input wire        reset,
+  input wire        io_resetLfsr,
+  input wire        io_increment,
+  input wire [22:0] stateReg
+);
+
+  // On reset or io_resetLfsr, state must be seeded to 23'h1DBFBC
+  property p_lfsr_reset_seed;
+    @(posedge clock)
+    (reset || io_resetLfsr) |=>
+      (stateReg == 23'h1DBFBC);
+  endproperty
+
+  // LFSR must never enter all-zero degenerate state
+  property p_lfsr_nonzero;
+    @(posedge clock) disable iff (reset || io_resetLfsr)
+    io_increment |-> ##1 (stateReg != 23'h0);
+  endproperty
+
+  a_lfsr_reset_seed: assert property (p_lfsr_reset_seed)
+    else $error("SVA FAIL: XC-08 LFSR not seeded to 23'h1DBFBC on reset");
+
+  a_lfsr_nonzero: assert property (p_lfsr_nonzero)
+    else $error("SVA FAIL: XC-08 LFSR entered degenerate all-zero state");
+
+endmodule
 // ============================================================
 // Bind statements
 // ============================================================
@@ -141,6 +175,13 @@ bind PatternWriter patternwriter_sva u_patternwriter_sva (
   .patternType    (io_interfaceIo_req_bits_patternType),
   .lfsr_pattern_0 (io_txLfsrCtrl_pattern_0),
   .lfsr_pattern_1 (io_txLfsrCtrl_pattern_1)
+);
+bind ParallelGaloisLFSR lfsr_sva u_lfsr_sva (
+  .clock       (clock),
+  .reset       (reset),
+  .io_resetLfsr(io_resetLfsr),
+  .io_increment(io_increment),
+  .stateReg    (stateReg)
 );
 
 `endif
