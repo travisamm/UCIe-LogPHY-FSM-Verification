@@ -497,7 +497,9 @@ class MBInitRequester(afeParams: AfeParams, sbParams: SidebandParams) extends Mo
 
       requesterRdy := sbMsgExchanger.io.done
 
-      when(io.requesterRdy && io.responderRdy) {
+      // Must not use io.requesterRdy here: it ORs in requesterRdyStatusReg, which can stay
+      // true from PARAM and skip CAL sideband entirely. Gate on this state's combinational done.
+      when(requesterRdy && io.responderRdy) {
         nextState := MBInitState.sREPAIRCLK                    
       }
     }
@@ -994,7 +996,8 @@ class MBInitResponder(afeParams: AfeParams, sbParams: SidebandParams) extends Mo
       sbMsgExchanger.io.req.bits := SBMsgCreate(SBM.MBINIT_CAL_DONE_RESP, "PHY", "PHY", true)
 
       responderRdy := sbMsgExchanger.io.done
-      when(io.requesterRdy && io.responderRdy) {
+      // Same as requester: io.responderRdy includes a sticky status bit — use responderRdy wire.
+      when(io.requesterRdy && responderRdy) {
         nextState := MBInitState.sREPAIRCLK                    
       }
     }
