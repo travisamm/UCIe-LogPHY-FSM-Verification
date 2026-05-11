@@ -99,7 +99,8 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
   // ---- REVERSALMB flow messages; LR-01/LR-06 map directly to CSV rows ----
   bit saw_lr_init_req_tx;
-  bit saw_lr_init_resp_tx;
+  bit saw_lr_init_resp_tx;   // DUT responder → partner (responder TX)
+  bit saw_lr_init_resp_rx;   // Partner → DUT requester (requester RX); LR-01 "wait for resp"
   bit saw_lr_res_req_tx;
   bit saw_lr_res_resp_tx;
   bit saw_lr_done_req_tx;
@@ -167,6 +168,9 @@ class mbinit_scoreboard extends uvm_scoreboard;
         saw_rsp_tx = 1;
         decode_rsp_tx(tx.rsp_tx_data);
       end
+      // Requester RX (remote / TB → DUT requester) — partner MB messages
+      if (tx.rx_valid)
+        decode_requester_rx(tx.rx_data);
 
       if (tx.currentState == MB_STATE_CAL)
         saw_state_cal = 1;
@@ -335,7 +339,7 @@ class mbinit_scoreboard extends uvm_scoreboard;
           `uvm_info("MB_SB","RV-07: DUT rsp sent REPAIRVAL_DONE_RESP",UVM_LOW)
           saw_rval_done_resp_tx=1; end
         `MB_SC_LR_INIT: if (!saw_lr_init_resp_tx) begin
-          `uvm_info("MB_SB","LR-01: DUT rsp sent REVERSALMB_INIT_RESP",UVM_LOW)
+          `uvm_info("MB_SB","LR-01: DUT responder TX REVERSALMB_INIT_RESP",UVM_LOW)
           saw_lr_init_resp_tx=1; end
         `MB_SC_LR_RES: if (!saw_lr_res_resp_tx) begin
           `uvm_info("MB_SB","REVERSALMB: DUT rsp sent REVERSALMB_RESULT_RESP",UVM_LOW)
@@ -357,6 +361,20 @@ class mbinit_scoreboard extends uvm_scoreboard;
       `uvm_error("MB_SB", $sformatf(
         "Responder TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
         d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+    end
+  endfunction
+
+  // Partner → requester SB (TB/remote drives requesterSbLaneIo_rx_*)
+  function void decode_requester_rx(logic [127:0] d);
+    if (`MB_OP(d) == `MB_OP_NODATA && `MB_MC(d) == `MB_MC_RESP) begin
+      case (`MB_SC(d))
+        `MB_SC_LR_INIT:
+          if (!saw_lr_init_resp_rx) begin
+            `uvm_info("MB_SB", "LR-01: REVERSALMB_INIT_RESP on requester RX (partner)", UVM_LOW)
+            saw_lr_init_resp_rx = 1;
+          end
+        default: ;
+      endcase
     end
   endfunction
 
@@ -595,6 +613,8 @@ class mbinit_scoreboard extends uvm_scoreboard;
         `uvm_error("MB_SB","RV-07 FAILED: REPAIRVAL did not exit to REVERSALMB")
       if (!saw_lr_init_req_tx)
         `uvm_error("MB_SB","LR-01 FAILED: requester never sent REVERSALMB_INIT_REQ")
+      if (!saw_lr_init_resp_rx)
+        `uvm_error("MB_SB","LR-01 FAILED: REVERSALMB_INIT_RESP never observed on requester RX (partner)")
       if (!saw_lr_res_req_tx)
         `uvm_error("MB_SB","REVERSALMB FLOW FAILED: requester never sent REVERSALMB_RESULT_REQ")
       if (!saw_lr_done_req_tx)

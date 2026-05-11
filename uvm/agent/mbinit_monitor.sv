@@ -29,6 +29,8 @@ class mbinit_monitor extends uvm_monitor;
     logic        prev_pw_req_valid;
     logic        prev_pr_req_valid;
     logic        prev_pttest_start;
+    logic        prev_req_rx_valid;
+    logic [127:0] prev_req_rx_data;
     logic [15:0] prev_txDataTriState;
     logic        prev_txClkTriState;
     logic        prev_txValidTriState;
@@ -51,6 +53,8 @@ class mbinit_monitor extends uvm_monitor;
     prev_pw_req_valid   = 0;
     prev_pr_req_valid   = 0;
     prev_pttest_start   = 0;
+    prev_req_rx_valid   = 0;
+    prev_req_rx_data    = 128'hX;
     prev_txDataTriState = 16'hX;
     prev_txClkTriState  = 1'bX;
     prev_txValidTriState= 1'bX;
@@ -74,6 +78,8 @@ class mbinit_monitor extends uvm_monitor;
           (vif.negotiatedPhySettings_valid !== prev_neg_valid)    ||
           (vif.requesterSbLaneIo_tx_valid !== prev_req_tx_valid)  ||
           (vif.responderSbLaneIo_tx_valid !== prev_rsp_tx_valid)  ||
+          (vif.requesterSbLaneIo_rx_valid !== prev_req_rx_valid)  ||
+          (vif.requesterSbLaneIo_rx_bits_data !== prev_req_rx_data) ||
           (vif.patternWriterIo_req_valid  !== prev_pw_req_valid)  ||
           (vif.patternReaderIo_req_valid  !== prev_pr_req_valid)  ||
           (vif.txPtTestReqIo_start        !== prev_pttest_start)  ||
@@ -96,6 +102,9 @@ class mbinit_monitor extends uvm_monitor;
         tx.fsm_error    = vif.fsmCtrl_error;
         tx.tx_valid     = vif.requesterSbLaneIo_tx_valid;
         tx.tx_data      = vif.requesterSbLaneIo_tx_bits_data;
+        // Partner → requester SB (observed on DUT RX pins; same fields as seq req_* stimulus)
+        tx.rx_valid     = vif.requesterSbLaneIo_rx_valid;
+        tx.rx_data      = vif.requesterSbLaneIo_rx_bits_data;
         tx.rsp_tx_valid = vif.responderSbLaneIo_tx_valid;
         tx.rsp_tx_data  = vif.responderSbLaneIo_tx_bits_data;
         // MBINIT state observed fields
@@ -132,6 +141,8 @@ class mbinit_monitor extends uvm_monitor;
         prev_error           = vif.fsmCtrl_error;
         prev_neg_valid       = vif.negotiatedPhySettings_valid;
         prev_req_tx_valid    = vif.requesterSbLaneIo_tx_valid;
+        prev_req_rx_valid    = vif.requesterSbLaneIo_rx_valid;
+        prev_req_rx_data     = vif.requesterSbLaneIo_rx_bits_data;
         prev_rsp_tx_valid    = vif.responderSbLaneIo_tx_valid;
         prev_pw_req_valid    = vif.patternWriterIo_req_valid;
         prev_pr_req_valid    = vif.patternReaderIo_req_valid;

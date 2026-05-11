@@ -1,7 +1,7 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
-.PHONY: sbinit sbinit_regress mbinit mbinit_regress ltsm mbtrain _mbtrain_run mbtrain_regress clean
+.PHONY: sbinit sbinit_regress mbinit mbinit_regress ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
@@ -12,6 +12,15 @@ MBTRAIN_LOG_DIR ?= run_logs/mbtrain
 MBTRAIN_SUBMAKE ?= $(MAKE)
 
 LTSTEST ?= test_ltsm_mbinit_repairval_trainerror
+
+# ---- PatternWriter LR-02 (standalone, no UVM) — PERLANEID / cycles / per-lane data ----
+PW_XRUN := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
+patternwriter_lr02:
+	$(PW_XRUN) -sv -64bit -timescale 1ns/1ps \
+	  ../elab/generatedVerilog/logphy/CircularShiftRegister.sv \
+	  ../elab/generatedVerilog/logphy/PatternWriter.sv \
+	  ./tb/patternwriter_tb_lr02.sv \
+	  +access+r
 
 # ---- SBINIT ----
 sbinit:
