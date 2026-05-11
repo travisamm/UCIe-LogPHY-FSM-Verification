@@ -73,6 +73,8 @@ class mbtrain_scoreboard extends uvm_scoreboard;
   bit saw_state_valvref;
   bit saw_state_datavref;
   bit saw_state_speedidle;
+  bit saw_state_txselfcal;
+  bit saw_state_rxclkcal;
   bit saw_fsm_done;
   bit saw_fsm_error;
 
@@ -91,9 +93,23 @@ class mbtrain_scoreboard extends uvm_scoreboard;
   bit expect_full_mbtrain    = 1;
   bit expect_valvref_checks  = 1;
   bit expect_datavref_checks = 1;
+  bit expect_txselfcal_checks = 0;
   bit expect_fsm_done        = 1;
   bit expect_fsm_error       = 0;
+  bit debug_txselfcal        = 0;
   logic [15:0] expected_max_error_threshold = 16'hFFFF;
+
+  int tc_cycles;
+  int tc_req_tx_valid_count;
+  int tc_req_tx_handshake_count;
+  int tc_rsp_tx_valid_count;
+  int tc_rsp_tx_handshake_count;
+  bit tc_saw_start;
+  bit tc_saw_done;
+  bit tc_saw_req_match;
+  bit tc_saw_rsp_match;
+  bit tc_saw_to_rxclkcal;
+  bit [3:0] prev_current_state = 4'hF;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -109,6 +125,18 @@ class mbtrain_scoreboard extends uvm_scoreboard;
     item_collected_export.connect(item_collected_fifo.analysis_export);
   endfunction
 
+  function bit is_req_subcode(logic [127:0] d, logic [7:0] subcode);
+    return (`MT_OP(d) == `MT_OP_NODATA &&
+            `MT_MC(d) == `MT_MC_REQ &&
+            `MT_SC(d) == subcode);
+  endfunction
+
+  function bit is_rsp_subcode(logic [127:0] d, logic [7:0] subcode);
+    return (`MT_OP(d) == `MT_OP_NODATA &&
+            `MT_MC(d) == `MT_MC_RESP &&
+            `MT_SC(d) == subcode);
+  endfunction
+
   task run_phase(uvm_phase phase);
     mbtrain_transaction tx;
     forever begin
@@ -116,11 +144,14 @@ class mbtrain_scoreboard extends uvm_scoreboard;
 
       if (tx.tx_valid)     decode_req_tx(tx.tx_data);
       if (tx.rsp_tx_valid) decode_rsp_tx(tx.rsp_tx_data);
+      collect_txselfcal_debug(tx);
 
       case (tx.currentState)
-        MT_ST_VALVREF:  saw_state_valvref = 1;
-        MT_ST_DATAVREF: saw_state_datavref = 1;
-        MT_ST_SPEEDIDLE:saw_state_speedidle = 1;
+        MT_ST_VALVREF:   saw_state_valvref = 1;
+        MT_ST_DATAVREF:  saw_state_datavref = 1;
+        MT_ST_SPEEDIDLE: saw_state_speedidle = 1;
+        MT_ST_TXSELFCAL: saw_state_txselfcal = 1;
+        MT_ST_RXCLKCAL:  saw_state_rxclkcal = 1;
         default: ;
       endcase
 
@@ -136,8 +167,53 @@ class mbtrain_scoreboard extends uvm_scoreboard;
         `uvm_info("MT_SB", "MBTRAIN fsmCtrl_error asserted", UVM_LOW)
         saw_fsm_error = 1;
       end
+
+      prev_current_state = tx.currentState;
     end
   endtask
+
+  function void collect_txselfcal_debug(mbtrain_transaction tx);
+    if (tx.currentState == MT_ST_TXSELFCAL) begin
+      tc_cycles++;
+      if (tx.trainingTxSelfCalStart)
+        tc_saw_start = 1;
+      if (tx.trainingTxSelfCalDone)
+        tc_saw_done = 1;
+      if (tx.tx_valid) begin
+        tc_req_tx_valid_count++;
+        if (is_req_subcode(tx.tx_data, `MT_SC_TC_DONE))
+          tc_saw_req_match = 1;
+      end
+      if (tx.tx_valid && tx.tx_ready)
+        tc_req_tx_handshake_count++;
+      if (tx.rsp_tx_valid) begin
+        tc_rsp_tx_valid_count++;
+        if (is_rsp_subcode(tx.rsp_tx_data, `MT_SC_TC_DONE))
+          tc_saw_rsp_match = 1;
+      end
+      if (tx.rsp_tx_valid && tx.rsp_tx_ready)
+        tc_rsp_tx_handshake_count++;
+    end
+
+    if (prev_current_state == MT_ST_TXSELFCAL &&
+        tx.currentState == MT_ST_RXCLKCAL)
+      tc_saw_to_rxclkcal = 1;
+
+    if (debug_txselfcal &&
+        (tx.currentState == MT_ST_TXSELFCAL ||
+         prev_current_state == MT_ST_TXSELFCAL ||
+         (tx.tx_valid && is_req_subcode(tx.tx_data, `MT_SC_TC_DONE)) ||
+         (tx.rsp_tx_valid && is_rsp_subcode(tx.rsp_tx_data, `MT_SC_TC_DONE)))) begin
+      `uvm_info("MT_SB", $sformatf(
+        "TXSELFCAL trace: state=%0h start=%0b done=%0b req_tx_v/r=%0b/%0b req_data=%032h req_tc=%0b rsp_tx_v/r=%0b/%0b rsp_data=%032h rsp_tc=%0b fsm_done=%0b err=%0b",
+        tx.currentState,
+        tx.trainingTxSelfCalStart,
+        tx.trainingTxSelfCalDone,
+        tx.tx_valid, tx.tx_ready, tx.tx_data, is_req_subcode(tx.tx_data, `MT_SC_TC_DONE),
+        tx.rsp_tx_valid, tx.rsp_tx_ready, tx.rsp_tx_data, is_rsp_subcode(tx.rsp_tx_data, `MT_SC_TC_DONE),
+        tx.fsm_done, tx.fsm_error), UVM_LOW)
+    end
+  endfunction
 
   function void check_lane_ctrl(mbtrain_transaction tx);
     logic [15:0] exp_tx_data;
@@ -363,18 +439,61 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       `MT_SC_DV_START: saw_dv_start_rsp = 1;
       `MT_SC_DV_END:   saw_dv_end_rsp = 1;
       `MT_SC_SI_DONE:  saw_si_done_rsp = 1;
+      `MT_SC_TC_DONE:  saw_tc_done_rsp = 1;
       default: ;
     endcase
   endfunction
 
+  function void print_txselfcal_debug_summary();
+    if (!debug_txselfcal ||
+        (!expect_full_mbtrain && !expect_txselfcal_checks && !saw_state_txselfcal))
+      return;
+
+    `uvm_info("MT_SB", $sformatf(
+      "TXSELFCAL summary: state_seen=%0b to_rxclkcal=%0b cycles=%0d start=%0b done=%0b req_valid=%0d req_hs=%0d req_match=%0b rsp_valid=%0d rsp_hs=%0d rsp_match=%0b",
+      saw_state_txselfcal, tc_saw_to_rxclkcal, tc_cycles,
+      tc_saw_start, tc_saw_done,
+      tc_req_tx_valid_count, tc_req_tx_handshake_count, tc_saw_req_match,
+      tc_rsp_tx_valid_count, tc_rsp_tx_handshake_count, tc_saw_rsp_match), UVM_LOW)
+
+    if (!tc_saw_start) begin
+      `uvm_info("MT_SB",
+        "TXSELFCAL classification hint: txSelfCalStart never asserted; check whether the sequence entered/held TXSELFCAL.",
+        UVM_LOW)
+    end
+    else if (!tc_saw_done) begin
+      `uvm_info("MT_SB",
+        "TXSELFCAL classification hint: txSelfCalStart asserted but txSelfCalDone never pulsed; check the UVM driver auto-stub.",
+        UVM_LOW)
+    end
+    else if (!tc_saw_req_match && tc_req_tx_valid_count == 0) begin
+      `uvm_info("MT_SB",
+        "TXSELFCAL classification hint: txSelfCalDone pulsed but requester TX never became valid in TXSELFCAL; this points at DUT state/ready behavior.",
+        UVM_LOW)
+    end
+    else if (!tc_saw_req_match) begin
+      `uvm_info("MT_SB",
+        "TXSELFCAL classification hint: requester TX was valid in TXSELFCAL but did not match TXSELFCAL_DONE_REQ; compare the DUT encoding against the UVM constants.",
+        UVM_LOW)
+    end
+    else if (!saw_tc_done_req) begin
+      `uvm_info("MT_SB",
+        "TXSELFCAL classification hint: requester TXSELFCAL_DONE_REQ appeared in the trace but decode did not latch it; check monitor/scoreboard decode.",
+        UVM_LOW)
+    end
+  endfunction
+
   function void check_phase(uvm_phase phase);
     `uvm_info("MT_SB", $sformatf(
-      "Summary: vv_msg=%0b/%0b/%0b/%0b vv_lane=%0b vv_phase=%0b vv_param=%0b vv_success=%0b dv_msg=%0b/%0b/%0b/%0b dv_param=%0b dv_success=%0b state_dv=%0b state_si=%0b fsm_done=%0b err=%0b lane_err=%0b param_err=%0b",
+      "Summary: vv_msg=%0b/%0b/%0b/%0b vv_lane=%0b vv_phase=%0b vv_param=%0b vv_success=%0b dv_msg=%0b/%0b/%0b/%0b dv_param=%0b dv_success=%0b state_dv=%0b state_si=%0b state_tc=%0b state_rcc=%0b fsm_done=%0b err=%0b lane_err=%0b param_err=%0b",
       saw_vv_start_req, saw_vv_start_rsp, saw_vv_end_req, saw_vv_end_rsp,
       saw_vv_lane_ctrl, saw_vv_phase_center, saw_vv_valtrain_params, saw_vv_success,
       saw_dv_start_req, saw_dv_start_rsp, saw_dv_end_req, saw_dv_end_rsp,
       saw_dv_lfsr_params, saw_dv_success, saw_state_datavref, saw_state_speedidle,
+      saw_state_txselfcal, saw_state_rxclkcal,
       saw_fsm_done, saw_fsm_error, lane_ctrl_error, train_param_error), UVM_LOW)
+
+    print_txselfcal_debug_summary();
 
     if (expect_valvref_checks) begin
       if (!saw_vv_start_req)       `uvm_error("MT_SB", "VV-START FAILED: requester never sent VALVREF start req")
@@ -418,6 +537,13 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       if (!saw_dc2_end_req)   `uvm_error("MT_SB","DATATRAINCENTER2: requester never sent END_REQ")
       if (!saw_ls_start_req)  `uvm_error("MT_SB","LINKSPEED: requester never sent LINKSPEED_START_REQ")
       if (!saw_ls_done_req)   `uvm_error("MT_SB","LINKSPEED: requester never sent LINKSPEED_DONE_REQ")
+    end
+
+    if (expect_txselfcal_checks) begin
+      if (!saw_state_txselfcal) `uvm_error("MT_SB","TXSELFCAL probe: TXSELFCAL state was never observed")
+      if (!tc_saw_start)       `uvm_error("MT_SB","TXSELFCAL probe: txSelfCalStart never asserted")
+      if (!tc_saw_done)        `uvm_error("MT_SB","TXSELFCAL probe: txSelfCalDone never pulsed")
+      if (!saw_tc_done_req)    `uvm_error("MT_SB","TXSELFCAL probe: requester never sent TXSELFCAL_DONE_REQ")
     end
 
     if (lane_ctrl_error)
