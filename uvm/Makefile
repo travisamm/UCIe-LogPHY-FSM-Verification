@@ -60,7 +60,7 @@ mbtrain:
 	@mkdir -p "$(MBTRAIN_LOG_DIR)"; \
 	tests="$(if $(strip $(MBTRAINTEST)),$(strip $(MBTRAINTEST)),$(strip $(MBTRAIN_TESTS)))"; \
 	results_file="$(MBTRAIN_LOG_DIR)/.results"; \
-	error_re='UVM_(ERROR|FATAL)|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
+	error_re='^(UVM_ERROR|UVM_FATAL)[[:space:]]+[^:]|UVM_(ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
 	failed=0; \
 	{ \
 	  printf "MBTRAIN detailed results\n"; \
@@ -74,7 +74,7 @@ mbtrain:
 	  else \
 	    sim_status=$$?; \
 	  fi; \
-	  if grep -Eq 'UVM_(ERROR|FATAL)' "$$log"; then \
+	  if grep -Eq "$$error_re" "$$log"; then \
 	    uvm_failure=1; \
 	  else \
 	    uvm_failure=0; \
