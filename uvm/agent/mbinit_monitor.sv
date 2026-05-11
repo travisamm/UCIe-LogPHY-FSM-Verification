@@ -37,6 +37,10 @@ class mbinit_monitor extends uvm_monitor;
     logic        prev_rxClkEn;
     logic        prev_rxValidEn;
     logic        prev_rxTrackEn;
+    logic        prev_using_pw;
+    logic        prev_using_pr;
+    logic        prev_loc_clk_ph;
+    logic        prev_neg_clk_ph;
 
     prev_state          = 3'hX;
     prev_done           = 0;
@@ -55,6 +59,10 @@ class mbinit_monitor extends uvm_monitor;
     prev_rxClkEn        = 1'bX;
     prev_rxValidEn      = 1'bX;
     prev_rxTrackEn      = 1'bX;
+    prev_using_pw       = 1'b0;
+    prev_using_pr       = 1'b0;
+    prev_loc_clk_ph     = 1'b0;
+    prev_neg_clk_ph     = 1'b0;
 
     forever begin
       @(posedge vif.clock);
@@ -76,7 +84,11 @@ class mbinit_monitor extends uvm_monitor;
           (vif.mbLaneCtrl_rxDataEn        !== prev_rxDataEn)      ||
           (vif.mbLaneCtrl_rxClkEn         !== prev_rxClkEn)       ||
           (vif.mbLaneCtrl_rxValidEn       !== prev_rxValidEn)     ||
-          (vif.mbLaneCtrl_rxTrackEn       !== prev_rxTrackEn)) begin
+          (vif.mbLaneCtrl_rxTrackEn       !== prev_rxTrackEn)     ||
+          (vif.usingPatternWriter         !== prev_using_pw)      ||
+          (vif.usingPatternReader         !== prev_using_pr)      ||
+          (vif.localPhySettings_clockPhase !== prev_loc_clk_ph)   ||
+          (vif.negotiatedPhySettings_clockPhase !== prev_neg_clk_ph)) begin
 
         tx = mbinit_transaction::type_id::create("tx");
         // Inherited observed fields (logphy_transaction)
@@ -91,6 +103,8 @@ class mbinit_monitor extends uvm_monitor;
         tx.negotiatedPhySettings_valid = vif.negotiatedPhySettings_valid;
         tx.negotiated_maxDataRate      = vif.negotiatedPhySettings_maxDataRate;
         tx.negotiated_clockMode        = vif.negotiatedPhySettings_clockMode;
+        tx.observed_local_clockPhase   = vif.localPhySettings_clockPhase;
+        tx.observed_negotiated_clockPhase = vif.negotiatedPhySettings_clockPhase;
         tx.interoperableParamsNotFound = vif.interoperableParamsNotFound;
         tx.applyLaneReversal           = vif.applyLaneReversal;
         // Pattern IO observations
@@ -130,6 +144,10 @@ class mbinit_monitor extends uvm_monitor;
         prev_rxClkEn         = vif.mbLaneCtrl_rxClkEn;
         prev_rxValidEn       = vif.mbLaneCtrl_rxValidEn;
         prev_rxTrackEn       = vif.mbLaneCtrl_rxTrackEn;
+        prev_using_pw        = vif.usingPatternWriter;
+        prev_using_pr        = vif.usingPatternReader;
+        prev_loc_clk_ph      = vif.localPhySettings_clockPhase;
+        prev_neg_clk_ph      = vif.negotiatedPhySettings_clockPhase;
       end
     end
   endtask

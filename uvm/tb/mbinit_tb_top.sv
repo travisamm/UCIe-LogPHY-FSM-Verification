@@ -5,7 +5,9 @@ make mbinit                                  # default: test_mbinit_sanity
 make mbinit MBTEST=test_mbinit_sanity
 make mbinit MBTEST=test_mbinit_param_mismatch
 make mbinit MBTEST=test_mbinit_param_only
-make mbinit_regress                          # runs all three above
+make mbinit MBTEST=test_mbinit_cal
+make mbinit MBTEST=test_mbinit_repairclk
+make mbinit_regress                          # runs sanity, mismatch, param_only, cal, repairclk, repairclk_unrep, repairval
 
 Run MBTRAIN:
 make mbtrain                                 # default: mbtrain_base_test

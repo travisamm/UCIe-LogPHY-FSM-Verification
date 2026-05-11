@@ -6,6 +6,8 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
 
   virtual mbinit_if vif;
   logic prev_mb_init_cal_start;
+  // Pulses mbInitCalDone this many cycles after each rising edge of mbInitCalStart
+  int unsigned cal_done_repeat_cycles = 3;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -73,7 +75,7 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
       forever begin
         @(posedge vif.clock);
         if (vif.mbInitCalStart && !prev_mb_init_cal_start) begin
-          repeat (3) @(posedge vif.clock);
+          repeat (cal_done_repeat_cycles) @(posedge vif.clock);
           vif.mbInitCalDone = 1;
           @(posedge vif.clock);
           vif.mbInitCalDone = 0;
@@ -127,6 +129,7 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
   endtask
 
   task drive_item(mbinit_transaction req);
+    cal_done_repeat_cycles = req.cal_done_repeat_cycles;
     if (req.delay > 0) begin
       vif.requesterSbLaneIo_rx_valid = 0;
       vif.responderSbLaneIo_rx_valid = 0;

@@ -52,6 +52,8 @@ mbinit_regress:
 	$(MAKE) mbinit MBTEST=test_mbinit_sanity
 	$(MAKE) mbinit MBTEST=test_mbinit_param_mismatch
 	$(MAKE) mbinit MBTEST=test_mbinit_param_only
+	$(MAKE) mbinit MBTEST=test_mbinit_cal
+	$(MAKE) mbinit MBTEST=test_mbinit_repairclk
 	$(MAKE) mbinit MBTEST=test_mbinit_repairclk_unrep
 	$(MAKE) mbinit MBTEST=test_mbinit_repairval_unrep
 

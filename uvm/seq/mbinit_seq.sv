@@ -74,7 +74,8 @@ class mbinit_base_seq extends uvm_sequence #(mbinit_transaction);
     input logic        req_valid  = 0,
     input logic [127:0] req_data  = 0,
     input logic        rsp_valid  = 0,
-    input logic [127:0] rsp_data  = 0
+    input logic [127:0] rsp_data  = 0,
+    input int unsigned cal_done_repeat_cycles = 3
   );
     mbinit_transaction req;
     req = mbinit_transaction::type_id::create("req");
@@ -85,6 +86,7 @@ class mbinit_base_seq extends uvm_sequence #(mbinit_transaction);
     req.rx_data      = req_data;
     req.rsp_rx_valid = rsp_valid;
     req.rsp_rx_data  = rsp_data;
+    req.cal_done_repeat_cycles = cal_done_repeat_cycles;
     start_item(req);
     finish_item(req);
   endtask
@@ -189,6 +191,60 @@ class seq_mbinit_param_only extends mbinit_base_seq;
     send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
               .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
               .delay(5), .hold(50));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbinit_cal_only: PARAM → CAL (MC-01/02, MP-06) then stop.
+// Uses a long mbInitCalDone delay on the CAL beat so the DUT stays in sCAL
+// until calibration completes (REQ.valid gated on mbInitCalDone in RTL).
+// ============================================================
+class seq_mbinit_cal_only extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_cal_only)
+
+  function new(string name = "seq_mbinit_cal_only");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(40), .cal_done_repeat_cycles(64));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbinit_repairclk_only: PARAM → CAL → full REPAIRCLK (RC-01/02/05)
+// Stops after REPAIRCLK DONE exchange; DUT should enter REPAIRVAL (RC-05).
+// ============================================================
+class seq_mbinit_repairclk_only extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_repairclk_only)
+
+  function new(string name = "seq_mbinit_repairclk_only");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(30), .cal_done_repeat_cycles(3));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_DONE_REQ),
+              .delay(5), .hold(80));
   endtask
 endclass
 
