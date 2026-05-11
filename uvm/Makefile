@@ -60,30 +60,62 @@ mbtrain:
 	@mkdir -p "$(MBTRAIN_LOG_DIR)"; \
 	tests="$(if $(strip $(MBTRAINTEST)),$(strip $(MBTRAINTEST)),$(strip $(MBTRAIN_TESTS)))"; \
 	results_file="$(MBTRAIN_LOG_DIR)/.results"; \
+	error_re='UVM_(ERROR|FATAL)|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
 	failed=0; \
-	: > "$$results_file"; \
+	{ \
+	  printf "MBTRAIN detailed results\n"; \
+	  printf "Tests: %s\n\n" "$$tests"; \
+	} > "$$results_file"; \
+	printf "\nMBTRAIN results:\n"; \
 	for test in $$tests; do \
 	  log="$(MBTRAIN_LOG_DIR)/$$test.log"; \
-	  printf "Running %s...\n" "$$test"; \
 	  if $(MBTRAIN_SUBMAKE) --no-print-directory _mbtrain_run MBTRAINTEST=$$test > "$$log" 2>&1; then \
 	    sim_status=0; \
 	  else \
 	    sim_status=$$?; \
 	  fi; \
-	  if [ $$sim_status -eq 0 ] && ! grep -Eq '^(UVM_ERROR|UVM_FATAL)([^:]*@|[[:space:]]*:[[:space:]]*[1-9])' "$$log"; then \
+	  if grep -Eq 'UVM_(ERROR|FATAL)' "$$log"; then \
+	    uvm_failure=1; \
+	  else \
+	    uvm_failure=0; \
+	  fi; \
+	  if [ $$sim_status -eq 0 ] && [ $$uvm_failure -eq 0 ]; then \
 	    result=PASS; \
 	  else \
 	    result=FAIL; \
 	    failed=1; \
 	  fi; \
-	  printf "  %-36s %s\n" "$$test" "$$result" >> "$$results_file"; \
+	  printf "  %-36s %s\n" "$$test" "$$result"; \
+	  { \
+	    printf "TEST: %s\n" "$$test"; \
+	    printf "STATUS: %s\n" "$$result"; \
+	    printf "LOG: %s\n" "$$log"; \
+	    printf "SIM_EXIT_STATUS: %s\n" "$$sim_status"; \
+	    if [ "$$result" = PASS ]; then \
+	      printf "REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found\n"; \
+	    else \
+	      printf "REASON:"; \
+	      if [ $$sim_status -ne 0 ]; then \
+	        printf " simulator exited with status %s;" "$$sim_status"; \
+	      fi; \
+	      if [ $$uvm_failure -ne 0 ]; then \
+	        printf " UVM_ERROR/UVM_FATAL present in log;"; \
+	      fi; \
+	      printf "\n"; \
+	      error_lines="$$(grep -En "$$error_re" "$$log" | sed -n '1,80p')"; \
+	      printf "ERROR_EXCERPT:\n"; \
+	      if [ -n "$$error_lines" ]; then \
+	        printf "%s\n" "$$error_lines"; \
+	      else \
+	        printf "<no UVM/Xcelium error regex matches; inspect full log for the nonzero exit cause>\n"; \
+	      fi; \
+	      printf "LOG_TAIL:\n"; \
+	      tail -n 40 "$$log"; \
+	    fi; \
+	    printf "\n"; \
+	  } >> "$$results_file"; \
 	done; \
-	printf "\nMBTRAIN results:\n"; \
-	cat "$$results_file"; \
-	printf "\nLogs: %s\n" "$(MBTRAIN_LOG_DIR)"; \
-	if [ $$failed -ne 0 ]; then \
-	  printf "One or more MBTRAIN tests failed; see the per-test logs above.\n"; \
-	fi; \
+	printf "\nDetailed results: %s\n" "$$results_file"; \
 	exit $$failed
 
 _mbtrain_run:
