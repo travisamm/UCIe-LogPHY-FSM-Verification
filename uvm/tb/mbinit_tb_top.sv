@@ -7,7 +7,8 @@ make mbinit MBTEST=test_mbinit_param_mismatch
 make mbinit MBTEST=test_mbinit_param_only
 make mbinit MBTEST=test_mbinit_cal
 make mbinit MBTEST=test_mbinit_repairclk
-make mbinit_regress                          # runs sanity, mismatch, param_only, cal, repairclk, repairclk_unrep, repairval
+make mbinit_all                              # all MBINIT UVM tests (same list as mbinit_regress); logs in run_logs/mbinit
+make mbinit_regress                          # alias for mbinit_all
 Optional REPAIRMB requester trace (FIRRTL names; only while currentState==REPAIRMB):
   make mbinit MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG' MBTEST=test_mbinit_rm05_post_repair_persist
 

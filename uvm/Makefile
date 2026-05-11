@@ -1,12 +1,16 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
-.PHONY: sbinit sbinit_regress mbinit mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
+.PHONY: sbinit sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
 # Optional xrun args for mbinit (e.g. MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG')
 MBINIT_XRUN_EXTRA ?=
+# All MBINIT UVM tests (see tests/mbinit_tests.sv). Override to run a subset.
+MBINIT_TESTS ?= test_mbinit_sanity test_mbinit_param_mismatch test_mbinit_param_only test_mbinit_cal test_mbinit_repairclk test_mbinit_repairclk_unrep test_mbinit_repairval_unrep test_mbinit_lr04_reversal_apply test_mbinit_lr07_reversal_trainerror test_mbinit_rm02_per_lane_reader test_mbinit_rm07_unrepairable test_mbinit_rm05_post_repair_persist
+MBINIT_LOG_DIR ?= run_logs/mbinit
+MBINIT_SUBMAKE ?= $(MAKE)
 MBTRAINTEST ?=
 #MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
 MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity test_mbtrain_speedidle test_mbtrain_speedidle_retrain test_mbtrain_speedidle_error test_mbtrain_rxclkcal test_mbtrain_dc2 test_mbtrain_linkspeed test_mbtrain_linkspeed_fail
@@ -72,19 +76,70 @@ mbinit_lr03_lr04:
 	$(MAKE) mbinit MBTEST=test_mbinit_lr04_reversal_apply
 	$(MAKE) mbinit MBTEST=test_mbinit_lr07_reversal_trainerror
 
-mbinit_regress:
-	$(MAKE) mbinit MBTEST=test_mbinit_sanity
-	$(MAKE) mbinit MBTEST=test_mbinit_param_mismatch
-	$(MAKE) mbinit MBTEST=test_mbinit_param_only
-	$(MAKE) mbinit MBTEST=test_mbinit_cal
-	$(MAKE) mbinit MBTEST=test_mbinit_repairclk
-	$(MAKE) mbinit MBTEST=test_mbinit_repairclk_unrep
-	$(MAKE) mbinit MBTEST=test_mbinit_repairval_unrep
-	$(MAKE) mbinit MBTEST=test_mbinit_lr04_reversal_apply
-	$(MAKE) mbinit MBTEST=test_mbinit_lr07_reversal_trainerror
-	$(MAKE) mbinit MBTEST=test_mbinit_rm02_per_lane_reader
-	$(MAKE) mbinit MBTEST=test_mbinit_rm07_unrepairable
-	$(MAKE) mbinit MBTEST=test_mbinit_rm05_post_repair_persist
+# Run every test in $(MBINIT_TESTS); logs under $(MBINIT_LOG_DIR); exit 1 if any fail.
+mbinit_all:
+	@mkdir -p "$(MBINIT_LOG_DIR)"; \
+	tests="$(strip $(MBINIT_TESTS))"; \
+	results_file="$(MBINIT_LOG_DIR)/.results"; \
+	error_re='^(UVM_ERROR|UVM_FATAL)[[:space:]]+[^:]|UVM_(ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
+	failed=0; \
+	{ \
+	  printf "MBINIT detailed results\n"; \
+	  printf "Tests: %s\n\n" "$$tests"; \
+	} > "$$results_file"; \
+	printf "\nMBINIT results:\n"; \
+	for test in $$tests; do \
+	  log="$(MBINIT_LOG_DIR)/$$test.log"; \
+	  if $(MBINIT_SUBMAKE) --no-print-directory mbinit MBTEST=$$test > "$$log" 2>&1; then \
+	    sim_status=0; \
+	  else \
+	    sim_status=$$?; \
+	  fi; \
+	  if grep -Eq "$$error_re" "$$log"; then \
+	    uvm_failure=1; \
+	  else \
+	    uvm_failure=0; \
+	  fi; \
+	  if [ $$sim_status -eq 0 ] && [ $$uvm_failure -eq 0 ]; then \
+	    result=PASS; \
+	  else \
+	    result=FAIL; \
+	    failed=1; \
+	  fi; \
+	  printf "  %-36s %s\n" "$$test" "$$result"; \
+	  { \
+	    printf "TEST: %s\n" "$$test"; \
+	    printf "STATUS: %s\n" "$$result"; \
+	    printf "LOG: %s\n" "$$log"; \
+	    printf "SIM_EXIT_STATUS: %s\n" "$$sim_status"; \
+	    if [ "$$result" = PASS ]; then \
+	      printf "REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found\n"; \
+	    else \
+	      printf "REASON:"; \
+	      if [ $$sim_status -ne 0 ]; then \
+	        printf " simulator exited with status %s;" "$$sim_status"; \
+	      fi; \
+	      if [ $$uvm_failure -ne 0 ]; then \
+	        printf " UVM_ERROR/UVM_FATAL present in log;"; \
+	      fi; \
+	      printf "\n"; \
+	      error_lines="$$(grep -En "$$error_re" "$$log" | sed -n '1,80p')"; \
+	      printf "ERROR_EXCERPT:\n"; \
+	      if [ -n "$$error_lines" ]; then \
+	        printf "%s\n" "$$error_lines"; \
+	      else \
+	        printf "<no UVM/Xcelium error regex matches; inspect full log for the nonzero exit cause>\n"; \
+	      fi; \
+	      printf "LOG_TAIL:\n"; \
+	      tail -n 40 "$$log"; \
+	    fi; \
+	    printf "\n"; \
+	  } >> "$$results_file"; \
+	done; \
+	printf "\nDetailed results: %s\n" "$$results_file"; \
+	exit $$failed
+
+mbinit_regress: mbinit_all
 
 # ---- LinkTrainingSM (MBINIT + TRAINERROR SB) — sources under ./ltsm/ ----
 ltsm:
