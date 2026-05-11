@@ -17,6 +17,8 @@ class mbtrain_driver extends uvm_driver #(mbtrain_transaction);
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit tx_selfcal_busy;
+
     // Idle defaults
     vif.fsmCtrl_start                   = 0;
     vif.goToState_valid                 = 0;
@@ -75,12 +77,23 @@ class mbtrain_driver extends uvm_driver #(mbtrain_transaction);
       end
 
       // Auto-stub: TxSelfCal done pulse 3 cycles after MBTrain requests it.
+      // Sample after the edge because txSelfCalStart is a DUT output that may
+      // assert after the active clock edge.
       forever begin
-        @(posedge vif.clock iff vif.trainingCtrl_txSelfCalStart);
-        repeat(3) @(posedge vif.clock);
-        vif.trainingCtrl_txSelfCalDone = 1;
         @(posedge vif.clock);
-        vif.trainingCtrl_txSelfCalDone = 0;
+        #1ps;
+        if (vif.trainingCtrl_txSelfCalStart && !tx_selfcal_busy) begin
+          tx_selfcal_busy = 1;
+          fork
+            begin
+              repeat(3) @(posedge vif.clock);
+              vif.trainingCtrl_txSelfCalDone = 1;
+              @(posedge vif.clock);
+              vif.trainingCtrl_txSelfCalDone = 0;
+              tx_selfcal_busy = 0;
+            end
+          join_none
+        end
       end
 
       // Auto-stub: RxClkCal done pulse 3 cycles after MBTrain requests it.
@@ -90,6 +103,11 @@ class mbtrain_driver extends uvm_driver #(mbtrain_transaction);
         vif.trainingCtrl_rxClkCalDone = 1;
         @(posedge vif.clock);
         vif.trainingCtrl_rxClkCalDone = 0;
+      end
+
+      forever begin
+        @(negedge vif.reset);
+        tx_selfcal_busy = 0;
       end
 
       forever begin
