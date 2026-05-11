@@ -2,43 +2,26 @@
 
 An open-source implementation of the UCIe 3.0 specification.
 
-You can request a copy of the UCIe specification [here](https://www.uciexpress.org/3-0-spec-download).
+You can request a copy of the UCIe 1.1 specification [here](https://www.uciexpress.org/1-1-spec-download).
 
-## Tests
-> [!NOTE]
-> For now to use `mill` please run the following to include the appropriate dependencies.
->```bash
->git clone https://github.com/ucb-substrate/chippy.git
->cd chippy
->git submodule update --init --recursive
->./mill __.publishLocal
->```
-> [!NOTE]
-> To run UVM testbenches, use 'make run TEST=[test_name]' (e.g. test_sbinit_sanity) inside of the ucie/uvm directory.
+## Getting Started
 
-To run the RTL tests, make sure Scala is installed.
+Install [sbt](https://www.scala-sbt.org/).
+If you run into issues building the Scala code,
+you may need to switch to Java 17.
 
-Then, run the following from the `scala/` folder.
+To run the tests, run `sbt test` from the root of this repository.
+To compile the code, run `sbt compile`.
+To format the code using scalafmt, run `sbt scalafmt`.
 
-```bash
-./mill test
-```
+If you are running `sbt` commands frequently, you may find it useful
+to leave the sbt shell (launched by running `sbt` with no arguments) open.
+You can then compile/test the code from the sbt shell.
 
-To run the VAMS tests, make sure the `XCELIUM_HOME` environment variable is correctly set and `xrun` is on your `PATH`.
+## Documentation
 
-Then, run the following from the `rs/` folder:
-
-```bash
-cargo t
-```
-
-## Organization
-
-Chisel RTL for all digital components can be found in the `scala/` directory.
-
-Verilog testbenches and AMS models can be found in the `verilog/` folder.
-
-Rust code for orchestrating tests can be found in the `rs/` folder.
+See the [API documentation](https://ucb-ucie.github.io/uciedigital/edu/berkeley/cs/ucie/digital/index.html).
+The API docs are updated automatically in continuous integration.
 
 ## Contributing
 
