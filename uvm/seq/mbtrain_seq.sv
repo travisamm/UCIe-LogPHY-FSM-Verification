@@ -312,4 +312,48 @@ class seq_mbtrain_full extends mbtrain_base_seq;
   endtask
 endclass
 
+// ============================================================
+// seq_mbtrain_txselfcal_probe: focused path to TXSELFCAL.
+//
+// This sequence intentionally holds the requester-side TXSELFCAL response
+// before driving the responder-side request so the log can distinguish a
+// missed requester message from a DUT state advance before requester exchange.
+// ============================================================
+class seq_mbtrain_txselfcal_probe extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_txselfcal_probe)
+
+  function new(string name = "seq_mbtrain_txselfcal_probe");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(2), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MT_SI_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MT_TC_DONE_RESP),
+              .delay(5), .hold(160));
+
+    send_item(.rsp_valid(1), .rsp_data(`MT_TC_DONE_REQ),
+              .delay(5), .hold(60));
+  endtask
+endclass
+
 `endif
