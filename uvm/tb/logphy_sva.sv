@@ -83,6 +83,7 @@ endmodule
 // Use `mbinit_scoreboard` + directed tests for protocol closure; re-enable a
 // bind only with a property that matches RTL timing (bounded skew or substate).
 // ============================================================
+// cadence coverage off
 module mbinit_state_sync_sva (
   input wire        clock,
   input wire        reset,
@@ -101,6 +102,7 @@ module mbinit_state_sync_sva (
     else $error("SVA FAIL: XC-03 requester/responder states out of sync");
 
 endmodule
+// cadence coverage on
 // ============================================================
 // SVA: XC-07 — Valid framing must be correct when LFSR pattern transmitted
 // When patternType=0 (LFSR), mbTxLaneIo_bits_valid must be asserted

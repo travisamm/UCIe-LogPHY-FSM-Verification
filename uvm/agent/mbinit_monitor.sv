@@ -48,6 +48,7 @@ class mbinit_monitor extends uvm_monitor;
     logic        prev_loc_clk_ph;
     logic        prev_neg_clk_ph;
     logic        prev_tx_width_changed;
+    logic        prev_interop_fail;
 
     prev_state          = 3'hX;
     prev_done           = 0;
@@ -77,6 +78,7 @@ class mbinit_monitor extends uvm_monitor;
     prev_loc_clk_ph     = 1'b0;
     prev_neg_clk_ph     = 1'b0;
     prev_tx_width_changed = 1'b0;
+    prev_interop_fail     = 1'b0;
 
     forever begin
       @(posedge vif.clock);
@@ -111,7 +113,8 @@ class mbinit_monitor extends uvm_monitor;
            vif.txPtTestReqIo_ptTestResults_bits !== prev_pt_res_bits) ||
           (vif.localPhySettings_clockPhase !== prev_loc_clk_ph)   ||
           (vif.negotiatedPhySettings_clockPhase !== prev_neg_clk_ph) ||
-          (vif.txWidthChanged !== prev_tx_width_changed)) begin
+          (vif.txWidthChanged !== prev_tx_width_changed) ||
+          (vif.interoperableParamsNotFound !== prev_interop_fail)) begin
 
         tx = mbinit_transaction::type_id::create("tx");
         // Inherited observed fields (logphy_transaction)
@@ -187,6 +190,7 @@ class mbinit_monitor extends uvm_monitor;
         prev_loc_clk_ph      = vif.localPhySettings_clockPhase;
         prev_neg_clk_ph      = vif.negotiatedPhySettings_clockPhase;
         prev_tx_width_changed = vif.txWidthChanged;
+        prev_interop_fail     = vif.interoperableParamsNotFound;
       end
     end
   endtask

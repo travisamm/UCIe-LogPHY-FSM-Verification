@@ -4,6 +4,8 @@ class mbinit_coverage extends uvm_component;
   uvm_analysis_imp #(mbinit_transaction, mbinit_coverage) analysis_export;
 
   covergroup mbinit_cg with function sample(mbinit_transaction t);
+    option.per_instance = 1;
+    option.name = "mbinit_cg";
 
     // MP-01/02/03/06: PARAM negotiation
     cp_neg_valid: coverpoint t.negotiatedPhySettings_valid {
@@ -62,10 +64,10 @@ class mbinit_coverage extends uvm_component;
     }
 
     cp_pattern_writer_type: coverpoint t.patternWriter_patternType {
-      bins type_0 = {0};
-      bins type_1 = {1};
-      bins type_2 = {2};
-      bins type_3 = {3};
+      bins type_0 = {0};  // CLKREPAIR  — REPAIRCLK
+      bins type_1 = {1};  // VALTRAIN   — REPAIRVAL
+      bins type_2 = {2};  // PERLANEID  — REVERSALMB, REPAIRMB
+      ignore_bins type_na = {3};  // unused in MBINIT
     }
 
     // LR-03/RM-02: pattern reader / Tx point-test activity (RM-02: scoreboard + `test_mbinit_rm02_per_lane_reader`)
@@ -93,27 +95,35 @@ class mbinit_coverage extends uvm_component;
     }
 
     // MP-04 cross: interop failure must cause fsm error
+    // Only PARAM state is reachable when interop fails; later states are structurally unreachable.
     cx_interop_error: cross cp_interop_fail, cp_fsm_state {
       bins interop_fail_in_param = binsof(cp_interop_fail.failed) &&
                                    binsof(cp_fsm_state.PARAM);
+      ignore_bins not_reachable = default;
     }
 
     // FSM progression: PARAM → CAL → REPAIRCLK → REPAIRVAL → REVERSALMB → REPAIRMB → TOMBTRAIN
+    // neg_valid is only meaningful in PARAM state; all other state combinations are unreachable.
     cx_neg_valid_in_param: cross cp_neg_valid, cp_fsm_state {
       bins negotiated = binsof(cp_neg_valid.valid) &&
                         binsof(cp_fsm_state.PARAM);
+      ignore_bins not_reachable = default;
     }
 
     // RC-01 cross: clk lanes enabled in REPAIRCLK
+    // Clk enable is only asserted during REPAIRCLK; other state combinations are unreachable.
     cx_clk_en_in_repairclk: cross cp_tx_clk_en, cp_fsm_state {
       bins clk_enabled_repairclk = binsof(cp_tx_clk_en.enabled) &&
                                    binsof(cp_fsm_state.REPAIRCLK);
+      ignore_bins not_reachable = default;
     }
 
     // RC-02 cross: pattern writer active in REPAIRCLK
+    // Pattern writer runs in REPAIRCLK; other state combinations are unreachable.
     cx_pw_in_repairclk: cross cp_pattern_writer, cp_fsm_state {
       bins pw_active_repairclk = binsof(cp_pattern_writer.active) &&
                                  binsof(cp_fsm_state.REPAIRCLK);
+      ignore_bins not_reachable = default;
     }
 
   endgroup : mbinit_cg

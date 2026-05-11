@@ -1,7 +1,11 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
+IMC      := MDV_XLM_HOME=/share/instsww/cadence/XCELIUM2509 /share/instsww/cadence/VMANAGER2509/tools/bin/imc
 XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
-.PHONY: sbinit sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
+COV_WORK  ?= cov_work
+COV_TEST  ?= default
+
+.PHONY: sbinit sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 cov_mbinit cov_report clean
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
@@ -233,5 +237,63 @@ _mbtrain_run:
 
 mbtrain_regress: mbtrain
 
+# ---- Coverage collection: run mbinit_regress with coverage enabled, then report ----
+# Usage:
+#   make cov_mbinit           — collect + merge + open HTML report
+#   make cov_mbinit COV_WORK=my_cov_dir
+#
+# Individual tests write to $(COV_WORK)/<testname>/; imc merges them into a
+# single database and generates an HTML report under $(COV_WORK)/report/.
+#
+# The HTML report index is at $(COV_WORK)/report/index.html — open in a browser.
+
+COV_MBINIT_WORK ?= cov_work/mbinit
+
+cov_mbinit:
+	@mkdir -p "$(COV_MBINIT_WORK)"
+	@tests="$(strip $(MBINIT_TESTS))"; \
+	for test in $$tests; do \
+	  echo "=== Coverage run: $$test ==="; \
+	  $(XRUN) $(XRUN_OPTS) \
+	    -coverage u \
+	    -covworkdir $(abspath $(COV_MBINIT_WORK)) \
+	    -covtest $$test \
+	    +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+	    -y ../elab/generatedVerilog/logphy +libext+.sv \
+	    ../elab/generatedVerilog/logphy/MBInitSM.sv \
+	    ../elab/generatedVerilog/logphy/MBInitRequester.sv \
+	    ../elab/generatedVerilog/logphy/MBInitResponder.sv \
+	    ./if/logphy_if.sv \
+	    ./if/mbinit_if.sv \
+	    ./agent/logphy_agent_pkg.sv \
+	    ./agent/mbinit_agent_pkg.sv \
+	    ./env/mbinit_env_pkg.sv \
+	    ./seq/mbinit_seq_pkg.sv \
+	    ./tests/mbinit_test_pkg.sv \
+	    ./tb/mbinit_bind_exports.sv \
+	    ./tb/logphy_sva.sv \
+	    ./tb/mbinit_tb_top.sv \
+	    +UVM_TESTNAME=$$test || true; \
+	done
+	$(MAKE) cov_report COV_WORK=$(COV_MBINIT_WORK)
+
+cov_report:
+	$(eval ABS_COV := $(abspath $(COV_WORK)))
+	$(eval SCOPE_DIR := $(ABS_COV)/scope)
+	$(eval MERGED := $(ABS_COV)/merged)
+	@echo "=== Merging all runs via runfile ==="
+	@first=""; \
+	ls $(SCOPE_DIR) | grep "^test_" | while read d; do echo "$(SCOPE_DIR)/$$d"; done \
+	  > $(ABS_COV)/runfile.txt; \
+	first=$$(head -1 $(ABS_COV)/runfile.txt); \
+	$(IMC) -load "$$first" \
+	  -execcmd "merge -runfile $(ABS_COV)/runfile.txt -out $(SCOPE_DIR)/merged_all -overwrite; exit"
+	@echo "=== Generating HTML report from merged_all ==="
+	@mkdir -p $(ABS_COV)/report
+	$(IMC) -load $(SCOPE_DIR)/merged_all \
+	  -execcmd "exclude -type mbinit_state_sync_sva -metrics assertion -comment {Intentionally unbound: XC-03 property too tight for RTL substate timing}; report_metrics -overwrite -out $(ABS_COV)/report; exit"
+	@echo ""
+	@echo "Coverage report: $(ABS_COV)/report/index.html"
+
 clean:
-	rm -rf *.log *.history INCA_libs xcelium.d run_logs
+	rm -rf *.log *.history INCA_libs xcelium.d run_logs cov_work
