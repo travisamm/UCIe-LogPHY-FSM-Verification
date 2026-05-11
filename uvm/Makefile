@@ -1,5 +1,5 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
-XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
+XRUN_OPTS := -sv -uvm  -access +rwc -timescale 1ns/1ps -64bit
 
 .PHONY: sbinit sbinit_regress mbinit mbinit_regress ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
 
