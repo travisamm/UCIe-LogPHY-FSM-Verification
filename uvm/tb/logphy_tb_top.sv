@@ -23,12 +23,11 @@ module logphy_tb_top;
   logphy_if vif(clock, reset);
 
   // DUT instantiation
+  // SBInitSM exposes only io_fsmCtrl_{start,done}; substateTransitioning/error are tied inside RTL.
   SBInitSM dut (
     .clock(clock),
     .reset(reset),
     .io_fsmCtrl_start(vif.fsmCtrl_start),
-    .io_fsmCtrl_substateTransitioning(vif.fsmCtrl_substateTransitioning),
-    .io_fsmCtrl_error(vif.fsmCtrl_error),
     .io_fsmCtrl_done(vif.fsmCtrl_done),
     .io_sbRxTxMode(vif.sbRxTxMode),
     .io_requesterSbLaneIo_tx_ready(vif.requesterSbLaneIo_tx_ready),

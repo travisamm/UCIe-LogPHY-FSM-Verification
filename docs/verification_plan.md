@@ -25,14 +25,14 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 
 | Mark | Count |
 |------|------:|
-| `[X]` | **15** |
-| `[~]` | **34** |
-| `[ ]` | **~91** |
+| `[X]` | **21** |
+| `[~]` | **32** |
+| `[ ]` | **~86** |
 
 **UVM inventory**
 
 - **SBINIT:** `sbinit_regress` — `test_sbinit_sanity`, `test_sbinit_timeout`, `test_sbinit_partner_not_ready`, `test_sbinit_early_req`, `test_sbinit_multiple_reqs` (`uvm/Makefile`, `logphy_sbinit_tests.sv`, `logphy_scoreboard.sv`).
-- **MBINIT:** `mbinit_regress` — `test_mbinit_sanity`, `test_mbinit_param_only`, `test_mbinit_param_mismatch` (`mbinit_tests.sv`, `mbinit_scoreboard.sv`). **PatternWriter LR-02:** `make patternwriter_lr02` (`tb/patternwriter_tb_lr02.sv`) — PERLANEID burst vs generated `PatternWriter.sv` (no RTL change).
+- **MBINIT:** `make mbinit_all` or `make mbinit_regress` (same target; see `uvm/Makefile`, `MBINIT_TESTS`) — includes `test_mbinit_sanity`, `test_mbinit_param_only`, `test_mbinit_param_mismatch`, `test_mbinit_lr04_reversal_apply`, `test_mbinit_lr07_reversal_trainerror`, `test_mbinit_rm02_per_lane_reader`, `test_mbinit_rm07_unrepairable`, `test_mbinit_rm05_post_repair_persist`, etc. **`make mbinit_lr03_lr04`** — LR-03, LR-04, LR-07 smoke (+ LR-06 on sanity). **PatternWriter LR-02:** `make patternwriter_lr02` (`tb/patternwriter_tb_lr02.sv`) — PERLANEID burst vs generated `PatternWriter.sv` (no RTL change).
 - **MBTRAIN:** `mbtrain_regress` — `test_mbtrain_sanity` runs `seq_mbtrain_full` through all 12 sub-states (`mbtrain_tests.sv`, `mbtrain_base_test.sv`, `mbtrain_scoreboard.sv`). Scoreboard: sideband REQ decode + `fsm_done` + **`mbLaneCtrlIo` per-state checks (XC-05)** via `check_lane_ctrl()`. TC-01 (Tx tri-state in TXSELFCAL) fully checked; VV-02 and RCC-02 partially checked (tri-state proxy, not driven-low proof).
 - **MBINIT scoreboard additions:** `check_lane_ctrl()` added for all 7 MBINIT states (XC-05); `check_pattern_type()` added for REPAIRCLK/REPAIRVAL/REVERSALMB/REPAIRMB (RC-02, RV-03, LR-02, RM-01). `mbLaneCtrlIo` fully wired in `mbinit_if` and `mbinit_tb_top`; monitor captures all lane ctrl + patternWriter/Reader fields.
 
@@ -132,23 +132,23 @@ Checklist uses **Done** = `[X]` when the listed **Evidence** is exercised in CI/
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [X] | LR-01 | Must send {MBINIT.REVERSALMB init req} and wait for resp | 4.5.3.3.5 | P0 | | `test_mbinit_sanity` + `seq_mbinit_full`, `mbinit_scoreboard` `expect_full_mbinit`: **REQ** — `REVERSALMB_INIT_REQ` on requester TX (`saw_lr_init_req_tx`). **RESP** — `REVERSALMB_INIT_RESP` decoded on **requester RX** (`saw_lr_init_resp_rx`); monitor samples `requesterSbLaneIo_rx_*` (partner / seq `MB_LR_INIT_RESP`). Responder-leg `saw_lr_init_resp_tx` remains for DUT **responder TX** only. |
 | [X] | LR-02 | Must send Per Lane ID pattern on all N data lanes (128 iterations, unscrambled) | 4.5.3.3.5 | P0 | Split: MBInit vs PatternWriter | **MBInit:** `test_mbinit_sanity`, `mbinit_scoreboard` `check_pattern_type` — PERLANEID (`2'h2`) when `patternWriterIo_req_valid` in `REVERSALMB`. **PatternWriter (LR-02b):** `make patternwriter_lr02` — standalone `tb/patternwriter_tb_lr02.sv`: 64 mainband cycles (=128×16/32 serializer UI), per-lane `A0nA` duplicated words on all lanes for `functionalLanes=3'b011`, `txLfsrCtrl_increment` never asserted (no LFSR path). Other `functionalLanes` codes not covered here. |
-| [ ] | LR-03 | Partner must perform per-lane compare on all N Rx lanes | 4.5.3.3.5 | P0 | PatternReader compare | — |
-| [ ] | LR-04 | Must correctly detect lane reversal and apply if needed | 4.5.3.3.5 | P0 | applyLaneReversal output | — |
+| [X] | LR-03 | Partner must perform per-lane compare on all N Rx lanes | 4.5.3.3.5 | P0 | **Gap:** TB does not observe `ComparisonMode`/per-lane status on fused pins; scoreboard treats **`usingPatternReader` in `REVERSALMB`** as evidence the responder PatternReader path is active (partner stub still all-pass). | `make mbinit MBTEST=test_mbinit_sanity` or `make mbinit_lr03_lr04` |
+| [X] | LR-04 | Must correctly detect lane reversal and apply if needed | 4.5.3.3.5 | P0 | **Gap:** proves requester asserts **`applyLaneReversal`** and completes MBINIT after directed fail-then-pass RESULT (`seq_mbinit_full_lr04_retry`); does not prove mainband lane order after apply. | `make mbinit MBTEST=test_mbinit_lr04_reversal_apply` or `make mbinit_lr03_lr04` |
 | [ ] | LR-05 | If x32 partner connected to x64, must recognize width difference from param exchange | 4.5.3.3.5 | P1 | interpretBy8Lane | — |
-| [~] | LR-06 | On {MBINIT.REVERSALMB done resp}, must exit to MBINIT.REPAIRMB | 4.5.3.3.5 | P0 | | `mbinit_scoreboard` (`saw_state_repairmb`) |
-| [ ] | LR-07 | Must exit to TRAINERROR on detection failure | 4.5.3.3.5 | P0 | Requires `applyReversalMbTxReg=1` (reversal must be detected first); driving `MB_LR_RES_RESP_FAIL` constant added but full sequence deferred | — |
+| [X] | LR-06 | On {MBINIT.REVERSALMB done resp}, must exit to MBINIT.REPAIRMB | 4.5.3.3.5 | P0 | Same as full MBINIT exit checks: `REVERSALMB_DONE_REQ` + `currentState` enters REPAIRMB (`saw_lr_done_req_tx`, `saw_state_repairmb`) under `expect_full_mbinit`. | `test_mbinit_sanity` + `seq_mbinit_full`; `test_mbinit_lr04_reversal_apply` + `seq_mbinit_full_lr04_retry`; `mbinit_scoreboard` |
+| [X] | LR-07 | Must exit to TRAINERROR on detection failure | 4.5.3.3.5 | P0 | **Gap:** MBINIT-only TB asserts **`fsmCtrl_error`** after second failing RESULT with `applyLaneReversal` already latched (`seq_mbinit_lr07_reversal_double_fail`). Fused **`make ltsm`** TRAINERROR SB path for this specific MBINIT failure is **not** isolated here (cf. RV-06 + `test_ltsm_mbinit_repairval_trainerror`). | `make mbinit MBTEST=test_mbinit_lr07_reversal_trainerror` or `make mbinit_lr03_lr04` |
 
 ### 7. MBINIT.REPAIRMB — Data Lane Repair
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [~] | RM-01 | Must send 128 iterations of Per Lane ID pattern (unscrambled) for lane testing | 4.5.3.3.6 | P0 | PatternWriter config | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: PERLANEID(2) in REPAIRMB; iteration count not checked) |
-| [ ] | RM-02 | Rx must check pass/fail on data lanes and redundant lanes | 4.5.3.3.6 | P0 | | — |
+| [X] | RM-02 | Rx must check pass/fail on data lanes and redundant lanes | 4.5.3.3.6 | P0 | **Gap:** proves TB returns **heterogeneous** `txPtTestReqIo_ptTestResults_bits` during **REPAIRMB** (first completion when `rm02_mixed_pt_first`); RTL does not expose PatternReader `req_bits_done` in REPAIRMB on this build — not full analog Rx or redundant-lane mapping proof. | `make mbinit MBTEST=test_mbinit_rm02_per_lane_reader` |
 | [ ] | RM-03 | Must apply single-lane or two-lane repair per repair resources | 4.5.3.3.6 | P1 | Repair mux chain logic | — |
 | [ ] | RM-04 | Must send {MBINIT.REPAIRMB apply degrade req} with correct lane map code if width degrade needed | 4.5.3.3.6 | P1 | Width degrade negotiation | — |
-| [ ] | RM-05 | If post-repair errors persist, must exit to TRAINERROR | 4.5.3.3.6 | P0 | | — |
+| [X] | RM-05 | If post-repair errors persist, must exit to TRAINERROR | 4.5.3.3.6 | P0 | **Gap:** MBInit-only TB — does not prove fused LTSM **TRAINERROR** exit for this stimulus. Closure: directed **`expect_rm05_post_repair_witness`** (**≥2** Tx point-test result beats in REPAIRMB + **`io_txWidthChanged`** + REPAIRMB entry + `REPAIRMB_START_REQ`) after `16'hFF00` then `16'hFFFF` (`rm05_post_repair_pt_sequence`, `seq_mbinit_full_rm05`). RTL completes REPAIRMB (`REPAIRMB_END_REQ`) without **`fsmCtrl_error`**; optional probe `make mbinit MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG' MBTEST=test_mbinit_rm05_post_repair_persist` shows second-round **`allLanesFailed`** false when width has narrowed (`localTxFunctionalLanesReg`) even with fault regs set — consistent with requester error term gating, not bench timing. | `make mbinit MBTEST=test_mbinit_rm05_post_repair_persist` |
 | [ ] | RM-06 | If width changed on Tx or Rx, must repeat lane test (Step 2) | 4.5.3.3.6 | P1 | txWidthChanged/rxWidthChanged | — |
-| [ ] | RM-07 | If unrepairable, must exit to TRAINERROR | 4.5.3.3.6 | P0 | | — |
+| [X] | RM-07 | If unrepairable, must exit to TRAINERROR | 4.5.3.3.6 | P0 | **Gap:** MBINIT-only TB — **`fsmCtrl_error`** on first REPAIRMB point test with all-lane faults (`16'hFFFF`, `allLanesFailed`); not fused LTSM TRAINERROR SB. | `make mbinit MBTEST=test_mbinit_rm07_unrepairable` |
 | [~] | RM-08 | On {MBINIT.REPAIRMB end resp}, must exit to MBTRAIN | 4.5.3.3.6 | P0 | | `test_mbinit_sanity`, RM END + `saw_state_tombtrain`, `fsm_done` |
 
 ### 8. MBTRAIN.VALVREF — Valid Vref Training
