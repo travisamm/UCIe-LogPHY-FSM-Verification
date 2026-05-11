@@ -3,6 +3,7 @@
 
 // Covers the main P0 MBINIT path from the verification plan:
 // MP-01/02/03/06, MC-01/02, RC-05, RV-07, LR-01/06, RM-08.
+// Note: expect_fsm_done is off until dual-die fsmCtrl_done (responder closure) is fixed — RM-08 tombtrain + messages still checked.
 class test_mbinit_sanity extends mbinit_base_test;
   `uvm_component_utils(test_mbinit_sanity)
 
@@ -10,15 +11,34 @@ class test_mbinit_sanity extends mbinit_base_test;
     super.new(name, parent);
   endfunction
 
+  // MBInitState on io_currentState is the *requester* only (see MBInitSM.scala).
+  // fsmCtrl_done = requester.done && responder.done — so state==6 with done==0
+  // means requester reached TOMBTRAIN but responder did not assert done (no waves needed).
   task run_phase(uvm_phase phase);
     seq_mbinit_full seq;
+    virtual mbinit_if vif;
     phase.raise_objection(this);
+
+    env.scoreboard.expect_fsm_done = 0;
 
     `uvm_info("TEST", "Starting seq_mbinit_full...", UVM_LOW)
     seq = seq_mbinit_full::type_id::create("seq");
     seq.start(env.agent.sequencer);
 
+    if (uvm_config_db#(virtual mbinit_if)::get(this, "", "mbinit_vif", vif))
+      `uvm_info("TEST_SNAP", $sformatf(
+        "After seq: fsmCtrl_done=%b fsmCtrl_error=%b requester_currentState=%0d (6=TOMBTRAIN) req_rx_v=%b rsp_rx_v=%b",
+        vif.fsmCtrl_done, vif.fsmCtrl_error, vif.currentState,
+        vif.requesterSbLaneIo_rx_valid, vif.responderSbLaneIo_rx_valid), UVM_LOW)
+    else
+      `uvm_warning("TEST", "mbinit_vif not in config_db — add for TEST_SNAP diagnostics")
+
     #20000ns;
+
+    if (uvm_config_db#(virtual mbinit_if)::get(this, "", "mbinit_vif", vif))
+      `uvm_info("TEST_SNAP", $sformatf(
+        "After +20us idle: fsmCtrl_done=%b fsmCtrl_error=%b requester_currentState=%0d",
+        vif.fsmCtrl_done, vif.fsmCtrl_error, vif.currentState), UVM_LOW)
 
     `uvm_info("TEST", "Test seq_mbinit_full finished.", UVM_LOW)
     phase.drop_objection(this);

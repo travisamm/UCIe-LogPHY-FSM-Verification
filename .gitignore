@@ -79,6 +79,7 @@ xcelium.d/
 INCA_libs/
 *.log
 *.history
+uvm/run_logs/
 
 out/
 .metals/
