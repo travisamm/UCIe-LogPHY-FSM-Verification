@@ -50,7 +50,15 @@ lazy val root = (project in file("."))
       }
       def isSelected(file: File): Boolean = {
         val path = pathOf(file)
-        selected.exists(path.endsWith)
+        selected.exists { sel =>
+          val s = sel.replace('\\', '/')
+          if (s.endsWith("/")) {
+            val prefix = s.stripSuffix("/")
+            path.contains("/" + prefix + "/") || path.endsWith("/" + prefix)
+          } else {
+            path.endsWith(s)
+          }
+        }
       }
 
       if (selected.nonEmpty)

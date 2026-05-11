@@ -78,6 +78,11 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit saw_rclk_done_req_tx;
   bit saw_rclk_done_resp_tx;
 
+  // ---- REPAIRCLK positive witnesses (RC-01 / RC-02) ----
+  bit saw_repairclk_lane_ctrl_good; // RC-01: at least one sample matching XC-05 REPAIRCLK expectations
+  bit saw_repairclk_pw_clkrepair;   // RC-02: patternWriter CLKREPAIR in REPAIRCLK
+  bit saw_repairclk_pr_clkrepair;   // RC-02: patternReader CLKREPAIR req in REPAIRCLK (repair verify path)
+
   // ---- REPAIRVAL flow messages; RV-07 is checked through DONE and state exit ----
   bit saw_rval_init_req_tx;
   bit saw_rval_init_resp_tx;
@@ -85,6 +90,12 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit saw_rval_res_resp_tx;
   bit saw_rval_done_req_tx;
   bit saw_rval_done_resp_tx;
+
+  // ---- RV-01 (partial): VALTRAIN in REPAIRVAL + negotiated clock phase vs local ----
+  bit saw_rv01_pw_valtrain;     // patternWriter VALTRAIN req in REPAIRVAL
+  bit saw_rv01_repairval_reader_on; // responder patternReader path active (usingPatternReader)
+  bit saw_rv01_using_pw;        // usingPatternWriter during VALTRAIN beat
+  bit rv01_phase_constraint_violation; // negotiated_phase & ~local_phase (violates AND semantics)
 
   // ---- REVERSALMB flow messages; LR-01/LR-06 map directly to CSV rows ----
   bit saw_lr_init_req_tx;
@@ -113,11 +124,19 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit expect_param_common_rate  = 1;
   bit expect_param_negotiation  = 1;
   bit expect_full_mbinit        = 1;
+  // PARAM through CAL exit (MP-06, MC-01, MC-02); use with short seq (no full MBINIT)
+  bit expect_mbinit_through_cal = 0;
+  // PARAM through REPAIRCLK exit (RC-01, RC-02, RC-05) + prior CAL/PARAM; use with seq_mbinit_repairclk_only
+  bit expect_mbinit_through_repairclk = 0;
+  // RC-03: unrepairable clock — must error before REPAIRVAL
+  bit expect_repairclk_rc03      = 0;
   bit expect_interop_failure    = 0;
   bit expect_fsm_done           = 1;
   bit expect_fsm_error          = 0;
   bit expect_lane_ctrl_checks   = 1;
   bit expect_pattern_type_checks = 1;
+  // RV-01: VALTRAIN + patternReader path + negotiated phase ⊆ local (see vplan notes)
+  bit expect_rv01_checks         = 1;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -164,6 +183,32 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
       check_lane_ctrl(tx);
       check_pattern_type(tx);
+
+      if (tx.currentState == MB_STATE_REPAIRCLK) begin
+        if (repairclk_lane_ctrl_matches(tx))
+          saw_repairclk_lane_ctrl_good = 1;
+        if (tx.patternWriter_req_valid && tx.patternWriter_patternType == 2'h0)
+          saw_repairclk_pw_clkrepair = 1;
+        if (tx.patternReader_req_valid && tx.patternReader_patternType == 2'h0)
+          saw_repairclk_pr_clkrepair = 1;
+      end
+
+      // RV-01: PatternWriter.scala drives VALTRAIN with forwarded clkP/clkN patterns on mainband;
+      // MBInitSM.scala REPAIRVAL still has TODO for explicit UI centering — we check bus-visible context.
+      if (tx.currentState == MB_STATE_REPAIRVAL) begin
+        if (tx.patternWriter_req_valid && tx.patternWriter_patternType == 2'h1) begin
+          saw_rv01_pw_valtrain = 1;
+          if (tx.usingPatternWriter)
+            saw_rv01_using_pw = 1;
+          if (tx.negotiatedPhySettings_valid &&
+              (tx.observed_negotiated_clockPhase & ~tx.observed_local_clockPhase))
+            rv01_phase_constraint_violation = 1;
+        end
+        if (tx.patternReader_req_valid && tx.patternReader_patternType == 2'h1)
+          saw_rv01_repairval_reader_on = 1;
+        if (tx.usingPatternReader)
+          saw_rv01_repairval_reader_on = 1;
+      end
 
       if (tx.negotiatedPhySettings_valid) begin
         if (!mp_02_verified && tx.negotiated_maxDataRate == 4'hF) begin
@@ -315,6 +360,19 @@ class mbinit_scoreboard extends uvm_scoreboard;
     end
   endfunction
 
+  // RC-01: XC-05 expectations for REPAIRCLK (same as check_lane_ctrl MB_STATE_REPAIRCLK branch)
+  function bit repairclk_lane_ctrl_matches(mbinit_transaction tx);
+    repairclk_lane_ctrl_matches =
+      (tx.mbLaneCtrl_txDataEn  == 16'h0) &&
+      (tx.mbLaneCtrl_txClkEn   === 1'b1) &&
+      (tx.mbLaneCtrl_txValidEn === 1'b1) &&
+      (tx.mbLaneCtrl_txTrackEn === 1'b1) &&
+      (tx.mbLaneCtrl_rxDataEn  == 16'h0) &&
+      (tx.mbLaneCtrl_rxClkEn   === 1'b1) &&
+      (tx.mbLaneCtrl_rxValidEn === 1'b1) &&
+      (tx.mbLaneCtrl_rxTrackEn === 1'b1);
+  endfunction
+
   // XC-05: verify mbLaneCtrlIo matches expected values for each MBINIT state
   function void check_lane_ctrl(mbinit_transaction tx);
     bit exp_txData, exp_txClk, exp_txValid, exp_txTrack;
@@ -443,6 +501,73 @@ class mbinit_scoreboard extends uvm_scoreboard;
     if (expect_interop_failure && !mp_04_triggered)
       `uvm_error("MB_SB","MP-04 FAILED: interoperableParamsNotFound never asserted")
 
+    if (expect_mbinit_through_cal) begin
+      if (!saw_param_req_tx)
+        `uvm_error("MB_SB","MP-01 FAILED (CAL test): requester never sent PARAM_CFG_REQ")
+      if (!saw_param_resp_tx)
+        `uvm_error("MB_SB","MP-01 FAILED (CAL test): responder never sent PARAM_CFG_RESP")
+      if (!mp_02_verified)
+        `uvm_error("MB_SB","MP-02 FAILED (CAL test): negotiated maxDataRate did not match expected common rate")
+      if (!mp_03_verified)
+        `uvm_error("MB_SB","MP-03 FAILED (CAL test): negotiated clockMode did not match request")
+      if (!saw_state_cal)
+        `uvm_error("MB_SB","MP-06 FAILED: PARAM did not exit to CAL")
+      if (!saw_cal_req_tx)
+        `uvm_error("MB_SB","MC-01 FAILED: requester never sent CAL_DONE_REQ")
+      if (!saw_cal_resp_tx)
+        `uvm_error("MB_SB","MC-02 FAILED: responder never sent CAL_DONE_RESP")
+      if (!saw_state_repairclk)
+        `uvm_error("MB_SB","MC-02 FAILED: CAL did not exit to REPAIRCLK")
+    end
+
+    if (expect_mbinit_through_repairclk) begin
+      if (!saw_param_req_tx)
+        `uvm_error("MB_SB","MP-01 FAILED (REPAIRCLK test): requester never sent PARAM_CFG_REQ")
+      if (!saw_param_resp_tx)
+        `uvm_error("MB_SB","MP-01 FAILED (REPAIRCLK test): responder never sent PARAM_CFG_RESP")
+      if (!mp_02_verified)
+        `uvm_error("MB_SB","MP-02 FAILED (REPAIRCLK test): negotiated maxDataRate did not match expected common rate")
+      if (!mp_03_verified)
+        `uvm_error("MB_SB","MP-03 FAILED (REPAIRCLK test): negotiated clockMode did not match request")
+      if (!saw_state_cal)
+        `uvm_error("MB_SB","MP-06 FAILED (REPAIRCLK test): PARAM did not exit to CAL")
+      if (!saw_cal_req_tx)
+        `uvm_error("MB_SB","MC-01 FAILED (REPAIRCLK test): requester never sent CAL_DONE_REQ")
+      if (!saw_cal_resp_tx)
+        `uvm_error("MB_SB","MC-02 FAILED (REPAIRCLK test): responder never sent CAL_DONE_RESP")
+      if (!saw_state_repairclk)
+        `uvm_error("MB_SB","MC-02 FAILED (REPAIRCLK test): CAL did not exit to REPAIRCLK")
+      if (!saw_repairclk_lane_ctrl_good)
+        `uvm_error("MB_SB","RC-01 FAILED: never observed REPAIRCLK lane ctrl matching spec (clock/track + Rx enables)")
+      if (!saw_repairclk_pw_clkrepair)
+        `uvm_error("MB_SB","RC-02 FAILED: never observed patternWriter CLKREPAIR in REPAIRCLK")
+      if (!saw_repairclk_pr_clkrepair)
+        `uvm_error("MB_SB","RC-02 FAILED: never observed patternReader CLKREPAIR request in REPAIRCLK")
+      if (!saw_rclk_init_req_tx)
+        `uvm_error("MB_SB","REPAIRCLK FAILED: requester never sent REPAIRCLK_INIT_REQ")
+      if (!saw_rclk_init_resp_tx)
+        `uvm_error("MB_SB","REPAIRCLK FAILED: responder never sent REPAIRCLK_INIT_RESP")
+      if (!saw_rclk_res_req_tx)
+        `uvm_error("MB_SB","REPAIRCLK FAILED: requester never sent REPAIRCLK_RESULT_REQ")
+      // Responder RESULT_RESP may be muxed with patternReaderIo.resp.valid in RTL — not
+      // guaranteed to appear as a distinct responderSbLaneIo_tx beat for the scoreboard.
+      if (!saw_rclk_done_req_tx)
+        `uvm_error("MB_SB","RC-05 FAILED: requester never sent REPAIRCLK_DONE_REQ")
+      if (!saw_state_repairval)
+        `uvm_error("MB_SB","RC-05 FAILED: REPAIRCLK did not exit to REPAIRVAL")
+    end
+
+    if (expect_repairclk_rc03) begin
+      if (!saw_rclk_init_req_tx)
+        `uvm_error("MB_SB","RC-03 FAILED: requester never sent REPAIRCLK_INIT_REQ")
+      if (!saw_rclk_res_req_tx)
+        `uvm_error("MB_SB","RC-03 FAILED: requester never sent REPAIRCLK_RESULT_REQ (failure path)")
+      if (!saw_fsm_error)
+        `uvm_error("MB_SB","RC-03 FAILED: fsmCtrl_error never asserted for unrepairable clock/track")
+      if (saw_state_repairval)
+        `uvm_error("MB_SB","RC-03 FAILED: entered REPAIRVAL after unrepairable REPAIRCLK (unexpected)")
+    end
+
     if (expect_full_mbinit) begin
       if (!saw_state_cal)
         `uvm_error("MB_SB","MP-06 FAILED: PARAM did not exit to CAL")
@@ -482,6 +607,16 @@ class mbinit_scoreboard extends uvm_scoreboard;
         `uvm_error("MB_SB","RM-08 FAILED: requester never sent REPAIRMB_END_REQ")
       if (!saw_state_tombtrain)
         `uvm_error("MB_SB","RM-08 FAILED: REPAIRMB did not exit toward MBTRAIN")
+      if (expect_rv01_checks) begin
+        if (!saw_rv01_pw_valtrain)
+          `uvm_error("MB_SB","RV-01 FAILED: never observed patternWriter VALTRAIN in REPAIRVAL")
+        if (!saw_rv01_repairval_reader_on)
+          `uvm_error("MB_SB","RV-01 FAILED: never observed responder patternReader activity in REPAIRVAL (usingPatternReader / VALTRAIN req)")
+        if (!saw_rv01_using_pw)
+          `uvm_error("MB_SB","RV-01 FAILED: usingPatternWriter not set during VALTRAIN on requester")
+        if (rv01_phase_constraint_violation)
+          `uvm_error("MB_SB","RV-01 FAILED: negotiated_clockPhase is not (local & remote) — see MBInitSM negotiated vs local")
+      end
     end
 
     if (expect_fsm_done && !saw_fsm_done)

@@ -2,7 +2,9 @@
 `define MBINIT_TESTS_SV
 
 // Covers the main P0 MBINIT path from the verification plan:
-// MP-01/02/03/06, MC-01/02, RC-05, RV-07, LR-01/06, RM-08.
+// MP-01/02/03/06, MC-01/02, RC-01/02/05, RV-01/07, LR-01/06, RM-08.
+// CAL-focused: `test_mbinit_cal` + `seq_mbinit_cal_only`.
+// REPAIRCLK-focused: `test_mbinit_repairclk` + `seq_mbinit_repairclk_only`.
 // Note: expect_fsm_done is off until dual-die fsmCtrl_done (responder closure) is fixed — RM-08 tombtrain + messages still checked.
 class test_mbinit_sanity extends mbinit_base_test;
   `uvm_component_utils(test_mbinit_sanity)
@@ -41,6 +43,67 @@ class test_mbinit_sanity extends mbinit_base_test;
         vif.fsmCtrl_done, vif.fsmCtrl_error, vif.currentState), UVM_LOW)
 
     `uvm_info("TEST", "Test seq_mbinit_full finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// MBINIT.CAL — MC-01/02 (and MP-06) with delayed mbInitCalDone (see seq_mbinit_cal_only).
+class test_mbinit_cal extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_cal)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_cal_only seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit        = 0;
+    env.scoreboard.expect_mbinit_through_cal = 1;
+    env.scoreboard.expect_param_messages     = 0;
+    env.scoreboard.expect_param_common_rate  = 0;
+    env.scoreboard.expect_param_negotiation  = 0;
+    env.scoreboard.expect_fsm_done           = 0;
+
+    `uvm_info("TEST", "Starting seq_mbinit_cal_only...", UVM_LOW)
+    seq = seq_mbinit_cal_only::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #8000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_cal finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// MBINIT.REPAIRCLK — RC-01/02/05 (PARAM/CAL prefix + full RCLK happy path).
+class test_mbinit_repairclk extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_repairclk)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_repairclk_only seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit             = 0;
+    env.scoreboard.expect_mbinit_through_cal      = 0;
+    env.scoreboard.expect_mbinit_through_repairclk = 1;
+    env.scoreboard.expect_param_messages          = 0;
+    env.scoreboard.expect_param_common_rate       = 0;
+    env.scoreboard.expect_param_negotiation       = 0;
+    env.scoreboard.expect_fsm_done                = 0;
+
+    `uvm_info("TEST", "Starting seq_mbinit_repairclk_only...", UVM_LOW)
+    seq = seq_mbinit_repairclk_only::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #12000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_repairclk finished.", UVM_LOW)
     phase.drop_objection(this);
   endtask
 endclass
@@ -86,6 +149,7 @@ class test_mbinit_repairclk_unrep extends mbinit_base_test;
     env.scoreboard.expect_full_mbinit = 0;
     env.scoreboard.expect_fsm_done    = 0;
     env.scoreboard.expect_fsm_error   = 1;
+    env.scoreboard.expect_repairclk_rc03 = 1;
 
     `uvm_info("TEST", "Starting seq_mbinit_repairclk_fail...", UVM_LOW)
     seq = seq_mbinit_repairclk_fail::type_id::create("seq");

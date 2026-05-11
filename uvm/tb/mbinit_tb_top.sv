@@ -5,7 +5,9 @@ make mbinit                                  # default: test_mbinit_sanity
 make mbinit MBTEST=test_mbinit_sanity
 make mbinit MBTEST=test_mbinit_param_mismatch
 make mbinit MBTEST=test_mbinit_param_only
-make mbinit_regress                          # runs all three above
+make mbinit MBTEST=test_mbinit_cal
+make mbinit MBTEST=test_mbinit_repairclk
+make mbinit_regress                          # runs sanity, mismatch, param_only, cal, repairclk, repairclk_unrep, repairval
 
 Run MBTRAIN:
 make mbtrain                                 # default: mbtrain_base_test
@@ -59,9 +61,8 @@ module mbinit_tb_top;
     .io_negotiatedPhySettings_bits_txAdjRuntime   (),
     .io_negotiatedPhySettings_bits_moduleId        (vif.negotiatedPhySettings_moduleId),
 
-    // State outputs
+    // State outputs (io_interoperableParamsNotFound is internal; see mbinit_bind_exports.sv)
     .io_currentState                (vif.currentState),
-    .io_interoperableParamsNotFound (vif.interoperableParamsNotFound),
     .io_usingPatternWriter          (vif.usingPatternWriter),
     .io_usingPatternReader          (vif.usingPatternReader),
     .io_applyLaneReversal           (vif.applyLaneReversal),
@@ -134,16 +135,12 @@ module mbinit_tb_top;
     .io_patternWriterIo_req_ready            (vif.patternWriterIo_req_ready),
     .io_patternWriterIo_req_valid            (vif.patternWriterIo_req_valid),
     .io_patternWriterIo_req_bits_patternType (vif.patternWriterIo_req_bits_patternType),
-    .io_patternWriterIo_functionalLanes      (),
     .io_patternWriterIo_resp_complete        (vif.patternWriterIo_resp_complete),
 
     // PatternReader
     .io_patternReaderIo_req_ready                   (vif.patternReaderIo_req_ready),
     .io_patternReaderIo_req_valid                   (vif.patternReaderIo_req_valid),
     .io_patternReaderIo_req_bits_patternType        (vif.patternReaderIo_req_bits_patternType),
-    .io_patternReaderIo_req_bits_comparisonMode     (vif.patternReaderIo_req_bits_comparisonMode),
-    .io_patternReaderIo_req_bits_errorThreshold     (vif.patternReaderIo_req_bits_errorThreshold),
-    .io_patternReaderIo_req_bits_doConsecutiveCount (vif.patternReaderIo_req_bits_doConsecutiveCount),
     .io_patternReaderIo_req_bits_done               (vif.patternReaderIo_req_bits_done),
     .io_patternReaderIo_req_bits_clear              (vif.patternReaderIo_req_bits_clear),
     .io_patternReaderIo_resp_valid                  (vif.patternReaderIo_resp_valid),
@@ -165,7 +162,6 @@ module mbinit_tb_top;
     .io_patternReaderIo_resp_bits_perLaneStatusBits_14 (vif.patternReaderIo_resp_bits_perLaneStatusBits[14]),
     .io_patternReaderIo_resp_bits_perLaneStatusBits_15 (vif.patternReaderIo_resp_bits_perLaneStatusBits[15]),
     .io_patternReaderIo_resp_bits_aggregateStatus      (vif.patternReaderIo_resp_bits_aggregateStatus),
-    .io_patternReaderIo_functionalLanes                (),
 
     // TxPtTest Requester
     .io_txPtTestReqInterfaceIo_done                    (vif.txPtTestReqIo_done),
@@ -187,21 +183,10 @@ module mbinit_tb_top;
     .io_txPtTestReqInterfaceIo_ptTestResults_bits_14   (vif.txPtTestReqIo_ptTestResults_bits[14]),
     .io_txPtTestReqInterfaceIo_ptTestResults_bits_15   (vif.txPtTestReqIo_ptTestResults_bits[15]),
     .io_txPtTestReqInterfaceIo_start                   (vif.txPtTestReqIo_start),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_clockPhase    (),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_dataPattern   (),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_validPattern  (),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_patternMode   (),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_iterationCount(),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_idleCount     (),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_burstCount    (),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_maxErrorThreshold(),
-    .io_txPtTestReqInterfaceIo_linkTrainingParameters_comparisonMode(),
-    .io_txPtTestReqInterfaceIo_patternType                          (),
 
     // TxPtTest Responder
     .io_txPtTestRespInterfaceIo_done       (vif.txPtTestRespIo_done),
-    .io_txPtTestRespInterfaceIo_start      (vif.txPtTestRespIo_start),
-    .io_txPtTestRespInterfaceIo_patternType()
+    .io_txPtTestRespInterfaceIo_start      (vif.txPtTestRespIo_start)
   );
 
   initial begin

@@ -22,6 +22,8 @@ class mbinit_transaction extends logphy_transaction;
 
   // Calibration done (driver pulses this; also auto-stubbed on mbInitCalStart)
   rand logic        mbInitCalDone;
+  // Cycles after mbInitCalStart rise before mbInitCalDone pulse (MC-01: REQ gated on cal done)
+  int unsigned      cal_done_repeat_cycles = 3;
 
   // PatternReader result (TB simulates; all lanes pass by default)
   rand logic [15:0] patternReader_perLaneStatusBits;
@@ -32,6 +34,9 @@ class mbinit_transaction extends logphy_transaction;
   logic        negotiatedPhySettings_valid;
   logic [3:0]  negotiated_maxDataRate;
   logic        negotiated_clockMode;
+  // Observed from DUT (TB local input + negotiated output); for RV-01 vs rand local_clockPhase
+  logic        observed_local_clockPhase;
+  logic        observed_negotiated_clockPhase;
   logic        interoperableParamsNotFound;
   logic        applyLaneReversal;
 
@@ -63,6 +68,7 @@ class mbinit_transaction extends logphy_transaction;
     `uvm_field_int(local_txAdjRuntime,              UVM_ALL_ON)
     `uvm_field_int(local_moduleId,                  UVM_ALL_ON)
     `uvm_field_int(mbInitCalDone,                   UVM_ALL_ON)
+    `uvm_field_int(cal_done_repeat_cycles,         UVM_ALL_ON)
     `uvm_field_int(patternReader_perLaneStatusBits, UVM_ALL_ON)
     `uvm_field_int(patternReader_aggregateStatus,   UVM_ALL_ON)
   `uvm_object_utils_end
