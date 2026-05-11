@@ -5,7 +5,7 @@ XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 COV_WORK  ?= cov_work
 COV_TEST  ?= default
 
-.PHONY: sbinit sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 cov_mbinit cov_report clean
+.PHONY: sbinit sbinit_all sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 cov_mbinit cov_sbinit cov_report clean
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
@@ -47,11 +47,72 @@ sbinit:
           ./tb/logphy_sva.sv \
           +UVM_TESTNAME=$(SBTEST) || true
 
-sbinit_regress:
-	$(MAKE) sbinit SBTEST=test_sbinit_sanity
-	$(MAKE) sbinit SBTEST=test_sbinit_partner_not_ready
-	$(MAKE) sbinit SBTEST=test_sbinit_early_req
-	$(MAKE) sbinit SBTEST=test_sbinit_multiple_reqs
+SBINIT_LOG_DIR ?= run_logs/sbinit
+SBINIT_SUBMAKE ?= $(MAKE)
+
+sbinit_all:
+	@mkdir -p "$(SBINIT_LOG_DIR)"; \
+	tests="$(strip $(SBINIT_TESTS))"; \
+	results_file="$(SBINIT_LOG_DIR)/.results"; \
+	error_re='^(UVM_ERROR|UVM_FATAL)[[:space:]]+[^:]|UVM_(ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
+	failed=0; \
+	{ \
+	  printf "SBINIT detailed results\n"; \
+	  printf "Tests: %s\n\n" "$$tests"; \
+	} > "$$results_file"; \
+	printf "\nSBINIT results:\n"; \
+	for test in $$tests; do \
+	  log="$(SBINIT_LOG_DIR)/$$test.log"; \
+	  if $(SBINIT_SUBMAKE) --no-print-directory sbinit SBTEST=$$test > "$$log" 2>&1; then \
+	    sim_status=0; \
+	  else \
+	    sim_status=$$?; \
+	  fi; \
+	  if grep -Eq "$$error_re" "$$log"; then \
+	    uvm_failure=1; \
+	  else \
+	    uvm_failure=0; \
+	  fi; \
+	  if [ $$sim_status -eq 0 ] && [ $$uvm_failure -eq 0 ]; then \
+	    result=PASS; \
+	  else \
+	    result=FAIL; \
+	    failed=1; \
+	  fi; \
+	  printf "  %-40s %s\n" "$$test" "$$result"; \
+	  { \
+	    printf "TEST: %s\n" "$$test"; \
+	    printf "STATUS: %s\n" "$$result"; \
+	    printf "LOG: %s\n" "$$log"; \
+	    printf "SIM_EXIT_STATUS: %s\n" "$$sim_status"; \
+	    if [ "$$result" = PASS ]; then \
+	      printf "REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found\n"; \
+	    else \
+	      printf "REASON:"; \
+	      if [ $$sim_status -ne 0 ]; then \
+	        printf " simulator exited with status %s;" "$$sim_status"; \
+	      fi; \
+	      if [ $$uvm_failure -ne 0 ]; then \
+	        printf " UVM_ERROR/UVM_FATAL present in log;"; \
+	      fi; \
+	      printf "\n"; \
+	      error_lines="$$(grep -En "$$error_re" "$$log" | sed -n '1,80p')"; \
+	      printf "ERROR_EXCERPT:\n"; \
+	      if [ -n "$$error_lines" ]; then \
+	        printf "%s\n" "$$error_lines"; \
+	      else \
+	        printf "<no UVM/Xcelium error regex matches; inspect full log for the nonzero exit cause>\n"; \
+	      fi; \
+	      printf "LOG_TAIL:\n"; \
+	      tail -n 40 "$$log"; \
+	    fi; \
+	    printf "\n"; \
+	  } >> "$$results_file"; \
+	done; \
+	printf "\nDetailed results: %s\n" "$$results_file"; \
+	exit $$failed
+
+sbinit_regress: sbinit_all
 
 # ---- MBINIT ----
 mbinit:
@@ -236,6 +297,41 @@ _mbtrain_run:
 	  +UVM_TESTNAME=$(MBTRAINTEST)
 
 mbtrain_regress: mbtrain
+
+# ---- Coverage collection: SBINIT ----
+# Runs all 5 SBINIT tests with functional coverage, merges, and generates an HTML report.
+# test_sbinit_timeout covers the error path; it may run long but is included for completeness.
+# Note: cp_fsm_error.error will remain 0 until the RTL hardcode in SBInit.scala is fixed.
+#
+# Usage:
+#   make cov_sbinit
+#   make cov_sbinit COV_SBINIT_WORK=my_dir
+
+SBINIT_TESTS ?= test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout
+COV_SBINIT_WORK ?= cov_work/sbinit
+
+cov_sbinit:
+	@mkdir -p "$(COV_SBINIT_WORK)"
+	@tests="$(strip $(SBINIT_TESTS))"; \
+	for test in $$tests; do \
+	  echo "=== Coverage run: $$test ==="; \
+	  $(XRUN) $(XRUN_OPTS) \
+	    -coverage u \
+	    -covworkdir $(abspath $(COV_SBINIT_WORK)) \
+	    -covtest $$test \
+	    +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+	    -y ../elab/generatedVerilog/logphy +libext+.sv \
+	    ../elab/generatedVerilog/logphy/SBInitSM.sv \
+	    ./if/logphy_if.sv \
+	    ./agent/logphy_agent_pkg.sv \
+	    ./env/logphy_env_pkg.sv \
+	    ./seq/logphy_seq_pkg.sv \
+	    ./tests/logphy_test_pkg.sv \
+	    ./tb/logphy_tb_top.sv \
+	    ./tb/logphy_sva.sv \
+	    +UVM_TESTNAME=$$test || true; \
+	done
+	$(MAKE) cov_report COV_WORK=$(COV_SBINIT_WORK)
 
 # ---- Coverage collection: run mbinit_regress with coverage enabled, then report ----
 # Usage:

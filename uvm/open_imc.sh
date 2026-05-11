@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
-# Open IMC GUI for MBINIT coverage.
+# Open IMC GUI for MBINIT or SBINIT coverage.
 # Usage:
-#   ./open_imc.sh              — load merged database (union of all runs)
-#   ./open_imc.sh sanity       — load only the sanity run
-#   ./open_imc.sh report       — open the HTML report in a browser
+#   ./open_imc.sh [subsystem] [action]
+#
+#   subsystem : mbinit (default) | sbinit
+#   action    : (none) — load merged database (union of all runs)
+#               sanity — load only the sanity run
+#               report — open the HTML report in a browser
+#
+# Examples:
+#   ./open_imc.sh                    — mbinit merged GUI
+#   ./open_imc.sh sbinit             — sbinit merged GUI
+#   ./open_imc.sh mbinit sanity      — mbinit sanity-only GUI
+#   ./open_imc.sh sbinit report      — open sbinit HTML report
 
 set -e
 
@@ -11,24 +20,42 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export MDV_XLM_HOME=/share/instsww/cadence/XCELIUM2509
 IMC=/share/instsww/cadence/VMANAGER2509/tools/bin/imc
 
-SCOPE="$SCRIPT_DIR/cov_work/mbinit/scope"
-MERGED="$SCOPE/merged_all"
-RUNFILE="$SCRIPT_DIR/cov_work/mbinit/runfile.txt"
-REPORT="$SCRIPT_DIR/cov_work/mbinit/report/index.html"
+# Parse subsystem and action from args
+ARG1="${1:-}"
+ARG2="${2:-}"
 
-case "${1:-}" in
+if [ "$ARG1" = "sbinit" ]; then
+  SUBSYS=sbinit
+  ACTION="$ARG2"
+elif [ "$ARG1" = "mbinit" ]; then
+  SUBSYS=mbinit
+  ACTION="$ARG2"
+else
+  # Backward compat: no subsystem prefix → mbinit, first arg is action
+  SUBSYS=mbinit
+  ACTION="$ARG1"
+fi
+
+WORK="$SCRIPT_DIR/cov_work/$SUBSYS"
+SCOPE="$WORK/scope"
+MERGED="$SCOPE/merged_all"
+RUNFILE="$WORK/runfile.txt"
+REPORT="$WORK/report/index.html"
+MAKE_TARGET="cov_$SUBSYS"
+
+case "$ACTION" in
   sanity)
-    DB="$SCOPE/test_mbinit_sanity"
+    DB="$SCOPE/test_${SUBSYS}_sanity"
     if [ ! -d "$DB" ]; then
-      echo "No sanity run found. Run 'make cov_mbinit' first."
+      echo "No sanity run found. Run 'make $MAKE_TARGET' first."
       exit 1
     fi
-    echo "Opening IMC GUI with sanity run only."
+    echo "Opening IMC GUI with $SUBSYS sanity run only."
     "$IMC" -load "$DB" &
     ;;
   report)
     if [ ! -f "$REPORT" ]; then
-      echo "No report found. Run 'make cov_mbinit' first."
+      echo "No report found. Run 'make $MAKE_TARGET' first."
       exit 1
     fi
     echo "Opening HTML report: $REPORT"
@@ -39,7 +66,7 @@ case "${1:-}" in
     if [ ! -d "$MERGED" ]; then
       echo "Merged database not found — building it now..."
       if [ ! -d "$SCOPE" ]; then
-        echo "No coverage data found. Run 'make cov_mbinit' first."
+        echo "No coverage data found. Run 'make $MAKE_TARGET' first."
         exit 1
       fi
       ls "$SCOPE" | grep "^test_" | while read d; do echo "$SCOPE/$d"; done > "$RUNFILE"
@@ -47,7 +74,7 @@ case "${1:-}" in
       "$IMC" -load "$first" \
         -execcmd "merge -runfile $RUNFILE -out $MERGED -overwrite; exit"
     fi
-    echo "Opening IMC GUI with merged database (all runs union)."
+    echo "Opening IMC GUI with $SUBSYS merged database (all runs union)."
     "$IMC" -load "$MERGED" \
       -initcmd "exclude -type mbinit_state_sync_sva -metrics assertion -comment {Intentionally unbound: XC-03 property too tight for RTL substate timing}" &
     ;;

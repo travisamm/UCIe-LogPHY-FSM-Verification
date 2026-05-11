@@ -6,6 +6,7 @@ class mbinit_coverage extends uvm_component;
   covergroup mbinit_cg with function sample(mbinit_transaction t);
     option.per_instance = 1;
     option.name = "mbinit_cg";
+    option.cross_auto_bin_max = 0;
 
     // MP-01/02/03/06: PARAM negotiation
     cp_neg_valid: coverpoint t.negotiatedPhySettings_valid {
@@ -99,7 +100,6 @@ class mbinit_coverage extends uvm_component;
     cx_interop_error: cross cp_interop_fail, cp_fsm_state {
       bins interop_fail_in_param = binsof(cp_interop_fail.failed) &&
                                    binsof(cp_fsm_state.PARAM);
-      ignore_bins not_reachable = default;
     }
 
     // FSM progression: PARAM → CAL → REPAIRCLK → REPAIRVAL → REVERSALMB → REPAIRMB → TOMBTRAIN
@@ -107,7 +107,6 @@ class mbinit_coverage extends uvm_component;
     cx_neg_valid_in_param: cross cp_neg_valid, cp_fsm_state {
       bins negotiated = binsof(cp_neg_valid.valid) &&
                         binsof(cp_fsm_state.PARAM);
-      ignore_bins not_reachable = default;
     }
 
     // RC-01 cross: clk lanes enabled in REPAIRCLK
@@ -115,7 +114,6 @@ class mbinit_coverage extends uvm_component;
     cx_clk_en_in_repairclk: cross cp_tx_clk_en, cp_fsm_state {
       bins clk_enabled_repairclk = binsof(cp_tx_clk_en.enabled) &&
                                    binsof(cp_fsm_state.REPAIRCLK);
-      ignore_bins not_reachable = default;
     }
 
     // RC-02 cross: pattern writer active in REPAIRCLK
@@ -123,7 +121,6 @@ class mbinit_coverage extends uvm_component;
     cx_pw_in_repairclk: cross cp_pattern_writer, cp_fsm_state {
       bins pw_active_repairclk = binsof(cp_pattern_writer.active) &&
                                  binsof(cp_fsm_state.REPAIRCLK);
-      ignore_bins not_reachable = default;
     }
 
   endgroup : mbinit_cg
