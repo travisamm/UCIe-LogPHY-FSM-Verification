@@ -198,6 +198,8 @@ class mbtrain_driver extends uvm_driver #(mbtrain_transaction);
     vif.requesterSbLaneIo_rx_bits_data  = req.rx_data;
     vif.responderSbLaneIo_rx_valid      = req.rsp_rx_valid;
     vif.responderSbLaneIo_rx_bits_data  = req.rsp_rx_data;
+    vif.requesterSbLaneIo_tx_ready      = req.tx_ready;
+    vif.responderSbLaneIo_tx_ready      = req.rsp_tx_ready;
     vif.trainingCtrl_req_start          = req.trainingReqStart;
     vif.trainingCtrl_req_testKind       = req.trainingReqTestKind;
     vif.trainingCtrl_req_complete       = req.trainingReqComplete;
