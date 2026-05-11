@@ -66,8 +66,11 @@ class mbtrain_monitor extends uvm_monitor;
 
     forever begin
       @(posedge vif.clock);
+      #1ps;
 
-      if ((vif.currentState                    !== prev_state)          ||
+      if (vif.requesterSbLaneIo_tx_valid ||
+          vif.responderSbLaneIo_tx_valid ||
+          (vif.currentState                    !== prev_state)          ||
           (vif.fsmCtrl_done                   !== prev_done)            ||
           (vif.fsmCtrl_error                  !== prev_error)           ||
           (vif.requesterSbLaneIo_tx_valid     !== prev_req_tx_valid)    ||
