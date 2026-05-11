@@ -252,4 +252,71 @@ class test_mbtrain_rxclkcal extends mbtrain_base_test;
     phase.drop_objection(this);
   endtask
 endclass
+// DC2-01: Focused DATATRAINCENTER2 test
+class test_mbtrain_dc2 extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_dc2)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_dc2 seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain    = 0;
+    env.scoreboard.expect_valvref_checks  = 0;
+    env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
+    env.scoreboard.expect_rxclkcal_checks = 0;
+    env.scoreboard.expect_dc2_checks      = 1;
+    env.scoreboard.expect_ls_checks       = 0;
+    env.scoreboard.expect_fsm_done        = 0;
+    env.scoreboard.expect_fsm_error       = 0;
+    env.scoreboard.debug_txselfcal        = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_dc2...", UVM_LOW)
+    seq = seq_mbtrain_dc2::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #20000ns;
+
+    `uvm_info("TEST", "Test test_mbtrain_dc2 finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// LS-01/03: Focused LINKSPEED test
+class test_mbtrain_linkspeed extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_linkspeed)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_linkspeed seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain    = 0;
+    env.scoreboard.expect_valvref_checks  = 0;
+    env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
+    env.scoreboard.expect_rxclkcal_checks = 0;
+    env.scoreboard.expect_dc2_checks      = 0;
+    env.scoreboard.expect_ls_checks       = 1;
+    env.scoreboard.expect_fsm_done        = 0;
+    env.scoreboard.expect_fsm_error       = 0;
+    env.scoreboard.debug_txselfcal        = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_linkspeed...", UVM_LOW)
+    seq = seq_mbtrain_linkspeed::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #20000ns;
+
+    `uvm_info("TEST", "Test test_mbtrain_linkspeed finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
 `endif

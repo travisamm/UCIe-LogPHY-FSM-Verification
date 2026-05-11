@@ -94,6 +94,8 @@ class mbtrain_scoreboard extends uvm_scoreboard;
   bit expect_valvref_checks  = 1;
   bit expect_datavref_checks = 1;
   bit expect_txselfcal_checks = 0;
+  bit expect_dc2_checks       = 0;
+  bit expect_ls_checks        = 0;
   bit expect_rxclkcal_checks  = 0;
   bit expect_fsm_done        = 1;
   bit expect_fsm_error       = 0;
@@ -555,6 +557,14 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       if (!saw_state_rxclkcal)  `uvm_error("MT_SB","RXCLKCAL probe: RXCLKCAL state was never observed")
       if (!saw_rcc_start_req)   `uvm_error("MT_SB","RXCLKCAL probe: requester never sent RXCLKCAL_START_REQ")
       if (!saw_rcc_done_req)    `uvm_error("MT_SB","RXCLKCAL probe: requester never sent RXCLKCAL_DONE_REQ")
+    end
+    if (expect_dc2_checks) begin
+      if (!saw_dc2_start_req) `uvm_error("MT_SB","DC2 probe: requester never sent DC2_START_REQ")
+      if (!saw_dc2_end_req)   `uvm_error("MT_SB","DC2 probe: requester never sent DC2_END_REQ")
+    end
+    if (expect_ls_checks) begin
+      if (!saw_ls_start_req)  `uvm_error("MT_SB","LS probe: requester never sent LINKSPEED_START_REQ")
+      if (!saw_ls_done_req)   `uvm_error("MT_SB","LS probe: requester never sent LINKSPEED_DONE_REQ")
     end
 
     if (lane_ctrl_error)
