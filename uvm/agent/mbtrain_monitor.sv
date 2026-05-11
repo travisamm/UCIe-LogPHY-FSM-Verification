@@ -23,7 +23,9 @@ class mbtrain_monitor extends uvm_monitor;
     logic [3:0]  prev_state;
     logic        prev_done, prev_error;
     logic        prev_req_tx_valid, prev_rsp_tx_valid;
+    logic        prev_req_tx_ready, prev_rsp_tx_ready;
     logic [127:0] prev_req_tx_data, prev_rsp_tx_data;
+    logic        prev_txSelfCalStart, prev_txSelfCalDone;
     logic [15:0] prev_txDataEn, prev_rxDataEn;
     logic        prev_txClkEn, prev_txValidEn, prev_txTrackEn;
     logic        prev_rxClkEn, prev_rxValidEn, prev_rxTrackEn;
@@ -40,8 +42,12 @@ class mbtrain_monitor extends uvm_monitor;
     prev_error          = 0;
     prev_req_tx_valid   = 0;
     prev_rsp_tx_valid   = 0;
+    prev_req_tx_ready   = 0;
+    prev_rsp_tx_ready   = 0;
     prev_req_tx_data    = 128'hX;
     prev_rsp_tx_data    = 128'hX;
+    prev_txSelfCalStart = 0;
+    prev_txSelfCalDone  = 0;
     prev_txDataEn       = 16'hX;
     prev_txClkEn        = 1'bX;
     prev_txValidEn      = 1'bX;
@@ -68,15 +74,21 @@ class mbtrain_monitor extends uvm_monitor;
       @(posedge vif.clock);
       #1ps;
 
-      if (vif.requesterSbLaneIo_tx_valid ||
+      if ((vif.currentState == 4'h3) ||
+          (prev_state == 4'h3) ||
+          vif.requesterSbLaneIo_tx_valid ||
           vif.responderSbLaneIo_tx_valid ||
           (vif.currentState                    !== prev_state)          ||
           (vif.fsmCtrl_done                   !== prev_done)            ||
           (vif.fsmCtrl_error                  !== prev_error)           ||
           (vif.requesterSbLaneIo_tx_valid     !== prev_req_tx_valid)    ||
           (vif.responderSbLaneIo_tx_valid     !== prev_rsp_tx_valid)    ||
+          (vif.requesterSbLaneIo_tx_ready     !== prev_req_tx_ready)    ||
+          (vif.responderSbLaneIo_tx_ready     !== prev_rsp_tx_ready)    ||
           (vif.requesterSbLaneIo_tx_bits_data !== prev_req_tx_data)      ||
           (vif.responderSbLaneIo_tx_bits_data !== prev_rsp_tx_data)      ||
+          (vif.trainingCtrl_txSelfCalStart    !== prev_txSelfCalStart)  ||
+          (vif.trainingCtrl_txSelfCalDone     !== prev_txSelfCalDone)   ||
           (vif.mbLaneCtrl_txDataEn            !== prev_txDataEn)        ||
           (vif.mbLaneCtrl_txClkEn             !== prev_txClkEn)         ||
           (vif.mbLaneCtrl_txValidEn           !== prev_txValidEn)       ||
@@ -105,13 +117,16 @@ class mbtrain_monitor extends uvm_monitor;
         tx.fsm_error    = vif.fsmCtrl_error;
         tx.tx_valid     = vif.requesterSbLaneIo_tx_valid;
         tx.tx_data      = vif.requesterSbLaneIo_tx_bits_data;
+        tx.tx_ready     = vif.requesterSbLaneIo_tx_ready;
         tx.rsp_tx_valid = vif.responderSbLaneIo_tx_valid;
         tx.rsp_tx_data  = vif.responderSbLaneIo_tx_bits_data;
+        tx.rsp_tx_ready = vif.responderSbLaneIo_tx_ready;
 
         tx.currentState          = vif.currentState;
         tx.freqSel_valid         = vif.freqSel_valid;
         tx.freqSel_bits          = vif.freqSel_bits;
         tx.trainingTxSelfCalStart = vif.trainingCtrl_txSelfCalStart;
+        tx.trainingTxSelfCalDone  = vif.trainingCtrl_txSelfCalDone;
         tx.trainingRxClkCalStart  = vif.trainingCtrl_rxClkCalStart;
         tx.doElectricalIdleTx    = vif.doElectricalIdleTx;
         tx.doElectricalIdleRx    = vif.doElectricalIdleRx;
@@ -172,8 +187,12 @@ class mbtrain_monitor extends uvm_monitor;
         prev_error          = vif.fsmCtrl_error;
         prev_req_tx_valid   = vif.requesterSbLaneIo_tx_valid;
         prev_rsp_tx_valid   = vif.responderSbLaneIo_tx_valid;
+        prev_req_tx_ready   = vif.requesterSbLaneIo_tx_ready;
+        prev_rsp_tx_ready   = vif.responderSbLaneIo_tx_ready;
         prev_req_tx_data    = vif.requesterSbLaneIo_tx_bits_data;
         prev_rsp_tx_data    = vif.responderSbLaneIo_tx_bits_data;
+        prev_txSelfCalStart = vif.trainingCtrl_txSelfCalStart;
+        prev_txSelfCalDone  = vif.trainingCtrl_txSelfCalDone;
         prev_txDataEn       = vif.mbLaneCtrl_txDataEn;
         prev_txClkEn        = vif.mbLaneCtrl_txClkEn;
         prev_txValidEn      = vif.mbLaneCtrl_txValidEn;
