@@ -41,8 +41,13 @@ class mbinit_monitor extends uvm_monitor;
     logic        prev_rxTrackEn;
     logic        prev_using_pw;
     logic        prev_using_pr;
+    logic        prev_pr_resp_valid;
+    logic [15:0] prev_pr_resp_pl;
+    logic        prev_pt_res_valid;
+    logic [15:0] prev_pt_res_bits;
     logic        prev_loc_clk_ph;
     logic        prev_neg_clk_ph;
+    logic        prev_tx_width_changed;
 
     prev_state          = 3'hX;
     prev_done           = 0;
@@ -65,8 +70,13 @@ class mbinit_monitor extends uvm_monitor;
     prev_rxTrackEn      = 1'bX;
     prev_using_pw       = 1'b0;
     prev_using_pr       = 1'b0;
+    prev_pr_resp_valid  = 1'b0;
+    prev_pr_resp_pl      = 16'hX;
+    prev_pt_res_valid   = 1'b0;
+    prev_pt_res_bits    = 16'h0;
     prev_loc_clk_ph     = 1'b0;
     prev_neg_clk_ph     = 1'b0;
+    prev_tx_width_changed = 1'b0;
 
     forever begin
       @(posedge vif.clock);
@@ -93,8 +103,15 @@ class mbinit_monitor extends uvm_monitor;
           (vif.mbLaneCtrl_rxTrackEn       !== prev_rxTrackEn)     ||
           (vif.usingPatternWriter         !== prev_using_pw)      ||
           (vif.usingPatternReader         !== prev_using_pr)      ||
+          (vif.patternReaderIo_resp_valid !== prev_pr_resp_valid) ||
+          (vif.patternReaderIo_resp_valid &&
+           vif.patternReaderIo_resp_bits_perLaneStatusBits !== prev_pr_resp_pl) ||
+          (vif.txPtTestReqIo_ptTestResults_valid !== prev_pt_res_valid) ||
+          (vif.txPtTestReqIo_ptTestResults_valid &&
+           vif.txPtTestReqIo_ptTestResults_bits !== prev_pt_res_bits) ||
           (vif.localPhySettings_clockPhase !== prev_loc_clk_ph)   ||
-          (vif.negotiatedPhySettings_clockPhase !== prev_neg_clk_ph)) begin
+          (vif.negotiatedPhySettings_clockPhase !== prev_neg_clk_ph) ||
+          (vif.txWidthChanged !== prev_tx_width_changed)) begin
 
         tx = mbinit_transaction::type_id::create("tx");
         // Inherited observed fields (logphy_transaction)
@@ -123,7 +140,13 @@ class mbinit_monitor extends uvm_monitor;
         tx.patternWriter_patternType = vif.patternWriterIo_req_bits_patternType;
         tx.patternReader_req_valid   = vif.patternReaderIo_req_valid;
         tx.patternReader_patternType = vif.patternReaderIo_req_bits_patternType;
+        tx.patternReader_resp_valid   = vif.patternReaderIo_resp_valid;
+        tx.patternReader_resp_perLaneBits = vif.patternReaderIo_resp_bits_perLaneStatusBits;
+        tx.patternReader_resp_aggregate   = vif.patternReaderIo_resp_bits_aggregateStatus;
         tx.txPtTest_start            = vif.txPtTestReqIo_start;
+        tx.tx_width_changed_pulse    = vif.txWidthChanged & ~prev_tx_width_changed;
+        tx.txPtTest_results_valid     = vif.txPtTestReqIo_ptTestResults_valid;
+        tx.txPtTest_results_bits      = vif.txPtTestReqIo_ptTestResults_bits;
         // Lane control observations
         tx.mbLaneCtrl_txDataEn  = vif.mbLaneCtrl_txDataEn;
         tx.mbLaneCtrl_txClkEn   = vif.mbLaneCtrl_txClkEn;
@@ -157,8 +180,13 @@ class mbinit_monitor extends uvm_monitor;
         prev_rxTrackEn       = vif.mbLaneCtrl_rxTrackEn;
         prev_using_pw        = vif.usingPatternWriter;
         prev_using_pr        = vif.usingPatternReader;
+        prev_pr_resp_valid   = vif.patternReaderIo_resp_valid;
+        prev_pr_resp_pl       = vif.patternReaderIo_resp_bits_perLaneStatusBits;
+        prev_pt_res_valid     = vif.txPtTestReqIo_ptTestResults_valid;
+        prev_pt_res_bits      = vif.txPtTestReqIo_ptTestResults_bits;
         prev_loc_clk_ph      = vif.localPhySettings_clockPhase;
         prev_neg_clk_ph      = vif.negotiatedPhySettings_clockPhase;
+        prev_tx_width_changed = vif.txWidthChanged;
       end
     end
   endtask

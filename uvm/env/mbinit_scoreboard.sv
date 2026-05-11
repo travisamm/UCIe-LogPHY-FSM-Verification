@@ -138,6 +138,21 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit expect_pattern_type_checks = 1;
   // RV-01: VALTRAIN + patternReader path + negotiated phase ⊆ local (see vplan notes)
   bit expect_rv01_checks         = 1;
+  // LR-03: responder PatternReader active in REVERSALMB (RTL uses ComparisonMode.PERLANE; not on TB pins)
+  bit expect_lr03_pattern_reader = 1;
+  bit saw_lr03_pattern_reader_reversalmb;
+  // LR-04: requester asserts applyLaneReversal after failed REVERSALMB RESULT then retry (directed seq)
+  bit expect_lr04_apply_lane_reversal = 0;
+  bit saw_apply_lane_reversal;
+  // RM-02: in REPAIRMB, Tx point-test result beat carried mixed per-lane pass/fail bits (TB stub)
+  bit expect_rm02_per_lane_reader = 0;
+  bit saw_rm02_heterogeneous_pt_repairmb;
+  // RM-07: unrepairable (all lanes failed) → fsmCtrl_error in REPAIRMB (MBINIT-only TRAINERROR proxy)
+  bit expect_rm07_repairmb_unrepairable = 0;
+  // RM-05: witness ≥2 REPAIRMB Tx point-test result beats + txWidthChanged pulse (driver: FF00 then FFFF)
+  bit expect_rm05_post_repair_witness = 0;
+  bit saw_repairmb_txwidth_pulse;
+  int unsigned repairmb_pt_results_beats;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -178,10 +193,23 @@ class mbinit_scoreboard extends uvm_scoreboard;
         saw_state_repairclk = 1;
       if (tx.currentState == MB_STATE_REPAIRVAL)
         saw_state_repairval = 1;
-      if (tx.currentState == MB_STATE_REVERSALMB)
+      if (tx.currentState == MB_STATE_REVERSALMB) begin
         saw_state_reversalmb = 1;
-      if (tx.currentState == MB_STATE_REPAIRMB)
+        // LR-03: responder PatternReader path active in REVERSALMB (req_valid only pulses in
+        // substates; usingPatternReader is held for the whole layer per MBInitResponder RTL)
+        if (tx.usingPatternReader)
+          saw_lr03_pattern_reader_reversalmb = 1;
+      end
+      if (tx.currentState == MB_STATE_REPAIRMB) begin
         saw_state_repairmb = 1;
+        if (tx.txPtTest_results_valid)
+          repairmb_pt_results_beats++;
+        if (tx.tx_width_changed_pulse)
+          saw_repairmb_txwidth_pulse = 1;
+        // RM-02: requester Rx path checks per-lane outcomes — witnessed via Tx ptTestResults in TB
+        if (tx.txPtTest_results_valid && (|tx.txPtTest_results_bits) && !(&tx.txPtTest_results_bits))
+          saw_rm02_heterogeneous_pt_repairmb = 1;
+      end
       if (tx.currentState == MB_STATE_TOMBTRAIN)
         saw_state_tombtrain = 1;
 
@@ -239,6 +267,9 @@ class mbinit_scoreboard extends uvm_scoreboard;
         `uvm_info("MB_SB", "MBINIT fsmCtrl_error asserted", UVM_LOW)
         saw_fsm_error = 1;
       end
+
+      if (tx.applyLaneReversal)
+        saw_apply_lane_reversal = 1;
     end
   endtask
 
@@ -492,11 +523,12 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
   function void check_phase(uvm_phase phase);
     `uvm_info("MB_SB", $sformatf(
-      "Summary: req_tx=%0b rsp_tx=%0b bad_req=%0b bad_rsp=%0b param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b lane_ctrl_err=%0b pat_type_err=%0b",
+      "Summary: req_tx=%0b rsp_tx=%0b bad_req=%0b bad_rsp=%0b param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b lane_ctrl_err=%0b pat_type_err=%0b lr03_pr_revmb=%0b apply_lane_rev=%0b",
       saw_req_tx, saw_rsp_tx, saw_bad_req_tx, saw_bad_rsp_tx,
       saw_param_req_tx, saw_param_resp_tx, mp_02_verified, mp_03_verified,
       saw_cal_req_tx, saw_fsm_done, saw_fsm_error,
-      lane_ctrl_error, pattern_type_error), UVM_LOW)
+      lane_ctrl_error, pattern_type_error,
+      saw_lr03_pattern_reader_reversalmb, saw_apply_lane_reversal), UVM_LOW)
 
     if (expect_param_messages && !saw_req_tx)
       `uvm_error("MB_SB","No requester sideband TX was observed")
@@ -615,6 +647,9 @@ class mbinit_scoreboard extends uvm_scoreboard;
         `uvm_error("MB_SB","LR-01 FAILED: requester never sent REVERSALMB_INIT_REQ")
       if (!saw_lr_init_resp_rx)
         `uvm_error("MB_SB","LR-01 FAILED: REVERSALMB_INIT_RESP never observed on requester RX (partner)")
+      if (expect_lr03_pattern_reader && !saw_lr03_pattern_reader_reversalmb)
+        `uvm_error("MB_SB",
+          "LR-03 FAILED: usingPatternReader not observed in REVERSALMB (responder PatternReader path)")
       if (!saw_lr_res_req_tx)
         `uvm_error("MB_SB","REVERSALMB FLOW FAILED: requester never sent REVERSALMB_RESULT_REQ")
       if (!saw_lr_done_req_tx)
@@ -627,6 +662,11 @@ class mbinit_scoreboard extends uvm_scoreboard;
         `uvm_error("MB_SB","RM-08 FAILED: requester never sent REPAIRMB_END_REQ")
       if (!saw_state_tombtrain)
         `uvm_error("MB_SB","RM-08 FAILED: REPAIRMB did not exit toward MBTRAIN")
+      if (expect_lr04_apply_lane_reversal && !saw_apply_lane_reversal)
+        `uvm_error("MB_SB","LR-04 FAILED: applyLaneReversal never asserted (expected fail-then-pass REVERSALMB)")
+      if (expect_rm02_per_lane_reader && !saw_rm02_heterogeneous_pt_repairmb)
+        `uvm_error("MB_SB",
+          "RM-02 FAILED: never observed heterogeneous Tx point-test per-lane bits in REPAIRMB (expect mixed pass/fail on ptTestResults)")
       if (expect_rv01_checks) begin
         if (!saw_rv01_pw_valtrain)
           `uvm_error("MB_SB","RV-01 FAILED: never observed patternWriter VALTRAIN in REPAIRVAL")
@@ -644,6 +684,30 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
     if (expect_fsm_error && !saw_fsm_error)
       `uvm_error("MB_SB","Expected fsmCtrl_error but it never asserted")
+
+    if (expect_rm07_repairmb_unrepairable) begin
+      if (!saw_state_repairmb)
+        `uvm_error("MB_SB","RM-07 FAILED: never entered REPAIRMB before error")
+      if (!saw_rm_start_req_tx)
+        `uvm_error("MB_SB","RM-07 FAILED: never saw REPAIRMB_START_REQ")
+      if (saw_rm_end_req_tx)
+        `uvm_error("MB_SB","RM-07 FAILED: REPAIRMB_END_REQ observed (unexpected success exit)")
+    end
+
+    if (expect_rm05_post_repair_witness) begin
+      if (!saw_state_repairmb)
+        `uvm_error("MB_SB","RM-05 FAILED: never entered REPAIRMB")
+      if (!saw_rm_start_req_tx)
+        `uvm_error("MB_SB","RM-05 FAILED: never saw REPAIRMB_START_REQ")
+      if (repairmb_pt_results_beats < 2)
+        `uvm_error("MB_SB", $sformatf(
+          "RM-05 FAILED: expected ≥2 Tx point-test result beats in REPAIRMB, saw %0d",
+          repairmb_pt_results_beats))
+      if (!saw_repairmb_txwidth_pulse)
+        `uvm_error("MB_SB",
+          "RM-05 FAILED: expected io_txWidthChanged pulse in REPAIRMB (width degrade after first half-fault PT)")
+    end
+
     if (!expect_fsm_error && saw_fsm_error)
       `uvm_error("MB_SB","Unexpected fsmCtrl_error on success-path test")
 

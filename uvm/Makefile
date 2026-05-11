@@ -1,10 +1,12 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
-.PHONY: sbinit sbinit_regress mbinit mbinit_regress ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
+.PHONY: sbinit sbinit_regress mbinit mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 clean
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
+# Optional xrun args for mbinit (e.g. MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG')
+MBINIT_XRUN_EXTRA ?=
 MBTRAINTEST ?=
 #MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
 MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity test_mbtrain_speedidle test_mbtrain_speedidle_retrain test_mbtrain_speedidle_error test_mbtrain_rxclkcal test_mbtrain_dc2 test_mbtrain_linkspeed test_mbtrain_linkspeed_fail
@@ -61,7 +63,14 @@ mbinit:
 	  ./tb/mbinit_bind_exports.sv \
       ./tb/logphy_sva.sv \
 	  ./tb/mbinit_tb_top.sv \
+	  $(MBINIT_XRUN_EXTRA) \
 	  +UVM_TESTNAME=$(MBTEST)
+
+# LR-03/04/06/07: sanity (LR-03, LR-06 on happy path), LR-04 retry, LR-07 double-fail error.
+mbinit_lr03_lr04:
+	$(MAKE) mbinit MBTEST=test_mbinit_sanity
+	$(MAKE) mbinit MBTEST=test_mbinit_lr04_reversal_apply
+	$(MAKE) mbinit MBTEST=test_mbinit_lr07_reversal_trainerror
 
 mbinit_regress:
 	$(MAKE) mbinit MBTEST=test_mbinit_sanity
@@ -71,6 +80,11 @@ mbinit_regress:
 	$(MAKE) mbinit MBTEST=test_mbinit_repairclk
 	$(MAKE) mbinit MBTEST=test_mbinit_repairclk_unrep
 	$(MAKE) mbinit MBTEST=test_mbinit_repairval_unrep
+	$(MAKE) mbinit MBTEST=test_mbinit_lr04_reversal_apply
+	$(MAKE) mbinit MBTEST=test_mbinit_lr07_reversal_trainerror
+	$(MAKE) mbinit MBTEST=test_mbinit_rm02_per_lane_reader
+	$(MAKE) mbinit MBTEST=test_mbinit_rm07_unrepairable
+	$(MAKE) mbinit MBTEST=test_mbinit_rm05_post_repair_persist
 
 # ---- LinkTrainingSM (MBINIT + TRAINERROR SB) — sources under ./ltsm/ ----
 ltsm:

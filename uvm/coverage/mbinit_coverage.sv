@@ -68,7 +68,7 @@ class mbinit_coverage extends uvm_component;
       bins type_3 = {3};
     }
 
-    // LR-03/RM-02: Pattern reader used
+    // LR-03/RM-02: pattern reader / Tx point-test activity (RM-02: scoreboard + `test_mbinit_rm02_per_lane_reader`)
     cp_pattern_reader: coverpoint t.usingPatternReader {
       bins active   = {1};
       bins inactive = {0};

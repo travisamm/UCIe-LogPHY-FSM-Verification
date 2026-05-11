@@ -220,4 +220,165 @@ class test_mbinit_param_mismatch extends mbinit_base_test;
   endtask
 endclass
 
+// LR-04: REVERSALMB RESULT fail then pass — requester must assert applyLaneReversal (retry path).
+class test_mbinit_lr04_reversal_apply extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_lr04_reversal_apply)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_full_lr04_retry seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_fsm_done               = 0;
+    env.scoreboard.expect_lr04_apply_lane_reversal = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_full_lr04_retry...", UVM_LOW)
+    seq = seq_mbinit_full_lr04_retry::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #20000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_lr04_reversal_apply finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// LR-07: second REVERSALMB RESULT still fails after lane-reversal apply → MBInit requester error
+// (fsmCtrl_error on this TB; fused LTSM TRAINERROR SB not checked).
+class test_mbinit_lr07_reversal_trainerror extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_lr07_reversal_trainerror)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_lr07_reversal_double_fail seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit = 0;
+    env.scoreboard.expect_fsm_done    = 0;
+    env.scoreboard.expect_fsm_error   = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_lr07_reversal_double_fail...", UVM_LOW)
+    seq = seq_mbinit_lr07_reversal_double_fail::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #15000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_lr07_reversal_trainerror finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// RM-02: PatternReader response carries heterogeneous per-lane pass/fail in REPAIRMB (driver inject).
+class test_mbinit_rm02_per_lane_reader extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_rm02_per_lane_reader)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void end_of_elaboration_phase(uvm_phase phase);
+    mbinit_driver dr;
+    super.end_of_elaboration_phase(phase);
+    if (!$cast(dr, env.agent.driver))
+      `uvm_fatal("TEST", "test_mbinit_rm02_per_lane_reader: expected mbinit_driver")
+    dr.rm02_mixed_pt_first = 1'b1;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_full seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_fsm_done               = 0;
+    env.scoreboard.expect_rm02_per_lane_reader   = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_full (RM-02 mixed first Tx point-test in REPAIRMB)...", UVM_LOW)
+    seq = seq_mbinit_full::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #20000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_rm02_per_lane_reader finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// RM-07: unrepairable lane situation in REPAIRMB → fsmCtrl_error (LTSM TRAINERROR not in MBInit-only TB).
+class test_mbinit_rm07_unrepairable extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_rm07_unrepairable)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void end_of_elaboration_phase(uvm_phase phase);
+    mbinit_driver dr;
+    super.end_of_elaboration_phase(phase);
+    if (!$cast(dr, env.agent.driver))
+      `uvm_fatal("TEST", "test_mbinit_rm07_unrepairable: expected mbinit_driver")
+    dr.rm07_first_repairmb_pt_all_fault = 1'b1;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_full seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit              = 0;
+    env.scoreboard.expect_fsm_done                 = 0;
+    env.scoreboard.expect_fsm_error                = 1;
+    env.scoreboard.expect_rm07_repairmb_unrepairable = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_full (RM-07 all-fault first REPAIRMB point test)...", UVM_LOW)
+    seq = seq_mbinit_full::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #20000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_rm07_unrepairable finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// RM-05: directed upper-half fault then full-fault PT in REPAIRMB — witness ≥2 result beats +
+// io_txWidthChanged pulse (see vplan gap: fsmCtrl_error / TRAINERROR not closed on this path).
+class test_mbinit_rm05_post_repair_persist extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_rm05_post_repair_persist)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void end_of_elaboration_phase(uvm_phase phase);
+    mbinit_driver dr;
+    super.end_of_elaboration_phase(phase);
+    if (!$cast(dr, env.agent.driver))
+      `uvm_fatal("TEST", "test_mbinit_rm05_post_repair_persist: expected mbinit_driver")
+    dr.rm05_post_repair_pt_sequence = 1'b1;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_full_rm05 seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit                = 0;
+    env.scoreboard.expect_fsm_done                   = 0;
+    env.scoreboard.expect_fsm_error                  = 0;
+    env.scoreboard.expect_rm05_post_repair_witness  = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_full_rm05 (RM-05 upper-half fault then all-fault PT)...", UVM_LOW)
+    seq = seq_mbinit_full_rm05::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #25000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_rm05_post_repair_persist finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
 `endif
