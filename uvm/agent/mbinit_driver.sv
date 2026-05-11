@@ -6,6 +6,7 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
 
   virtual mbinit_if vif;
   logic prev_mb_init_cal_start;
+  logic prev_pattern_reader_req_done;
   // Pulses mbInitCalDone this many cycles after each rising edge of mbInitCalStart
   int unsigned cal_done_repeat_cycles = 3;
 
@@ -21,6 +22,7 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
 
   task run_phase(uvm_phase phase);
     prev_mb_init_cal_start = 1'b0;
+    prev_pattern_reader_req_done = 1'b0;
 
     // Idle defaults
     vif.fsmCtrl_start                  = 0;
@@ -92,17 +94,20 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
         vif.patternWriterIo_resp_complete = 0;
       end
 
-      // Auto-stub: PatternReader — drive resp when done flag asserted
+      // Auto-stub: PatternReader — pulse resp on rising edge of req_bits_done.
+      // MBInitSM responder REPAIRCLK/REPAIRVAL/REPAIRMB holds req.valid only in
+      // substate s0; s1 drives done := msgReceived with req.valid false, so the
+      // handshake must not require req_valid and done in the same cycle.
       forever begin
-        @(posedge vif.clock iff (vif.patternReaderIo_req_valid &&
-                                  vif.patternReaderIo_req_bits_done));
-        vif.patternReaderIo_resp_valid = 1;
-        vif.patternReaderIo_resp_bits_perLaneStatusBits =
-          req.patternReader_perLaneStatusBits;
-        vif.patternReaderIo_resp_bits_aggregateStatus =
-          req.patternReader_aggregateStatus;
         @(posedge vif.clock);
-        vif.patternReaderIo_resp_valid = 0;
+        if (vif.patternReaderIo_req_bits_done && !prev_pattern_reader_req_done) begin
+          vif.patternReaderIo_resp_valid = 1;
+          vif.patternReaderIo_resp_bits_perLaneStatusBits = 16'hFFFF;
+          vif.patternReaderIo_resp_bits_aggregateStatus   = 1'b1;
+          @(posedge vif.clock);
+          vif.patternReaderIo_resp_valid = 0;
+        end
+        prev_pattern_reader_req_done = vif.patternReaderIo_req_bits_done;
       end
 
       // Auto-stub: TxPtTest Requester done

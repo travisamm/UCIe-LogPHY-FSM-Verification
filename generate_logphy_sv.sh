@@ -39,6 +39,7 @@ TOPS=(
   MainSBInit
   MainMBInitSM
   MainMBTrainSM
+  MainLinkTrainingSM
   MainPhyRetrainSidebandHandshake
   MainTrainErrorRequester
   MainTrainErrorResponder
@@ -189,7 +190,7 @@ module_sources() {
       echo "logphy/modules/linktraining/MBTrainSM.scala:logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/linktraining/TxD2CEyeWidthSweep.scala:logphy/modules/linktraining/RxD2CPointTest.scala:logphy/modules/linktraining/RxD2CEyeWidthSweep.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala:logphy/modules/PhyLaneTrainer.scala"
       ;;
     MainLinkTrainingSM)
-      echo "logphy/modules/linktraining/:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala"
+      echo "logphy/modules/linktraining/:logphy/modules/PhyLaneTrainer.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/UcieLFSR.scala:logphy/modules/SidebandMessageExchanger.scala"
       ;;
     MainTxD2CPointTestRequester|MainTxD2CPointTestResponder)
       echo "logphy/modules/linktraining/TxD2CPointTest.scala:logphy/modules/PatternWriter.scala:logphy/modules/PatternReader.scala:logphy/modules/SidebandMessageExchanger.scala"
