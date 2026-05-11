@@ -32,7 +32,7 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 **UVM inventory**
 
 - **SBINIT:** `sbinit_regress` — `test_sbinit_sanity`, `test_sbinit_timeout`, `test_sbinit_partner_not_ready`, `test_sbinit_early_req`, `test_sbinit_multiple_reqs` (`uvm/Makefile`, `logphy_sbinit_tests.sv`, `logphy_scoreboard.sv`).
-- **MBINIT:** `mbinit_regress` — `test_mbinit_sanity`, `test_mbinit_param_only`, `test_mbinit_param_mismatch` (`mbinit_tests.sv`, `mbinit_scoreboard.sv`).
+- **MBINIT:** `mbinit_regress` — `test_mbinit_sanity`, `test_mbinit_param_only`, `test_mbinit_param_mismatch` (`mbinit_tests.sv`, `mbinit_scoreboard.sv`). **PatternWriter LR-02:** `make patternwriter_lr02` (`tb/patternwriter_tb_lr02.sv`) — PERLANEID burst vs generated `PatternWriter.sv` (no RTL change).
 - **MBTRAIN:** `mbtrain_regress` — `test_mbtrain_sanity` runs `seq_mbtrain_full` through all 12 sub-states (`mbtrain_tests.sv`, `mbtrain_base_test.sv`, `mbtrain_scoreboard.sv`). Scoreboard: sideband REQ decode + `fsm_done` + **`mbLaneCtrlIo` per-state checks (XC-05)** via `check_lane_ctrl()`. TC-01 (Tx tri-state in TXSELFCAL) fully checked; VV-02 and RCC-02 partially checked (tri-state proxy, not driven-low proof).
 - **MBINIT scoreboard additions:** `check_lane_ctrl()` added for all 7 MBINIT states (XC-05); `check_pattern_type()` added for REPAIRCLK/REPAIRVAL/REVERSALMB/REPAIRMB (RC-02, RV-03, LR-02, RM-01). `mbLaneCtrlIo` fully wired in `mbinit_if` and `mbinit_tb_top`; monitor captures all lane ctrl + patternWriter/Reader fields.
 
@@ -130,8 +130,8 @@ Checklist uses **Done** = `[X]` when the listed **Evidence** is exercised in CI/
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [~] | LR-01 | Must send {MBINIT.REVERSALMB init req} and wait for resp | 4.5.3.3.5 | P0 | | `mbinit_scoreboard` (LR REQ/RESP flags) |
-| [~] | LR-02 | Must send Per Lane ID pattern on all N data lanes (128 iterations, unscrambled) | 4.5.3.3.5 | P0 | PatternWriter config | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: PERLANEID(2) in REVERSALMB; iteration count not checked) |
+| [X] | LR-01 | Must send {MBINIT.REVERSALMB init req} and wait for resp | 4.5.3.3.5 | P0 | | `test_mbinit_sanity` + `seq_mbinit_full`, `mbinit_scoreboard` `expect_full_mbinit`: **REQ** — `REVERSALMB_INIT_REQ` on requester TX (`saw_lr_init_req_tx`). **RESP** — `REVERSALMB_INIT_RESP` decoded on **requester RX** (`saw_lr_init_resp_rx`); monitor samples `requesterSbLaneIo_rx_*` (partner / seq `MB_LR_INIT_RESP`). Responder-leg `saw_lr_init_resp_tx` remains for DUT **responder TX** only. |
+| [X] | LR-02 | Must send Per Lane ID pattern on all N data lanes (128 iterations, unscrambled) | 4.5.3.3.5 | P0 | Split: MBInit vs PatternWriter | **MBInit:** `test_mbinit_sanity`, `mbinit_scoreboard` `check_pattern_type` — PERLANEID (`2'h2`) when `patternWriterIo_req_valid` in `REVERSALMB`. **PatternWriter (LR-02b):** `make patternwriter_lr02` — standalone `tb/patternwriter_tb_lr02.sv`: 64 mainband cycles (=128×16/32 serializer UI), per-lane `A0nA` duplicated words on all lanes for `functionalLanes=3'b011`, `txLfsrCtrl_increment` never asserted (no LFSR path). Other `functionalLanes` codes not covered here. |
 | [ ] | LR-03 | Partner must perform per-lane compare on all N Rx lanes | 4.5.3.3.5 | P0 | PatternReader compare | — |
 | [ ] | LR-04 | Must correctly detect lane reversal and apply if needed | 4.5.3.3.5 | P0 | applyLaneReversal output | — |
 | [ ] | LR-05 | If x32 partner connected to x64, must recognize width difference from param exchange | 4.5.3.3.5 | P1 | interpretBy8Lane | — |
