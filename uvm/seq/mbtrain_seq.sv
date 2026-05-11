@@ -467,4 +467,45 @@ class seq_mbtrain_speedidle_error extends mbtrain_base_seq;
     send_item(.delay(5), .hold(50), .negotiated_rate(4'h0));
   endtask
 endclass
+// ============================================================
+// seq_mbtrain_rxclkcal: focused RCC-01/02/05 sequence
+// ============================================================
+class seq_mbtrain_rxclkcal extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_rxclkcal)
+
+  function new(string name = "seq_mbtrain_rxclkcal");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(2), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_SI_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_TC_DONE_RESP),
+              .delay(5), .hold(80));
+    send_item(.rsp_valid(1), .rsp_data(`MT_TC_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_RCC_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_RCC_START_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_RCC_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_RCC_DONE_REQ),
+              .delay(5), .hold(30));
+  endtask
+endclass
 `endif

@@ -221,4 +221,35 @@ class test_mbtrain_speedidle_error extends mbtrain_base_test;
     phase.drop_objection(this);
   endtask
 endclass
+// RCC-01/02/05: Focused RXCLKCAL test
+class test_mbtrain_rxclkcal extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_rxclkcal)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_rxclkcal seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain     = 0;
+    env.scoreboard.expect_valvref_checks   = 0;
+    env.scoreboard.expect_datavref_checks  = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
+    env.scoreboard.expect_rxclkcal_checks  = 1;
+    env.scoreboard.expect_fsm_done         = 0;
+    env.scoreboard.expect_fsm_error        = 0;
+    env.scoreboard.debug_txselfcal         = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_rxclkcal...", UVM_LOW)
+    seq = seq_mbtrain_rxclkcal::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #10000ns;
+
+    `uvm_info("TEST", "Test test_mbtrain_rxclkcal finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
 `endif

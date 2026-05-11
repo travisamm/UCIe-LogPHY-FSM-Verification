@@ -94,6 +94,7 @@ class mbtrain_scoreboard extends uvm_scoreboard;
   bit expect_valvref_checks  = 1;
   bit expect_datavref_checks = 1;
   bit expect_txselfcal_checks = 0;
+  bit expect_rxclkcal_checks  = 0;
   bit expect_fsm_done        = 1;
   bit expect_fsm_error       = 0;
   bit debug_txselfcal        = 0;
@@ -549,6 +550,11 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       if (!tc_saw_start)       `uvm_error("MT_SB","TXSELFCAL probe: txSelfCalStart never asserted")
       if (!tc_saw_done)        `uvm_error("MT_SB","TXSELFCAL probe: txSelfCalDone never pulsed")
       if (!saw_tc_done_req)    `uvm_error("MT_SB","TXSELFCAL probe: requester never sent TXSELFCAL_DONE_REQ")
+    end
+    if (expect_rxclkcal_checks) begin
+      if (!saw_state_rxclkcal)  `uvm_error("MT_SB","RXCLKCAL probe: RXCLKCAL state was never observed")
+      if (!saw_rcc_start_req)   `uvm_error("MT_SB","RXCLKCAL probe: requester never sent RXCLKCAL_START_REQ")
+      if (!saw_rcc_done_req)    `uvm_error("MT_SB","RXCLKCAL probe: requester never sent RXCLKCAL_DONE_REQ")
     end
 
     if (lane_ctrl_error)
