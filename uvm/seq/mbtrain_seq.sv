@@ -23,11 +23,11 @@
 `define MT_SI_DONE_REQ   128'h00000000_00000000_00000004_002D4012
 `define MT_SI_DONE_RESP  128'h00000000_00000000_00000004_002E8012
 
-// TXSELFCAL (driver auto-stubs mbTrainTxSelfCalDone on mbTrainTxSelfCalStart)
+// TXSELFCAL (driver auto-stubs trainingCtrl_txSelfCalDone on txSelfCalStart)
 `define MT_TC_DONE_REQ   128'h00000000_00000000_00000005_002D4012
 `define MT_TC_DONE_RESP  128'h00000000_00000000_00000005_002E8012
 
-// RXCLKCAL (driver auto-stubs mbTrainRxClkCalDone on mbTrainRxClkCalStart)
+// RXCLKCAL (driver auto-stubs trainingCtrl_rxClkCalDone on rxClkCalStart)
 `define MT_RCC_START_REQ  128'h00000000_00000000_00000006_002D4012
 `define MT_RCC_START_RESP 128'h00000000_00000000_00000006_002E8012
 `define MT_RCC_DONE_REQ   128'h00000000_00000000_00000007_002D4012
@@ -92,24 +92,105 @@ class mbtrain_base_seq extends uvm_sequence #(mbtrain_transaction);
     input logic        req_valid  = 0,
     input logic [127:0] req_data  = 0,
     input logic        rsp_valid  = 0,
-    input logic [127:0] rsp_data  = 0
+    input logic [127:0] rsp_data  = 0,
+    input logic        training_req_start = 0,
+    input logic [1:0]  training_req_kind  = 2'h0,
+    input logic        training_req_complete = 0,
+    input logic [15:0] max_error_threshold = 16'hFFFF,
+    input logic [3:0]  negotiated_rate = 4'h3
   );
     mbtrain_transaction req;
     req = mbtrain_transaction::type_id::create("req");
-    req.start_fsm    = start_fsm;
-    req.delay        = delay;
-    req.hold_cycles  = hold;
-    req.rx_valid     = req_valid;
-    req.rx_data      = req_data;
-    req.rsp_rx_valid = rsp_valid;
-    req.rsp_rx_data  = rsp_data;
+    req.start_fsm                = start_fsm;
+    req.delay                    = delay;
+    req.hold_cycles              = hold;
+    req.rx_valid                 = req_valid;
+    req.rx_data                  = req_data;
+    req.rsp_rx_valid             = rsp_valid;
+    req.rsp_rx_data              = rsp_data;
+    req.trainingReqStart         = training_req_start;
+    req.trainingReqTestKind      = training_req_kind;
+    req.trainingReqComplete      = training_req_complete;
+    req.maxErrorThresholdPerLane = max_error_threshold;
+    req.negotiatedMaxDataRate    = negotiated_rate;
     start_item(req);
     finish_item(req);
+  endtask
+
+  task run_training_point_op(input logic [15:0] max_error_threshold = 16'hFFFF);
+    send_item(.training_req_start(1), .training_req_kind(2'h0),
+              .delay(5), .hold(2), .max_error_threshold(max_error_threshold));
+    send_item(.delay(10), .hold(1), .max_error_threshold(max_error_threshold));
+    send_item(.training_req_complete(1), .delay(2), .hold(2),
+              .max_error_threshold(max_error_threshold));
   endtask
 
   virtual task body();
   endtask
 
+endclass
+
+// ============================================================
+// seq_mbtrain_valvref: focused VV-01/02/03/04/06 sequence
+// VALVREF START -> one point-test link op -> VALVREF END -> DATAVREF
+// ============================================================
+class seq_mbtrain_valvref extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_valvref)
+
+  function new(string name = "seq_mbtrain_valvref");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2),
+              .max_error_threshold(16'h0007));
+
+    send_item(.req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(5), .hold(30), .max_error_threshold(16'h0007));
+
+    run_training_point_op(16'h0007);
+
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30), .max_error_threshold(16'h0007));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbtrain_datavref: focused DV-01/02/03 sequence
+// Drives through VALVREF, then checks DATAVREF link-op behavior and exit.
+// ============================================================
+class seq_mbtrain_datavref extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_datavref)
+
+  function new(string name = "seq_mbtrain_datavref");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2),
+              .max_error_threshold(16'h0009));
+
+    send_item(.req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(5), .hold(30), .max_error_threshold(16'h0009));
+    send_item(.training_req_complete(1), .delay(5), .hold(2),
+              .max_error_threshold(16'h0009));
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30), .max_error_threshold(16'h0009));
+
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30), .max_error_threshold(16'h0009));
+
+    run_training_point_op(16'h0009);
+
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30), .max_error_threshold(16'h0009));
+  endtask
 endclass
 
 // ============================================================
@@ -138,6 +219,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_VV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
               .delay(5), .hold(30));
@@ -146,6 +228,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
               .delay(5), .hold(30));
@@ -155,12 +238,12 @@ class seq_mbtrain_full extends mbtrain_base_seq;
               .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
               .delay(5), .hold(30));
 
-    // 5. TXSELFCAL (driver auto-stubs mbTrainTxSelfCalDone on mbTrainTxSelfCalStart)
+    // 5. TXSELFCAL (driver auto-stubs trainingCtrl_txSelfCalDone)
     send_item(.req_valid(1), .req_data(`MT_TC_DONE_RESP),
               .rsp_valid(1), .rsp_data(`MT_TC_DONE_REQ),
               .delay(5), .hold(30));
 
-    // 6. RXCLKCAL (driver auto-stubs mbTrainRxClkCalDone on mbTrainRxClkCalStart)
+    // 6. RXCLKCAL (driver auto-stubs trainingCtrl_rxClkCalDone)
     send_item(.req_valid(1), .req_data(`MT_RCC_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_RCC_START_REQ),
               .delay(5), .hold(30));
@@ -172,6 +255,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_VTC_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_VTC_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_VTC_DONE_RESP),
               .rsp_valid(1), .rsp_data(`MT_VTC_DONE_REQ),
               .delay(5), .hold(30));
@@ -180,6 +264,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_VTV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_VTV_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_VTV_DONE_RESP),
               .rsp_valid(1), .rsp_data(`MT_VTV_DONE_REQ),
               .delay(5), .hold(30));
@@ -188,6 +273,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_DC1_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_DC1_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_DC1_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_DC1_END_REQ),
               .delay(5), .hold(30));
@@ -196,6 +282,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_DTV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_DTV_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_DTV_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_DTV_END_REQ),
               .delay(5), .hold(30));
@@ -204,6 +291,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_RDS_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_RDS_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_RDS_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_RDS_END_REQ),
               .delay(5), .hold(30));
@@ -212,6 +300,7 @@ class seq_mbtrain_full extends mbtrain_base_seq;
     send_item(.req_valid(1), .req_data(`MT_DC2_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_DC2_START_REQ),
               .delay(5), .hold(30));
+    run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_DC2_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_DC2_END_REQ),
               .delay(5), .hold(30));
