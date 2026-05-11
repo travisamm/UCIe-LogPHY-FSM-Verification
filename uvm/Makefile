@@ -3,6 +3,11 @@ XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
+MBTRAINTEST ?=
+MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
+MBTRAIN_LOG_DIR ?= run_logs/mbtrain
+
+.PHONY: sbinit sbinit_regress mbinit mbinit_regress mbtrain _mbtrain_run mbtrain_regress clean
 
 # ---- SBINIT ----
 sbinit:
@@ -49,10 +54,35 @@ mbinit_regress:
 	$(MAKE) mbinit MBTEST=test_mbinit_repairclk_unrep
 	$(MAKE) mbinit MBTEST=test_mbinit_repairval_unrep
 
-MBTRAINTEST ?= mbtrain_base_test
-
 # ---- MBTRAIN ----
 mbtrain:
+	@mkdir -p "$(MBTRAIN_LOG_DIR)"; \
+	tests="$(if $(strip $(MBTRAINTEST)),$(strip $(MBTRAINTEST)),$(strip $(MBTRAIN_TESTS)))"; \
+	results_file="$(MBTRAIN_LOG_DIR)/.results"; \
+	failed=0; \
+	: > "$$results_file"; \
+	for test in $$tests; do \
+	  log="$(MBTRAIN_LOG_DIR)/$$test.log"; \
+	  printf "Running %s...\n" "$$test"; \
+	  if $(MAKE) --no-print-directory _mbtrain_run MBTRAINTEST=$$test > "$$log" 2>&1; then \
+	    sim_status=0; \
+	  else \
+	    sim_status=$$?; \
+	  fi; \
+	  if [ $$sim_status -eq 0 ] && ! grep -Eq '^(UVM_ERROR|UVM_FATAL)([^:]*@|[[:space:]]*:[[:space:]]*[1-9])' "$$log"; then \
+	    result=PASS; \
+	  else \
+	    result=FAIL; \
+	    failed=1; \
+	  fi; \
+	  printf "  %-36s %s\n" "$$test" "$$result" >> "$$results_file"; \
+	done; \
+	printf "\nMBTRAIN results:\n"; \
+	cat "$$results_file"; \
+	printf "\nLogs: %s\n" "$(MBTRAIN_LOG_DIR)"; \
+	exit $$failed
+
+_mbtrain_run:
 	$(XRUN) $(XRUN_OPTS) \
 	  +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
 	  -y ../elab/generatedVerilog/logphy +libext+.sv \
@@ -67,8 +97,7 @@ mbtrain:
 	  ./tb/mbtrain_tb_top.sv \
 	  +UVM_TESTNAME=$(MBTRAINTEST)
 
-mbtrain_regress:
-	$(MAKE) mbtrain MBTRAINTEST=test_mbtrain_sanity
+mbtrain_regress: mbtrain
 
 clean:
-	rm -rf *.log *.history INCA_libs xcelium.d
+	rm -rf *.log *.history INCA_libs xcelium.d run_logs
