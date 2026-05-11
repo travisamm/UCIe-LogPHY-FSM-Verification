@@ -142,12 +142,10 @@ class seq_mbtrain_valvref extends mbtrain_base_seq;
   endfunction
 
   virtual task body();
-    send_item(.start_fsm(1), .delay(2), .hold(2),
-              .max_error_threshold(16'h0007));
-
-    send_item(.req_valid(1), .req_data(`MT_VV_START_RESP),
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
-              .delay(5), .hold(30), .max_error_threshold(16'h0007));
+              .delay(2), .hold(30), .max_error_threshold(16'h0007));
 
     run_training_point_op(16'h0007);
 
@@ -169,12 +167,10 @@ class seq_mbtrain_datavref extends mbtrain_base_seq;
   endfunction
 
   virtual task body();
-    send_item(.start_fsm(1), .delay(2), .hold(2),
-              .max_error_threshold(16'h0009));
-
-    send_item(.req_valid(1), .req_data(`MT_VV_START_RESP),
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
-              .delay(5), .hold(30), .max_error_threshold(16'h0009));
+              .delay(2), .hold(30), .max_error_threshold(16'h0009));
     send_item(.training_req_complete(1), .delay(5), .hold(2),
               .max_error_threshold(16'h0009));
     send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
@@ -212,13 +208,11 @@ class seq_mbtrain_full extends mbtrain_base_seq;
   endfunction
 
   virtual task body();
-    // 1. Start FSM
-    send_item(.start_fsm(1), .delay(2), .hold(2));
-
-    // 2. VALVREF — START exchange, then driver runs test stubs, then END exchange
-    send_item(.req_valid(1), .req_data(`MT_VV_START_RESP),
+    // 1. Start FSM and complete VALVREF START while fsmCtrl_start is high.
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
               .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
-              .delay(5), .hold(30));
+              .delay(2), .hold(30));
     run_training_point_op();
     send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
               .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
