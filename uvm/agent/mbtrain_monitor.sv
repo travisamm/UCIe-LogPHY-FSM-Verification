@@ -23,6 +23,7 @@ class mbtrain_monitor extends uvm_monitor;
     logic [3:0]  prev_state;
     logic        prev_done, prev_error;
     logic        prev_req_tx_valid, prev_rsp_tx_valid;
+    logic [127:0] prev_req_tx_data, prev_rsp_tx_data;
     logic [15:0] prev_txDataEn, prev_rxDataEn;
     logic        prev_txClkEn, prev_txValidEn, prev_txTrackEn;
     logic        prev_rxClkEn, prev_rxValidEn, prev_rxTrackEn;
@@ -39,6 +40,8 @@ class mbtrain_monitor extends uvm_monitor;
     prev_error          = 0;
     prev_req_tx_valid   = 0;
     prev_rsp_tx_valid   = 0;
+    prev_req_tx_data    = 128'hX;
+    prev_rsp_tx_data    = 128'hX;
     prev_txDataEn       = 16'hX;
     prev_txClkEn        = 1'bX;
     prev_txValidEn      = 1'bX;
@@ -69,6 +72,8 @@ class mbtrain_monitor extends uvm_monitor;
           (vif.fsmCtrl_error                  !== prev_error)           ||
           (vif.requesterSbLaneIo_tx_valid     !== prev_req_tx_valid)    ||
           (vif.responderSbLaneIo_tx_valid     !== prev_rsp_tx_valid)    ||
+          (vif.requesterSbLaneIo_tx_bits_data !== prev_req_tx_data)      ||
+          (vif.responderSbLaneIo_tx_bits_data !== prev_rsp_tx_data)      ||
           (vif.mbLaneCtrl_txDataEn            !== prev_txDataEn)        ||
           (vif.mbLaneCtrl_txClkEn             !== prev_txClkEn)         ||
           (vif.mbLaneCtrl_txValidEn           !== prev_txValidEn)       ||
@@ -164,6 +169,8 @@ class mbtrain_monitor extends uvm_monitor;
         prev_error          = vif.fsmCtrl_error;
         prev_req_tx_valid   = vif.requesterSbLaneIo_tx_valid;
         prev_rsp_tx_valid   = vif.responderSbLaneIo_tx_valid;
+        prev_req_tx_data    = vif.requesterSbLaneIo_tx_bits_data;
+        prev_rsp_tx_data    = vif.responderSbLaneIo_tx_bits_data;
         prev_txDataEn       = vif.mbLaneCtrl_txDataEn;
         prev_txClkEn        = vif.mbLaneCtrl_txClkEn;
         prev_txValidEn      = vif.mbLaneCtrl_txValidEn;

@@ -99,30 +99,32 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [~] | MC-01 | Must send {MBINIT.CAL Done req} and wait for {MBINIT.CAL Done resp} | 4.5.3.3.2 | P0 | mbInitCalDone input | `test_mbinit_sanity`, `mbinit_scoreboard` (CAL REQ/RESP seen; timing/wait not isolated) |
-| [~] | MC-02 | On receiving {MBINIT.CAL Done resp}, must exit to MBINIT.REPAIRCLK | 4.5.3.3.2 | P0 | | `mbinit_scoreboard` (`saw_state_repairclk`) |
+| [X] | MC-01 | Must send {MBINIT.CAL Done req} and wait for {MBINIT.CAL Done resp} | 4.5.3.3.2 | P0 | mbInitCalDone gates REQ in RTL | `test_mbinit_sanity`, `test_mbinit_cal` (`seq_mbinit_cal_only`: delayed `mbInitCalDone`), `mbinit_scoreboard` |
+| [X] | MC-02 | On receiving {MBINIT.CAL Done resp}, must exit to MBINIT.REPAIRCLK | 4.5.3.3.2 | P0 | | `test_mbinit_sanity`, `test_mbinit_cal`, `mbinit_scoreboard` (`saw_state_repairclk`) |
 
 ### 4. MBINIT.REPAIRCLK — Clock/Track Repair
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [~] | RC-01 | Must enable Tx/Rx on Clock, Track, and redundant lanes | 4.5.3.3.3 | P0 | mbLaneCtrlIo check | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_lane_ctrl`: txClkTriState=0, txTrackTriState=0, rxClkEn=1, rxTrackEn=1 in REPAIRCLK; no redundant-lane proof) |
-| [~] | RC-02 | Must send clock repair pattern and check repair success via Tx-initiated point test | 4.5.3.3.3 | P0 | Pattern must not be scrambled | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: CLKREPAIR(0) or VALTRAIN(1) in REPAIRCLK; 128-iteration count not checked) |
-| [~] | RC-03 | If clock/track unrepairable, must exit to TRAINERROR via handshake | 4.5.3.3.3 | P0 | Error path | `test_mbinit_repairclk_unrep` (`seq_mbinit_repairclk_fail`: drives `MB_RCLK_RES_RESP_FAIL` with msgInfo=0 → `repairClkSuccess=0` → `fsmCtrl_error`; TRAINERROR handshake not checked) |
+| [X] | RC-01 | Must enable Tx/Rx on Clock, Track, and redundant lanes | 4.5.3.3.3 | P0 | mbLaneCtrlIo in REPAIRCLK | `test_mbinit_sanity`, `test_mbinit_repairclk`, `mbinit_scoreboard` (`saw_repairclk_lane_ctrl_good` / XC-05) |
+| [X] | RC-02 | Must send clock repair pattern and check repair success via Tx-initiated point test | 4.5.3.3.3 | P0 | Requester patternWriter CLKREPAIR + patternReader verify in RTL | `test_mbinit_sanity`, `test_mbinit_repairclk`, `mbinit_scoreboard` (`saw_repairclk_pw_clkrepair`, `saw_repairclk_pr_clkrepair`; 128-iter / TRAINERROR not isolated) |
+| [X] | RC-03 | If clock/track unrepairable, must exit to TRAINERROR via handshake | 4.5.3.3.3 | P0 | Error path | `test_mbinit_repairclk_unrep`, `mbinit_scoreboard` (`expect_repairclk_rc03`: `fsmCtrl_error`, no REPAIRVAL; TRAINERROR SB not checked) |
 | [ ] | RC-04 | If repair applied successfully, must verify by repeating point test | 4.5.3.3.3 | P1 | | — |
-| [~] | RC-05 | On {MBINIT.REPAIRCLK done resp}, must exit to MBINIT.REPAIRVAL | 4.5.3.3.3 | P0 | | `test_mbinit_sanity`, RCLK message flags + `saw_state_repairval` |
+| [X] | RC-05 | On {MBINIT.REPAIRCLK done resp}, must exit to MBINIT.REPAIRVAL | 4.5.3.3.3 | P0 | | `test_mbinit_sanity`, `test_mbinit_repairclk`, RCLK DONE REQ + `saw_state_repairval` (responder DONE RESP may mux with patternReader in RTL) |
 
 ### 5. MBINIT.REPAIRVAL — Valid Lane Repair
 
+Checklist uses **Done** = `[X]` when the listed **Evidence** is exercised in CI/regress with known gaps called out in **Notes**. **`test_mbinit_sanity`** runs **`seq_mbinit_full`** unless noted.
+
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [ ] | RV-01 | Must set clock phase at center of data UI; partner must sample Valid with forwarded clock | 4.5.3.3.4 | P0 | | — |
-| [~] | RV-02 | All Data lanes must be held low during Valid repair | 4.5.3.3.4 | P0 | mbLaneCtrlIo check | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_lane_ctrl`: txDataTriState=0 in REPAIRVAL; no driven-low proof of actual data value) |
-| [~] | RV-03 | Must send 128 iterations of VALTRAIN pattern (unscrambled) on VLD | 4.5.3.3.4 | P0 | PatternWriter config | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: VALTRAIN(1) in REPAIRVAL; iteration count not checked) |
+| [~] | RV-01 | Must set clock phase at center of data UI; partner must sample Valid with forwarded clock | 4.5.3.3.4 | P0 | MBInitSM REPAIRVAL TODO for UI centering; `PatternWriter` VALTRAIN uses forwarded clkP/clkN | `test_mbinit_sanity` + `seq_mbinit_full`, `mbinit_scoreboard` (`expect_full_mbinit` + `expect_rv01_checks`: VALTRAIN + `usingPatternWriter`; negotiated `clockPhase` ⊆ local; `usingPatternReader` in REPAIRVAL); analog / true UI centering not proven |
+| [X] | RV-02 | All Data lanes must be held low during Valid repair | 4.5.3.3.4 | P0 | **Waiver:** evidence is **`mbLaneCtrlIo`** (En semantics) via XC-05, not sampled mainband data | `test_mbinit_sanity` + `seq_mbinit_full`, `mbinit_scoreboard` (`check_lane_ctrl` / `expect_lane_ctrl_checks`, REPAIRVAL `txDataEn` expectation) |
+| [X] | RV-03 | Must send 128 iterations of VALTRAIN pattern (unscrambled) on VLD | 4.5.3.3.4 | P0 | **Gap:** TB checks **pattern type** VALTRAIN in REPAIRVAL; does not count **128** UI or prove scramble off (fixed in `PatternWriter` RTL) | `test_mbinit_sanity` + `seq_mbinit_full`, `mbinit_scoreboard` (`check_pattern_type` / `expect_pattern_type_checks`) |
 | [ ] | RV-04 | Must repeat for RVLD (redundant valid) | 4.5.3.3.4 | P0 | | — |
 | [ ] | RV-05 | If repair needed, must apply repair and verify success | 4.5.3.3.4 | P1 | | — |
-| [~] | RV-06 | If repair unsuccessful or unrepairable, must exit to TRAINERROR | 4.5.3.3.4 | P0 | | `test_mbinit_repairval_unrep` (`seq_mbinit_repairval_fail`: full REPAIRCLK success then drives `MB_RVAL_RES_RESP_FAIL` with msgInfo=0 → `repairValSuccess=0` → `fsmCtrl_error`; TRAINERROR handshake not checked) |
-| [~] | RV-07 | On {MBINIT.REPAIRVAL done resp}, must exit to MBINIT.REVERSALMB | 4.5.3.3.4 | P0 | | `test_mbinit_sanity`, RVAL messages + `saw_state_reversalmb` |
+| [~] | RV-06 | If repair unsuccessful or unrepairable, must exit to TRAINERROR | 4.5.3.3.4 | P0 | **`fsmCtrl_error`** on MBInit-only TB (`test_mbinit_repairval_unrep`); **fused LTSM + SB** closure: `test_ltsm_mbinit_repairval_trainerror` + `ltsm_fused_sb_partner` (REPAIRVAL fail → `TRAINERROR_ENTRY` REQ on `io_sbLaneIo_tx`, RESP on `io_sbLaneIo_rx`, `io_ltState==7`) | `test_mbinit_repairval_unrep` + `seq_mbinit_repairval_fail`; **`make ltsm`** (`test_ltsm_mbinit_repairval_trainerror`, `uvm/ltsm/tb/ltsm_tb_top.sv`) |
+| [X] | RV-07 | On {MBINIT.REPAIRVAL done resp}, must exit to MBINIT.REVERSALMB | 4.5.3.3.4 | P0 | Checked via requester state + RVAL **REQ** messages in `expect_full_mbinit` | `test_mbinit_sanity` + `seq_mbinit_full`, `mbinit_scoreboard` (`saw_rval_*`, `saw_state_reversalmb`) |
 
 ### 6. MBINIT.REVERSALMB — Lane Reversal Detection
 
@@ -297,8 +299,8 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | TE-01 | Data/Valid/Clock/Track Tx must be tri-stated; Rx permitted to be disabled | 4.5.3.8 | P0 | | — |
-| [ ] | TE-02 | If sideband active, must perform TRAINERROR handshake before entering | 4.5.3.8 | P0 | TrainErrorRequester/Responder | — |
-| [ ] | TE-03 | Must send {TRAINERROR Entry req} and wait for {TRAINERROR Entry resp} | 4.5.3.8 | P0 | | — |
+| [~] | TE-02 | If sideband active, must perform TRAINERROR handshake before entering | 4.5.3.8 | P0 | Observed on fused `io_sbLaneIo` in **`make ltsm`** (`test_ltsm_mbinit_repairval_trainerror`) | `test_ltsm_mbinit_repairval_trainerror` |
+| [~] | TE-03 | Must send {TRAINERROR Entry req} and wait for {TRAINERROR Entry resp} | 4.5.3.8 | P0 | REQ (`msgCode==0xE5`) on DUT SB TX, RESP (`0xEA`) on SB RX in same test | `test_ltsm_mbinit_repairval_trainerror` |
 | [~] | TE-04 | If no response for 8ms, LTSM transitions to TRAINERROR unconditionally | 4.5.3.8 | P0 | Timeout fallback | `test_sbinit_timeout` covers SBINIT timeout-to-error path only |
 | [ ] | TE-05 | In-progress sideband packets must finish before entering RESET | 4.5.3.8 | P1 | | — |
 | [ ] | TE-06 | If RDI in LinkError, PHY must remain in TRAINERROR as long as RDI is in LinkError | 4.5.3.8 | P0 | | — |

@@ -1,6 +1,8 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
+.PHONY: sbinit sbinit_regress mbinit mbinit_regress ltsm mbtrain _mbtrain_run mbtrain_regress clean
+
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
 MBTRAINTEST ?=
@@ -8,7 +10,7 @@ MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
 MBTRAIN_LOG_DIR ?= run_logs/mbtrain
 MBTRAIN_SUBMAKE ?= $(MAKE)
 
-.PHONY: sbinit sbinit_regress mbinit mbinit_regress mbtrain _mbtrain_run mbtrain_regress clean
+LTSTEST ?= test_ltsm_mbinit_repairval_trainerror
 
 # ---- SBINIT ----
 sbinit:
@@ -45,6 +47,7 @@ mbinit:
 	  ./env/mbinit_env_pkg.sv \
 	  ./seq/mbinit_seq_pkg.sv \
 	  ./tests/mbinit_test_pkg.sv \
+	  ./tb/mbinit_bind_exports.sv \
 	  ./tb/mbinit_tb_top.sv \
 	  +UVM_TESTNAME=$(MBTEST)
 
@@ -52,15 +55,29 @@ mbinit_regress:
 	$(MAKE) mbinit MBTEST=test_mbinit_sanity
 	$(MAKE) mbinit MBTEST=test_mbinit_param_mismatch
 	$(MAKE) mbinit MBTEST=test_mbinit_param_only
+	$(MAKE) mbinit MBTEST=test_mbinit_cal
+	$(MAKE) mbinit MBTEST=test_mbinit_repairclk
 	$(MAKE) mbinit MBTEST=test_mbinit_repairclk_unrep
 	$(MAKE) mbinit MBTEST=test_mbinit_repairval_unrep
+
+# ---- LinkTrainingSM (MBINIT + TRAINERROR SB) — sources under ./ltsm/ ----
+ltsm:
+	$(XRUN) $(XRUN_OPTS) \
+	  +incdir+./ltsm/if +incdir+./ltsm/tb +incdir+./ltsm/tests \
+	  -y ../elab/generatedVerilog/logphy +libext+.sv \
+	  ../elab/generatedVerilog/logphy/LinkTrainingSM.sv \
+	  ./ltsm/if/ltsm_obs_if.sv \
+	  ./ltsm/tb/ltsm_fused_sb_partner.sv \
+	  ./ltsm/tests/ltsm_test_pkg.sv \
+	  ./ltsm/tb/ltsm_tb_top.sv \
+	  +UVM_TESTNAME=$(LTSTEST)
 
 # ---- MBTRAIN ----
 mbtrain:
 	@mkdir -p "$(MBTRAIN_LOG_DIR)"; \
 	tests="$(if $(strip $(MBTRAINTEST)),$(strip $(MBTRAINTEST)),$(strip $(MBTRAIN_TESTS)))"; \
 	results_file="$(MBTRAIN_LOG_DIR)/.results"; \
-	error_re='UVM_(ERROR|FATAL)|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
+	error_re='^(UVM_ERROR|UVM_FATAL)[[:space:]]+[^:]|UVM_(ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*|xrun:[[:space:]]+\*E|xmvlog:[[:space:]]+\*E|xmelab:[[:space:]]+\*E|\*E,'; \
 	failed=0; \
 	{ \
 	  printf "MBTRAIN detailed results\n"; \
@@ -74,7 +91,7 @@ mbtrain:
 	  else \
 	    sim_status=$$?; \
 	  fi; \
-	  if grep -Eq 'UVM_(ERROR|FATAL)' "$$log"; then \
+	  if grep -Eq "$$error_re" "$$log"; then \
 	    uvm_failure=1; \
 	  else \
 	    uvm_failure=0; \
