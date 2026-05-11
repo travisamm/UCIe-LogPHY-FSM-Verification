@@ -232,9 +232,12 @@ class seq_mbtrain_full extends mbtrain_base_seq;
               .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
               .delay(5), .hold(30));
 
-    // 5. TXSELFCAL (driver auto-stubs trainingCtrl_txSelfCalDone)
+    // 5. TXSELFCAL (driver auto-stubs trainingCtrl_txSelfCalDone).
+    // Drive the requester response first so a stale requesterRdy cannot let
+    // the responder half advance the state before TXSELFCAL_DONE_REQ is sent.
     send_item(.req_valid(1), .req_data(`MT_TC_DONE_RESP),
-              .rsp_valid(1), .rsp_data(`MT_TC_DONE_REQ),
+              .delay(5), .hold(80));
+    send_item(.rsp_valid(1), .rsp_data(`MT_TC_DONE_REQ),
               .delay(5), .hold(30));
 
     // 6. RXCLKCAL (driver auto-stubs trainingCtrl_rxClkCalDone)
