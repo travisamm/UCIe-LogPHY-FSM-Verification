@@ -94,7 +94,30 @@ module mbinit_state_sync_sva (
     else $error("SVA FAIL: XC-03 requester/responder states out of sync");
 
 endmodule
+// ============================================================
+// SVA: XC-07 — Valid framing must be correct when LFSR pattern transmitted
+// When patternType=0 (LFSR), mbTxLaneIo_bits_valid must be asserted
+// Spec: XC-07
+// ============================================================
+module patternwriter_valid_framing_sva (
+  input wire        clock,
+  input wire        reset,
+  input wire        inProgress,
+  input wire [1:0]  patternTypeReg,
+  input wire [31:0] bits_valid
+);
 
+  // When LFSR pattern (type=0) is active, valid framing must be non-zero
+  property p_lfsr_valid_framing;
+    @(posedge clock) disable iff (reset)
+    (inProgress && patternTypeReg == 2'h0) |->
+      (bits_valid != 32'h0);
+  endproperty
+
+  a_lfsr_valid_framing: assert property (p_lfsr_valid_framing)
+    else $error("SVA FAIL: XC-07 LFSR pattern transmitted without valid framing");
+
+endmodule
 // ============================================================
 // Bind statements
 // ============================================================
@@ -104,7 +127,13 @@ bind SBInitRequester sbinit_sva u_sbinit_sva (
   .currentState(currentState),
   .rxTxMode    (io_rxTxMode_0)
 );
-
+bind PatternWriter patternwriter_valid_framing_sva u_patternwriter_valid_framing_sva (
+  .clock        (clock),
+  .reset        (reset),
+  .inProgress   (inProgress),
+  .patternTypeReg(patternTypeReg),
+  .bits_valid   (io_mbTxLaneIo_bits_valid_0)
+);
 bind PatternWriter patternwriter_sva u_patternwriter_sva (
   .clock          (clock),
   .reset          (reset),
