@@ -7,6 +7,7 @@ package mbinit_env_pkg;
   import mbinit_agent_pkg::*;
 
   `include "mbinit_scoreboard.sv"
+  `include "../coverage/mbinit_coverage.sv"
   `include "mbinit_env.sv"
 
 endpackage
