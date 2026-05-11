@@ -6,6 +6,7 @@ MBTEST ?= test_mbinit_sanity
 MBTRAINTEST ?=
 MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
 MBTRAIN_LOG_DIR ?= run_logs/mbtrain
+MBTRAIN_SUBMAKE ?= $(MAKE)
 
 .PHONY: sbinit sbinit_regress mbinit mbinit_regress mbtrain _mbtrain_run mbtrain_regress clean
 
@@ -64,7 +65,7 @@ mbtrain:
 	for test in $$tests; do \
 	  log="$(MBTRAIN_LOG_DIR)/$$test.log"; \
 	  printf "Running %s...\n" "$$test"; \
-	  if $(MAKE) --no-print-directory _mbtrain_run MBTRAINTEST=$$test > "$$log" 2>&1; then \
+	  if $(MBTRAIN_SUBMAKE) --no-print-directory _mbtrain_run MBTRAINTEST=$$test > "$$log" 2>&1; then \
 	    sim_status=0; \
 	  else \
 	    sim_status=$$?; \
@@ -80,6 +81,9 @@ mbtrain:
 	printf "\nMBTRAIN results:\n"; \
 	cat "$$results_file"; \
 	printf "\nLogs: %s\n" "$(MBTRAIN_LOG_DIR)"; \
+	if [ $$failed -ne 0 ]; then \
+	  printf "One or more MBTRAIN tests failed; see the per-test logs above.\n"; \
+	fi; \
 	exit $$failed
 
 _mbtrain_run:
