@@ -1,6 +1,9 @@
 `ifndef MBTRAIN_TESTS_SV
 `define MBTRAIN_TESTS_SV
 
+// Flip to 1'b1 before remote runs when TXSELFCAL root-cause logs are needed.
+localparam bit MBTRAIN_DEBUG_TXSELFCAL = 1'b0;
+
 // Focused VALVREF coverage for VV-01/02/03/04/06.
 class test_mbtrain_valvref extends mbtrain_base_test;
   `uvm_component_utils(test_mbtrain_valvref)
@@ -16,8 +19,10 @@ class test_mbtrain_valvref extends mbtrain_base_test;
     env.scoreboard.expect_full_mbtrain = 0;
     env.scoreboard.expect_valvref_checks = 1;
     env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
     env.scoreboard.expect_fsm_done = 0;
     env.scoreboard.expect_fsm_error = 0;
+    env.scoreboard.debug_txselfcal = MBTRAIN_DEBUG_TXSELFCAL;
     env.scoreboard.expected_max_error_threshold = 16'h0007;
 
     `uvm_info("TEST", "Starting seq_mbtrain_valvref...", UVM_LOW)
@@ -46,8 +51,10 @@ class test_mbtrain_datavref extends mbtrain_base_test;
     env.scoreboard.expect_full_mbtrain = 0;
     env.scoreboard.expect_valvref_checks = 0;
     env.scoreboard.expect_datavref_checks = 1;
+    env.scoreboard.expect_txselfcal_checks = 0;
     env.scoreboard.expect_fsm_done = 0;
     env.scoreboard.expect_fsm_error = 0;
+    env.scoreboard.debug_txselfcal = MBTRAIN_DEBUG_TXSELFCAL;
     env.scoreboard.expected_max_error_threshold = 16'h0009;
 
     `uvm_info("TEST", "Starting seq_mbtrain_datavref...", UVM_LOW)
@@ -76,6 +83,8 @@ class test_mbtrain_sanity extends mbtrain_base_test;
     seq_mbtrain_full seq;
     phase.raise_objection(this);
 
+    env.scoreboard.debug_txselfcal = MBTRAIN_DEBUG_TXSELFCAL;
+
     `uvm_info("TEST", "Starting seq_mbtrain_full...", UVM_LOW)
     seq = seq_mbtrain_full::type_id::create("seq");
     seq.start(env.agent.sequencer);
@@ -83,6 +92,38 @@ class test_mbtrain_sanity extends mbtrain_base_test;
     #20000ns;
 
     `uvm_info("TEST", "Test seq_mbtrain_full finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// Optional focused TXSELFCAL probe. Not included in MBTRAIN_TESTS by default;
+// run with: make mbtrain MBTRAINTEST=test_mbtrain_txselfcal_probe
+class test_mbtrain_txselfcal_probe extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_txselfcal_probe)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_txselfcal_probe seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain = 0;
+    env.scoreboard.expect_valvref_checks = 0;
+    env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 1;
+    env.scoreboard.expect_fsm_done = 0;
+    env.scoreboard.expect_fsm_error = 0;
+    env.scoreboard.debug_txselfcal = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_txselfcal_probe...", UVM_LOW)
+    seq = seq_mbtrain_txselfcal_probe::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #12000ns;
+
+    `uvm_info("TEST", "Test seq_mbtrain_txselfcal_probe finished.", UVM_LOW)
     phase.drop_objection(this);
   endtask
 endclass
