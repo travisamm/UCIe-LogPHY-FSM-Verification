@@ -681,4 +681,95 @@ class seq_mbtrain_linkspeed extends mbtrain_base_seq;
               .delay(5), .hold(30));
   endtask
 endclass
+// ============================================================
+// seq_mbtrain_linkspeed_fail: LS-04
+// Link test fails (ptTestResults=0) -> expect PHYRETRAIN/error
+// ============================================================
+class seq_mbtrain_linkspeed_fail extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_linkspeed_fail)
+
+  function new(string name = "seq_mbtrain_linkspeed_fail");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(2), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_SI_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_TC_DONE_RESP),
+              .delay(5), .hold(80));
+    send_item(.rsp_valid(1), .rsp_data(`MT_TC_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_RCC_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_RCC_START_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_RCC_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_RCC_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_VTC_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VTC_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VTC_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VTC_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_VTV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VTV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VTV_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VTV_DONE_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DC1_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DC1_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DC1_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DC1_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DTV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DTV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DTV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DTV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_RDS_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_RDS_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_RDS_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_RDS_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DC2_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DC2_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DC2_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DC2_END_REQ),
+              .delay(5), .hold(30));
+    // LINKSPEED with failing test results
+    send_item(.req_valid(1), .req_data(`MT_LS_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_LS_START_REQ),
+              .delay(5), .hold(30),
+              .max_error_threshold(16'h0000));
+    send_item(.delay(5), .hold(50),
+              .max_error_threshold(16'h0000));
+  endtask
+endclass
 `endif
