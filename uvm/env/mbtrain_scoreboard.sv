@@ -456,7 +456,12 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       tc_req_tx_valid_count, tc_req_tx_handshake_count, tc_saw_req_match,
       tc_rsp_tx_valid_count, tc_rsp_tx_handshake_count, tc_saw_rsp_match), UVM_LOW)
 
-    if (!tc_saw_start) begin
+    if (tc_saw_to_rxclkcal && tc_cycles <= 1 && !tc_saw_req_match) begin
+      `uvm_info("MT_SB",
+        "TXSELFCAL classification hint: DUT advanced from TXSELFCAL to RXCLKCAL before a requester TXSELFCAL_DONE_REQ exchange completed; this points at stale ready/state transition behavior.",
+        UVM_LOW)
+    end
+    else if (!tc_saw_start) begin
       `uvm_info("MT_SB",
         "TXSELFCAL classification hint: txSelfCalStart never asserted; check whether the sequence entered/held TXSELFCAL.",
         UVM_LOW)
