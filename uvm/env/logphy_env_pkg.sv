@@ -8,6 +8,7 @@ package logphy_env_pkg;
   import logphy_agent_pkg::*;
 
   `include "logphy_scoreboard.sv"
+  `include "../coverage/sbinit_coverage.sv"
   `include "logphy_env.sv"
 
 endpackage
