@@ -210,6 +210,57 @@ module_sources() {
   esac
 }
 
+# CIRCT firtool (see header in emitted SidebandMessageExchanger.sv) sometimes lowers
+# io.msgReceived = Output(Bool()) to an internal net only — no module port — while
+# MBInitRequester/MBInitResponder still connect .io_msgReceived. Reconcile here so we
+# do not hand-edit generated SV after every run.
+patch_sideband_message_exchanger_sv() {
+  local f="$OUT/SidebandMessageExchanger.sv"
+  [[ -f "$f" ]] || return 0
+  python3 - "$f" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fp:
+    text = fp.read()
+
+# Port list already exports io_msgReceived (fixed firtool or re-run).
+port_block = re.search(
+    r"(module\s+SidebandMessageExchanger\s*\()(.*?)(\)\s*;)",
+    text,
+    flags=re.S,
+)
+if not port_block:
+    sys.exit(0)
+ports = port_block.group(2)
+# Already exported (fixed firtool or second script run).
+if re.search(r"\bio_msgReceived\b", ports):
+    pass
+elif re.search(
+    r"(?m)^(\s*output\s+io_msgSent,)\s*\n(\s*)input\s+io_sbLaneIo_tx_ready",
+    text,
+):
+    text = re.sub(
+        r"(?m)^(\s*output\s+io_msgSent,)\s*\n(\s*)input\s+io_sbLaneIo_tx_ready",
+        r"\1\n  output         io_msgReceived,\n\2input          io_sbLaneIo_tx_ready",
+        text,
+        count=1,
+    )
+else:
+    print(
+        "patch_sideband_message_exchanger_sv: could not find io_msgSent / tx_ready stub",
+        file=sys.stderr,
+    )
+
+# With an output port, an inner `wire io_msgReceived;` duplicates the net name.
+text = re.sub(r"(?m)^\s*wire\s+io_msgReceived;\s*\n", "", text)
+
+with open(path, "w", encoding="utf-8") as fp:
+    fp.write(text)
+PY
+}
+
 write_runner() {
   local module="$1"
   local ctor="$2"
@@ -268,6 +319,8 @@ for MODULE in "${TARGETS[@]}"; do
 
   rm -f "$LOG"
 done
+
+patch_sideband_message_exchanger_sv
 
 echo "────────────────────────────────────────────────────"
 echo "  Passed: $PASS   Failed: $FAIL"
