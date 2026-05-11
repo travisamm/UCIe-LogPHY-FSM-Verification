@@ -6,7 +6,8 @@ XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
 MBTRAINTEST ?=
-MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
+#MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity
+MBTRAIN_TESTS ?= test_mbtrain_valvref test_mbtrain_datavref test_mbtrain_sanity test_mbtrain_speedidle test_mbtrain_speedidle_retrain test_mbtrain_speedidle_error
 MBTRAIN_LOG_DIR ?= run_logs/mbtrain
 MBTRAIN_SUBMAKE ?= $(MAKE)
 

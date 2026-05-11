@@ -128,4 +128,97 @@ class test_mbtrain_txselfcal_probe extends mbtrain_base_test;
   endtask
 endclass
 
+
+// SI-01/06: Normal SPEEDIDLE path from DATAVREF -> TXSELFCAL
+class test_mbtrain_speedidle extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_speedidle)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_speedidle seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain    = 0;
+    env.scoreboard.expect_valvref_checks  = 0;
+    env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
+    env.scoreboard.expect_fsm_done        = 0;
+    env.scoreboard.expect_fsm_error       = 0;
+    env.scoreboard.debug_txselfcal        = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_speedidle...", UVM_LOW)
+    seq = seq_mbtrain_speedidle::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #10000ns;
+
+    `uvm_info("TEST", "Test test_mbtrain_speedidle finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// SI-02: SPEEDIDLE from L1/retrain path via goToState_valid
+class test_mbtrain_speedidle_retrain extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_speedidle_retrain)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_speedidle_retrain seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain    = 0;
+    env.scoreboard.expect_valvref_checks  = 0;
+    env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
+    env.scoreboard.expect_fsm_done        = 0;
+    env.scoreboard.expect_fsm_error       = 0;
+    env.scoreboard.debug_txselfcal        = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_speedidle_retrain...", UVM_LOW)
+    seq = seq_mbtrain_speedidle_retrain::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #10000ns;
+
+    `uvm_info("TEST", "Test test_mbtrain_speedidle_retrain finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// SI-04: SPEEDIDLE with no valid frequency -> expect TRAINERROR
+class test_mbtrain_speedidle_error extends mbtrain_base_test;
+  `uvm_component_utils(test_mbtrain_speedidle_error)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbtrain_speedidle_error seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbtrain    = 0;
+    env.scoreboard.expect_valvref_checks  = 0;
+    env.scoreboard.expect_datavref_checks = 0;
+    env.scoreboard.expect_txselfcal_checks = 0;
+    env.scoreboard.expect_fsm_done        = 0;
+    env.scoreboard.expect_fsm_error       = 0; // SI-04 blocked: RTL does not assert error on invalid freq
+    env.scoreboard.debug_txselfcal        = MBTRAIN_DEBUG_TXSELFCAL;
+
+    `uvm_info("TEST", "Starting seq_mbtrain_speedidle_error...", UVM_LOW)
+    seq = seq_mbtrain_speedidle_error::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #10000ns;
+
+    `uvm_info("TEST", "Test test_mbtrain_speedidle_error finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
 `endif

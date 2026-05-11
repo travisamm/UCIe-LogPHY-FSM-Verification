@@ -356,4 +356,115 @@ class seq_mbtrain_txselfcal_probe extends mbtrain_base_seq;
   endtask
 endclass
 
+// ============================================================
+// seq_mbtrain_speedidle: SI-01/06
+// Normal path from DATAVREF -> SPEEDIDLE -> TXSELFCAL
+// pllLock=1 (driver default), negotiatedMaxDataRate=4'h3
+// ============================================================
+class seq_mbtrain_speedidle extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_speedidle)
+
+  function new(string name = "seq_mbtrain_speedidle");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(2), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30));
+    // SPEEDIDLE: pllLock=1 default, valid freq -> exit to TXSELFCAL
+    send_item(.req_valid(1), .req_data(`MT_SI_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
+              .delay(5), .hold(30));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbtrain_speedidle_retrain: SI-02
+// goToState_valid=1 simulates L1 retrain entry into SPEEDIDLE
+// ============================================================
+class seq_mbtrain_speedidle_retrain extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_speedidle_retrain)
+
+  function new(string name = "seq_mbtrain_speedidle_retrain");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    mbtrain_transaction req;
+    req = mbtrain_transaction::type_id::create("req");
+    req.start_fsm             = 1;
+    req.goToState_valid       = 1;
+    req.goToState_bits        = 2'h1;
+    req.phyInRetrain          = 1;
+    req.rx_valid              = 1;
+    req.rx_data               = `MT_VV_START_RESP;
+    req.rsp_rx_valid          = 1;
+    req.rsp_rx_data           = `MT_VV_START_REQ;
+    req.delay                 = 2;
+    req.hold_cycles           = 30;
+    req.negotiatedMaxDataRate = 4'h3;
+    start_item(req);
+    finish_item(req);
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30));
+    // SPEEDIDLE with goToState_valid=1 restores last ACTIVE speed
+    send_item(.req_valid(1), .req_data(`MT_SI_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MT_SI_DONE_REQ),
+              .delay(5), .hold(30));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbtrain_speedidle_error: SI-04
+// negotiatedMaxDataRate=0 -> no valid freq -> expect TRAINERROR
+// ============================================================
+class seq_mbtrain_speedidle_error extends mbtrain_base_seq;
+  `uvm_object_utils(seq_mbtrain_speedidle_error)
+
+  function new(string name = "seq_mbtrain_speedidle_error");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1),
+              .req_valid(1), .req_data(`MT_VV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_START_REQ),
+              .delay(2), .hold(30), .negotiated_rate(4'h0));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_VV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_VV_END_REQ),
+              .delay(5), .hold(30), .negotiated_rate(4'h0));
+    send_item(.req_valid(1), .req_data(`MT_DV_START_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_START_REQ),
+              .delay(5), .hold(30), .negotiated_rate(4'h0));
+    run_training_point_op();
+    send_item(.req_valid(1), .req_data(`MT_DV_END_RESP),
+              .rsp_valid(1), .rsp_data(`MT_DV_END_REQ),
+              .delay(5), .hold(30), .negotiated_rate(4'h0));
+    // No SI_DONE handshake — invalid freq should trigger TRAINERROR
+    send_item(.delay(5), .hold(50), .negotiated_rate(4'h0));
+  endtask
+endclass
 `endif
