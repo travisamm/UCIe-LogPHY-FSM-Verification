@@ -1,4 +1,4 @@
-XRUN     := xrun
+XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
 
 SBTEST ?= test_sbinit_sanity
@@ -46,6 +46,8 @@ mbinit_regress:
 	$(MAKE) mbinit MBTEST=test_mbinit_sanity
 	$(MAKE) mbinit MBTEST=test_mbinit_param_mismatch
 	$(MAKE) mbinit MBTEST=test_mbinit_param_only
+	$(MAKE) mbinit MBTEST=test_mbinit_repairclk_unrep
+	$(MAKE) mbinit MBTEST=test_mbinit_repairval_unrep
 
 MBTRAINTEST ?= mbtrain_base_test
 

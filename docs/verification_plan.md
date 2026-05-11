@@ -25,15 +25,16 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 
 | Mark | Count |
 |------|------:|
-| `[X]` | **14** |
-| `[~]` | **14** |
-| `[ ]` | **~112** |
+| `[X]` | **15** |
+| `[~]` | **34** |
+| `[ ]` | **~91** |
 
 **UVM inventory**
 
 - **SBINIT:** `sbinit_regress` — `test_sbinit_sanity`, `test_sbinit_timeout`, `test_sbinit_partner_not_ready`, `test_sbinit_early_req`, `test_sbinit_multiple_reqs` (`uvm/Makefile`, `logphy_sbinit_tests.sv`, `logphy_scoreboard.sv`).
 - **MBINIT:** `mbinit_regress` — `test_mbinit_sanity`, `test_mbinit_param_only`, `test_mbinit_param_mismatch` (`mbinit_tests.sv`, `mbinit_scoreboard.sv`).
-- **MBTRAIN:** only `mbtrain_base_test` is packaged; it runs **`mbtrain_base_seq` with an empty `body()`** — **`seq_mbtrain_full` is not wired to any test** (`mbtrain_test_pkg.sv`, `mbtrain_base_test.sv`). Infrastructure: `seq_mbtrain_full`, `mbtrain_scoreboard.sv` (sideband REQ decode + `fsm_done`; TODO for `mbLaneCtrlIo` per spec).
+- **MBTRAIN:** `mbtrain_regress` — `test_mbtrain_sanity` runs `seq_mbtrain_full` through all 12 sub-states (`mbtrain_tests.sv`, `mbtrain_base_test.sv`, `mbtrain_scoreboard.sv`). Scoreboard: sideband REQ decode + `fsm_done` + **`mbLaneCtrlIo` per-state checks (XC-05)** via `check_lane_ctrl()`. TC-01 (Tx tri-state in TXSELFCAL) fully checked; VV-02 and RCC-02 partially checked (tri-state proxy, not driven-low proof).
+- **MBINIT scoreboard additions:** `check_lane_ctrl()` added for all 7 MBINIT states (XC-05); `check_pattern_type()` added for REPAIRCLK/REPAIRVAL/REVERSALMB/REPAIRMB (RC-02, RV-03, LR-02, RM-01). `mbLaneCtrlIo` fully wired in `mbinit_if` and `mbinit_tb_top`; monitor captures all lane ctrl + patternWriter/Reader fields.
 
 **Scala inventory (non-commented)**
 
@@ -105,9 +106,9 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [ ] | RC-01 | Must enable Tx/Rx on Clock, Track, and redundant lanes | 4.5.3.3.3 | P0 | | — |
-| [ ] | RC-02 | Must send clock repair pattern and check repair success via Tx-initiated point test | 4.5.3.3.3 | P0 | Pattern must not be scrambled | — |
-| [ ] | RC-03 | If clock/track unrepairable, must exit to TRAINERROR via handshake | 4.5.3.3.3 | P0 | Error path | — |
+| [~] | RC-01 | Must enable Tx/Rx on Clock, Track, and redundant lanes | 4.5.3.3.3 | P0 | mbLaneCtrlIo check | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_lane_ctrl`: txClkTriState=0, txTrackTriState=0, rxClkEn=1, rxTrackEn=1 in REPAIRCLK; no redundant-lane proof) |
+| [~] | RC-02 | Must send clock repair pattern and check repair success via Tx-initiated point test | 4.5.3.3.3 | P0 | Pattern must not be scrambled | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: CLKREPAIR(0) or VALTRAIN(1) in REPAIRCLK; 128-iteration count not checked) |
+| [~] | RC-03 | If clock/track unrepairable, must exit to TRAINERROR via handshake | 4.5.3.3.3 | P0 | Error path | `test_mbinit_repairclk_unrep` (`seq_mbinit_repairclk_fail`: drives `MB_RCLK_RES_RESP_FAIL` with msgInfo=0 → `repairClkSuccess=0` → `fsmCtrl_error`; TRAINERROR handshake not checked) |
 | [ ] | RC-04 | If repair applied successfully, must verify by repeating point test | 4.5.3.3.3 | P1 | | — |
 | [~] | RC-05 | On {MBINIT.REPAIRCLK done resp}, must exit to MBINIT.REPAIRVAL | 4.5.3.3.3 | P0 | | `test_mbinit_sanity`, RCLK message flags + `saw_state_repairval` |
 
@@ -116,11 +117,11 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | RV-01 | Must set clock phase at center of data UI; partner must sample Valid with forwarded clock | 4.5.3.3.4 | P0 | | — |
-| [ ] | RV-02 | All Data lanes must be held low during Valid repair | 4.5.3.3.4 | P0 | mbLaneCtrlIo check | — |
-| [ ] | RV-03 | Must send 128 iterations of VALTRAIN pattern (unscrambled) on VLD | 4.5.3.3.4 | P0 | PatternWriter config | — |
+| [~] | RV-02 | All Data lanes must be held low during Valid repair | 4.5.3.3.4 | P0 | mbLaneCtrlIo check | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_lane_ctrl`: txDataTriState=0 in REPAIRVAL; no driven-low proof of actual data value) |
+| [~] | RV-03 | Must send 128 iterations of VALTRAIN pattern (unscrambled) on VLD | 4.5.3.3.4 | P0 | PatternWriter config | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: VALTRAIN(1) in REPAIRVAL; iteration count not checked) |
 | [ ] | RV-04 | Must repeat for RVLD (redundant valid) | 4.5.3.3.4 | P0 | | — |
 | [ ] | RV-05 | If repair needed, must apply repair and verify success | 4.5.3.3.4 | P1 | | — |
-| [ ] | RV-06 | If repair unsuccessful or unrepairable, must exit to TRAINERROR | 4.5.3.3.4 | P0 | | — |
+| [~] | RV-06 | If repair unsuccessful or unrepairable, must exit to TRAINERROR | 4.5.3.3.4 | P0 | | `test_mbinit_repairval_unrep` (`seq_mbinit_repairval_fail`: full REPAIRCLK success then drives `MB_RVAL_RES_RESP_FAIL` with msgInfo=0 → `repairValSuccess=0` → `fsmCtrl_error`; TRAINERROR handshake not checked) |
 | [~] | RV-07 | On {MBINIT.REPAIRVAL done resp}, must exit to MBINIT.REVERSALMB | 4.5.3.3.4 | P0 | | `test_mbinit_sanity`, RVAL messages + `saw_state_reversalmb` |
 
 ### 6. MBINIT.REVERSALMB — Lane Reversal Detection
@@ -128,18 +129,18 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [~] | LR-01 | Must send {MBINIT.REVERSALMB init req} and wait for resp | 4.5.3.3.5 | P0 | | `mbinit_scoreboard` (LR REQ/RESP flags) |
-| [ ] | LR-02 | Must send Per Lane ID pattern on all N data lanes (128 iterations, unscrambled) | 4.5.3.3.5 | P0 | | — |
+| [~] | LR-02 | Must send Per Lane ID pattern on all N data lanes (128 iterations, unscrambled) | 4.5.3.3.5 | P0 | PatternWriter config | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: PERLANEID(2) in REVERSALMB; iteration count not checked) |
 | [ ] | LR-03 | Partner must perform per-lane compare on all N Rx lanes | 4.5.3.3.5 | P0 | PatternReader compare | — |
 | [ ] | LR-04 | Must correctly detect lane reversal and apply if needed | 4.5.3.3.5 | P0 | applyLaneReversal output | — |
 | [ ] | LR-05 | If x32 partner connected to x64, must recognize width difference from param exchange | 4.5.3.3.5 | P1 | interpretBy8Lane | — |
 | [~] | LR-06 | On {MBINIT.REVERSALMB done resp}, must exit to MBINIT.REPAIRMB | 4.5.3.3.5 | P0 | | `mbinit_scoreboard` (`saw_state_repairmb`) |
-| [ ] | LR-07 | Must exit to TRAINERROR on detection failure | 4.5.3.3.5 | P0 | | — |
+| [ ] | LR-07 | Must exit to TRAINERROR on detection failure | 4.5.3.3.5 | P0 | Requires `applyReversalMbTxReg=1` (reversal must be detected first); driving `MB_LR_RES_RESP_FAIL` constant added but full sequence deferred | — |
 
 ### 7. MBINIT.REPAIRMB — Data Lane Repair
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [ ] | RM-01 | Must send 128 iterations of Per Lane ID pattern (unscrambled) for lane testing | 4.5.3.3.6 | P0 | | — |
+| [~] | RM-01 | Must send 128 iterations of Per Lane ID pattern (unscrambled) for lane testing | 4.5.3.3.6 | P0 | PatternWriter config | `test_mbinit_sanity`, `mbinit_scoreboard` (`check_pattern_type`: PERLANEID(2) in REPAIRMB; iteration count not checked) |
 | [ ] | RM-02 | Rx must check pass/fail on data lanes and redundant lanes | 4.5.3.3.6 | P0 | | — |
 | [ ] | RM-03 | Must apply single-lane or two-lane repair per repair resources | 4.5.3.3.6 | P1 | Repair mux chain logic | — |
 | [ ] | RM-04 | Must send {MBINIT.REPAIRMB apply degrade req} with correct lane map code if width degrade needed | 4.5.3.3.6 | P1 | Width degrade negotiation | — |
@@ -153,11 +154,11 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | VV-01 | Partner must set forwarded clock phase at center of data UI on Tx | 4.5.3.4.1 | P0 | | — |
-| [ ] | VV-02 | Must sample Valid with forwarded clock; all data lanes and Track held low | 4.5.3.4.1 | P0 | mbLaneCtrlIo | — |
+| [~] | VV-02 | Must sample Valid with forwarded clock; all data lanes and Track held low | 4.5.3.4.1 | P0 | mbLaneCtrlIo | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`check_lane_ctrl`: txDataTriState=0, txTrackTriState=0, rxValidEn=1; no driven-low proof) |
 | [ ] | VV-03 | Must use 128 iterations of continuous VALTRAIN pattern (unscrambled) | 4.5.3.4.1 | P0 | | — |
 | [ ] | VV-04 | Detection success if VALTRAIN errors < per-lane threshold | 4.5.3.4.1 | P0 | maxErrorThresholdPerLane | — |
 | [ ] | VV-05 | LFSR RESET has no impact in this state | 4.5.3.4.1 | P1 | | — |
-| [ ] | VV-06 | On {MBTRAIN.VALVREF end resp}, must exit to MBTRAIN.DATAVREF | 4.5.3.4.1 | P0 | | `seq_mbtrain_full` + `mbtrain_scoreboard` not run by default |
+| [~] | VV-06 | On {MBTRAIN.VALVREF end resp}, must exit to MBTRAIN.DATAVREF | 4.5.3.4.1 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_dv_start_req`) |
 
 ### 9. MBTRAIN.DATAVREF — Data Vref Training
 
@@ -165,7 +166,7 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | DV-01 | Must use 4K UI of continuous LFSR pattern with correct valid framing | 4.5.3.4.2 | P0 | | — |
 | [ ] | DV-02 | Detection success if total error count < threshold per lane | 4.5.3.4.2 | P0 | | — |
-| [ ] | DV-03 | On {MBTRAIN.DATAVREF end resp}, must exit to MBTRAIN.SPEEDIDLE | 4.5.3.4.2 | P0 | | See §8 note |
+| [~] | DV-03 | On {MBTRAIN.DATAVREF end resp}, must exit to MBTRAIN.SPEEDIDLE | 4.5.3.4.2 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_si_done_req`) |
 
 ### 10. MBTRAIN.SPEEDIDLE — Speed Transition Idle
 
@@ -176,24 +177,24 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | [ ] | SI-03 | If from LINKSPEED/PHYRETRAIN (speed degrade) and not 4GT/s: must pick next-lower rate | 4.5.3.4.3 | P0 | Speed degrade path | — |
 | [ ] | SI-04 | Else must exit to TRAINERROR | 4.5.3.4.3 | P0 | | — |
 | [ ] | SI-05 | Link width set to width from last REPAIRMB or REPAIR exit | 4.5.3.4.3 | P1 | | — |
-| [ ] | SI-06 | On {MBTRAIN.SPEEDIDLE done resp}, must exit to MBTRAIN.TXSELFCAL | 4.5.3.4.3 | P0 | | See §8 note |
+| [~] | SI-06 | On {MBTRAIN.SPEEDIDLE done resp}, must exit to MBTRAIN.TXSELFCAL | 4.5.3.4.3 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_tc_done_req`) |
 
 ### 11. MBTRAIN.TXSELFCAL — Tx Self-Calibration
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [ ] | TC-01 | Data/Clock/Valid/Track Tx are tri-stated; Rx permitted to be disabled | 4.5.3.4.4 | P0 | | — |
-| [ ] | TC-02 | On {MBTRAIN.TXSELFCAL Done resp}, must exit to MBTRAIN.RXCLKCAL | 4.5.3.4.4 | P0 | | See §8 note |
+| [X] | TC-01 | Data/Clock/Valid/Track Tx are tri-stated; Rx permitted to be disabled | 4.5.3.4.4 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`check_lane_ctrl`: txDataTriState=FFFF, txClkTriState=1, txValidTriState=1, txTrackTriState=1, rxDataEn=0, rxClkEn=0) |
+| [~] | TC-02 | On {MBTRAIN.TXSELFCAL Done resp}, must exit to MBTRAIN.RXCLKCAL | 4.5.3.4.4 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_rcc_start_req`) |
 
 ### 12. MBTRAIN.RXCLKCAL — Rx Clock Calibration
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | RCC-01 | Partner must start sending forwarded clock and Track after start req received | 4.5.3.4.5 | P0 | rxClkCalSendFwClkPattern | — |
-| [ ] | RCC-02 | Tx clock must be free running; all data lanes and Valid held low | 4.5.3.4.5 | P0 | | — |
+| [~] | RCC-02 | Tx clock must be free running; all data lanes and Valid held low | 4.5.3.4.5 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`check_lane_ctrl`: txDataTriState=0, rxDataEn=0, rxValidEn=0, rxClkEn=1, rxTrackEn=1; no driven-low proof) |
 | [ ] | RCC-03 | Partner must not adjust circuit or PI phase params within this state | 4.5.3.4.5 | P1 | | — |
 | [ ] | RCC-04 | I/Q correction: partner must apply TCKN_L shift if within HW range, respond Success/Out of Range | 4.5.3.4.5 | P1 | Only for >32 GT/s | — |
-| [ ] | RCC-05 | On {MBTRAIN.RXCLKCAL done resp}, must exit to MBTRAIN.VALTRAINCENTER | 4.5.3.4.5 | P0 | | See §8 note |
+| [~] | RCC-05 | On {MBTRAIN.RXCLKCAL done resp}, must exit to MBTRAIN.VALTRAINCENTER | 4.5.3.4.5 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_vtc_start_req`) |
 
 ### 13. MBTRAIN.VALTRAINCENTER — Valid-to-Clock Centering
 
@@ -202,7 +203,7 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | [ ] | VTC-01 | Must perform Tx-initiated eye width sweep and/or point test on Valid lane | 4.5.3.4.6 | P0 | LinkOpSequenceIO | — |
 | [ ] | VTC-02 | Must use 128 iterations continuous VALTRAIN (unscrambled) | 4.5.3.4.6 | P0 | | — |
 | [ ] | VTC-03 | Detection success if VALTRAIN errors < threshold | 4.5.3.4.6 | P0 | | — |
-| [ ] | VTC-04 | On done, must exit to MBTRAIN.VALTRAINVREF | 4.5.3.4.6 | P0 | | See §8 note |
+| [~] | VTC-04 | On done, must exit to MBTRAIN.VALTRAINVREF | 4.5.3.4.6 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_vtv_start_req`) |
 
 ### 14. MBTRAIN.VALTRAINVREF — Valid Vref at Operating Speed
 
@@ -210,7 +211,7 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | VTV-01 | Optional Vref re-optimization at operating data rate | 4.5.3.4.7 | P1 | Implementation-specific | — |
 | [ ] | VTV-02 | If performed, must use 128 iterations continuous VALTRAIN (unscrambled) | 4.5.3.4.7 | P1 | | — |
-| [ ] | VTV-03 | On {MBTRAIN.VALTRAINVREF end resp}, must exit to MBTRAIN.DATATRAINCENTER1 | 4.5.3.4.7 | P0 | | See §8 note |
+| [~] | VTV-03 | On {MBTRAIN.VALTRAINVREF end resp}, must exit to MBTRAIN.DATATRAINCENTER1 | 4.5.3.4.7 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_dc1_start_req`) |
 
 ### 15. MBTRAIN.DATATRAINCENTER1 — Data-to-Clock Centering
 
@@ -220,28 +221,28 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 | [ ] | DC1-02 | Must perform Tx-initiated eye width sweep and/or point test | 4.5.3.4.8 | P0 | | — |
 | [ ] | DC1-03 | Detection success if total error < threshold per lane | 4.5.3.4.8 | P0 | | — |
 | [ ] | DC1-04 | On success, must set clock phase to optimal sample point | 4.5.3.4.8 | P0 | | — |
-| [ ] | DC1-05 | On done, must exit to MBTRAIN.DATATRAINVREF | 4.5.3.4.8 | P0 | | See §8 note |
+| [~] | DC1-05 | On done, must exit to MBTRAIN.DATATRAINVREF | 4.5.3.4.8 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_dtv_start_req`) |
 
 ### 16. MBTRAIN.DATATRAINVREF — Data Vref at Operating Speed
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | DTV-01 | Must use 4K UI continuous LFSR pattern with valid framing | 4.5.3.4.9 | P0 | | — |
-| [ ] | DTV-02 | On done, must exit to MBTRAIN.RXDESKEW | 4.5.3.4.9 | P0 | | See §8 note |
+| [~] | DTV-02 | On done, must exit to MBTRAIN.RXDESKEW | 4.5.3.4.9 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_rds_start_req`) |
 
 ### 17. MBTRAIN.RXDESKEW — Rx Per-Lane Deskew
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | RDS-01 | Must use 4K UI continuous LFSR pattern with valid framing | 4.5.3.4.10 | P0 | | — |
-| [ ] | RDS-02 | On done, must exit to MBTRAIN.DATATRAINCENTER2 | 4.5.3.4.10 | P0 | | See §8 note |
+| [~] | RDS-02 | On done, must exit to MBTRAIN.DATATRAINCENTER2 | 4.5.3.4.10 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_dc2_start_req`) |
 
 ### 18. MBTRAIN.DATATRAINCENTER2 — Final Data Centering
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | DC2-01 | Must use 4K UI continuous LFSR pattern with valid framing | 4.5.3.4.11 | P0 | | — |
-| [ ] | DC2-02 | On done, must exit to MBTRAIN.LINKSPEED | 4.5.3.4.11 | P0 | | See §8 note |
+| [~] | DC2-02 | On done, must exit to MBTRAIN.LINKSPEED | 4.5.3.4.11 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_ls_start_req`) |
 
 ### 19. MBTRAIN.LINKSPEED — Link Speed Verification
 
@@ -249,7 +250,7 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 |------|-----|-------------|----------|-----|---------------------|----------|
 | [ ] | LS-01 | Must verify link at operating speed via Tx-initiated point test or eye sweep | 4.5.3.4.12 | P0 | | — |
 | [ ] | LS-02 | If change in Runtime Link Test Control register detected, must exit to PHYRETRAIN | 4.5.3.4.12 | P1 | changeInRuntimeLinkCtrlRegs | — |
-| [ ] | LS-03 | If link test passes, must exit to LINKINIT | 4.5.3.4.12 | P0 | | — |
+| [~] | LS-03 | If link test passes, must exit to LINKINIT | 4.5.3.4.12 | P0 | | `test_mbtrain_sanity`, `mbtrain_scoreboard` (`saw_ls_done_req`, `saw_fsm_done`) |
 | [ ] | LS-04 | If link test fails, must exit to PHYRETRAIN with speed degrade encoding | 4.5.3.4.12 | P0 | | — |
 
 ### 20. MBTRAIN.REPAIR — Runtime Repair
@@ -334,7 +335,7 @@ Rough counts: **each requirement ID** in §4 is one row (~**140** total). `[~]` 
 
 | Done | ID | Requirement | Spec Ref | Pri | Notes / RTL Mapping | Evidence |
 |------|-----|-------------|----------|-----|---------------------|----------|
-| [ ] | XC-05 | Tx tri-state and Rx enable must be correct per-state as specified in each sub-state | 4.5.3 | P0 | mbLaneCtrlIo per state | — |
+| [~] | XC-05 | Tx tri-state and Rx enable must be correct per-state as specified in each sub-state | 4.5.3 | P0 | mbLaneCtrlIo per state | `test_mbtrain_sanity` (12 MBTRAIN states), `test_mbinit_sanity` (7 MBINIT states); both scoreboards have `check_lane_ctrl()`; txValidTriState in REPAIRVAL skipped (substate-dependent) |
 | [ ] | XC-06 | Clock Tx mode must match operating speed and clock mode (strobe vs continuous) | 4.5.3 | P1 | | — |
 | [ ] | XC-07 | Valid framing must be correct when accompanying LFSR data patterns | 4.1.2 | P0 | | — |
 

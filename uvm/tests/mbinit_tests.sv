@@ -51,6 +51,60 @@ class test_mbinit_param_only extends mbinit_base_test;
   endtask
 endclass
 
+// RC-03: unrepairable clock repair — DUT must assert fsmCtrl_error.
+class test_mbinit_repairclk_unrep extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_repairclk_unrep)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_repairclk_fail seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit = 0;
+    env.scoreboard.expect_fsm_done    = 0;
+    env.scoreboard.expect_fsm_error   = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_repairclk_fail...", UVM_LOW)
+    seq = seq_mbinit_repairclk_fail::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #5000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_repairclk_unrep finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
+// RV-06: unrepairable valid repair — DUT must assert fsmCtrl_error.
+class test_mbinit_repairval_unrep extends mbinit_base_test;
+  `uvm_component_utils(test_mbinit_repairval_unrep)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    seq_mbinit_repairval_fail seq;
+    phase.raise_objection(this);
+
+    env.scoreboard.expect_full_mbinit = 0;
+    env.scoreboard.expect_fsm_done    = 0;
+    env.scoreboard.expect_fsm_error   = 1;
+
+    `uvm_info("TEST", "Starting seq_mbinit_repairval_fail...", UVM_LOW)
+    seq = seq_mbinit_repairval_fail::type_id::create("seq");
+    seq.start(env.agent.sequencer);
+
+    #5000ns;
+
+    `uvm_info("TEST", "Test test_mbinit_repairval_unrep finished.", UVM_LOW)
+    phase.drop_objection(this);
+  endtask
+endclass
+
 // Negative PARAM negotiation test: MP-04.
 class test_mbinit_param_mismatch extends mbinit_base_test;
   `uvm_component_utils(test_mbinit_param_mismatch)

@@ -68,10 +68,10 @@ class mbinit_monitor extends uvm_monitor;
           (vif.patternWriterIo_req_valid  !== prev_pw_req_valid)  ||
           (vif.patternReaderIo_req_valid  !== prev_pr_req_valid)  ||
           (vif.txPtTestReqIo_start        !== prev_pttest_start)  ||
-          (vif.mbLaneCtrl_txDataTriState  !== prev_txDataTriState)||
-          (vif.mbLaneCtrl_txClkTriState   !== prev_txClkTriState) ||
-          (vif.mbLaneCtrl_txValidTriState !== prev_txValidTriState)||
-          (vif.mbLaneCtrl_txTrackTriState !== prev_txTrackTriState)||
+          (vif.mbLaneCtrl_txDataEn  !== prev_txDataTriState)||
+          (vif.mbLaneCtrl_txClkEn   !== prev_txClkTriState) ||
+          (vif.mbLaneCtrl_txValidEn !== prev_txValidTriState)||
+          (vif.mbLaneCtrl_txTrackEn !== prev_txTrackTriState)||
           (vif.mbLaneCtrl_rxDataEn        !== prev_rxDataEn)      ||
           (vif.mbLaneCtrl_rxClkEn         !== prev_rxClkEn)       ||
           (vif.mbLaneCtrl_rxValidEn       !== prev_rxValidEn)     ||
@@ -101,10 +101,10 @@ class mbinit_monitor extends uvm_monitor;
         tx.patternReader_patternType = vif.patternReaderIo_req_bits_patternType;
         tx.txPtTest_start            = vif.txPtTestReqIo_start;
         // Lane control observations
-        tx.mbLaneCtrl_txDataTriState  = vif.mbLaneCtrl_txDataTriState;
-        tx.mbLaneCtrl_txClkTriState   = vif.mbLaneCtrl_txClkTriState;
-        tx.mbLaneCtrl_txValidTriState = vif.mbLaneCtrl_txValidTriState;
-        tx.mbLaneCtrl_txTrackTriState = vif.mbLaneCtrl_txTrackTriState;
+        tx.mbLaneCtrl_txDataEn  = vif.mbLaneCtrl_txDataEn;
+        tx.mbLaneCtrl_txClkEn   = vif.mbLaneCtrl_txClkEn;
+        tx.mbLaneCtrl_txValidEn = vif.mbLaneCtrl_txValidEn;
+        tx.mbLaneCtrl_txTrackEn = vif.mbLaneCtrl_txTrackEn;
         tx.mbLaneCtrl_rxDataEn        = vif.mbLaneCtrl_rxDataEn;
         tx.mbLaneCtrl_rxClkEn         = vif.mbLaneCtrl_rxClkEn;
         tx.mbLaneCtrl_rxValidEn       = vif.mbLaneCtrl_rxValidEn;
@@ -121,10 +121,10 @@ class mbinit_monitor extends uvm_monitor;
         prev_pw_req_valid    = vif.patternWriterIo_req_valid;
         prev_pr_req_valid    = vif.patternReaderIo_req_valid;
         prev_pttest_start    = vif.txPtTestReqIo_start;
-        prev_txDataTriState  = vif.mbLaneCtrl_txDataTriState;
-        prev_txClkTriState   = vif.mbLaneCtrl_txClkTriState;
-        prev_txValidTriState = vif.mbLaneCtrl_txValidTriState;
-        prev_txTrackTriState = vif.mbLaneCtrl_txTrackTriState;
+        prev_txDataTriState  = vif.mbLaneCtrl_txDataEn;
+        prev_txClkTriState   = vif.mbLaneCtrl_txClkEn;
+        prev_txValidTriState = vif.mbLaneCtrl_txValidEn;
+        prev_txTrackTriState = vif.mbLaneCtrl_txTrackEn;
         prev_rxDataEn        = vif.mbLaneCtrl_rxDataEn;
         prev_rxClkEn         = vif.mbLaneCtrl_rxClkEn;
         prev_rxValidEn       = vif.mbLaneCtrl_rxValidEn;

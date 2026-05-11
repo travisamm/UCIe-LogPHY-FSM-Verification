@@ -1,12 +1,12 @@
 `ifndef MBINIT_SCOREBOARD_SV
 `define MBINIT_SCOREBOARD_SV
 
-// SB field extraction (opcode[4:0], msgCode[21:14], msgSubcode[39:32])
+// SB field extraction — matches SBMsgCompare in SidebandMessageExchanger.scala (and on-wire
+// tx.bits.data, which is driven straight from io.req.bits): opcode[4:0], msgCode[21:14],
+// msgSubcode[39:32].
 `define MB_OP(d)   d[4:0]
 `define MB_MC(d)   d[21:14]
 `define MB_SC(d)   d[39:32]
-`define MB_SHIFTED_MC(d) d[24:17]
-`define MB_SHIFTED_SC(d) d[42:35]
 
 // Opcodes
 `define MB_OP_NODATA 5'h12
@@ -50,10 +50,8 @@ class mbinit_scoreboard extends uvm_scoreboard;
   // ---- PARAM (MP-01..04, MP-06) ----
   bit saw_req_tx;          // Any requester sideband TX
   bit saw_rsp_tx;          // Any responder sideband TX
-  bit saw_bad_req_tx;      // Requester TX did not match expected SB fields
-  bit saw_bad_rsp_tx;      // Responder TX did not match expected SB fields
-  bit saw_shifted_req_tx;  // TX fields match the known generated shifted layout
-  bit saw_shifted_rsp_tx;  // TX fields match the known generated shifted layout
+  bit saw_bad_req_tx;      // Requester TX did not match any expected MBINIT SB message
+  bit saw_bad_rsp_tx;      // Responder TX did not match any expected MBINIT SB message
   bit saw_param_req_tx;    // MP-01: DUT requester sent PARAM_CFG_REQ
   bit saw_param_resp_tx;   // MP-01: DUT responder sent PARAM_CFG_RESP
   bit mp_02_verified;      // MP-02: negotiated max common data rate observed
@@ -250,18 +248,9 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
     if (!decoded && !saw_bad_req_tx) begin
       saw_bad_req_tx = 1;
-      if ((`MB_OP(d) == `MB_OP_64DATA || `MB_OP(d) == `MB_OP_NODATA) &&
-          `MB_SHIFTED_MC(d) == `MB_MC_REQ) begin
-        saw_shifted_req_tx = 1;
-        `uvm_error("MB_SB", $sformatf(
-          "Requester TX appears to use shifted sideband fields: data=%032h op[4:0]=%02h msgCode[24:17]=%02h msgSubcode[42:35]=%02h; UCIe fields are msgCode[21:14]/msgSubcode[39:32]",
-          d, `MB_OP(d), `MB_SHIFTED_MC(d), `MB_SHIFTED_SC(d)))
-      end
-      else begin
       `uvm_error("MB_SB", $sformatf(
-        "Requester TX has invalid MBINIT sideband fields: data=%032h op=%02h msgCode=%02h msgSubcode=%02h",
+        "Requester TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
         d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
-      end
     end
   endfunction
 
@@ -320,18 +309,9 @@ class mbinit_scoreboard extends uvm_scoreboard;
 
     if (!decoded && !saw_bad_rsp_tx) begin
       saw_bad_rsp_tx = 1;
-      if ((`MB_OP(d) == `MB_OP_64DATA || `MB_OP(d) == `MB_OP_NODATA) &&
-          `MB_SHIFTED_MC(d) == `MB_MC_RESP) begin
-        saw_shifted_rsp_tx = 1;
-        `uvm_error("MB_SB", $sformatf(
-          "Responder TX appears to use shifted sideband fields: data=%032h op[4:0]=%02h msgCode[24:17]=%02h msgSubcode[42:35]=%02h; UCIe fields are msgCode[21:14]/msgSubcode[39:32]",
-          d, `MB_OP(d), `MB_SHIFTED_MC(d), `MB_SHIFTED_SC(d)))
-      end
-      else begin
       `uvm_error("MB_SB", $sformatf(
-        "Responder TX has invalid MBINIT sideband fields: data=%032h op=%02h msgCode=%02h msgSubcode=%02h",
+        "Responder TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
         d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
-      end
     end
   endfunction
 
@@ -342,48 +322,50 @@ class mbinit_scoreboard extends uvm_scoreboard;
     bit skip_txValid, mismatch;
     skip_txValid = 0;
     mismatch     = 0;
+    // En polarity: 1=enabled/active, 0=disabled. TX expectations are inverted
+    // from the old TriState convention (TriState 1=disabled → En 0=disabled).
     case (tx.currentState)
       MB_STATE_PARAM, MB_STATE_CAL: begin
-        exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
+        exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
         exp_rxData=0; exp_rxClk=0; exp_rxValid=0; exp_rxTrack=0;
       end
       MB_STATE_REPAIRCLK: begin
-        exp_txData=1; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
+        exp_txData=0; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
         exp_rxData=0; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=1;
       end
       MB_STATE_REPAIRVAL: begin
-        exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=1;
+        exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=0;
         exp_rxData=0; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=0;
-        skip_txValid = 1; // txValidTriState is substate-dependent in REPAIRVAL
+        skip_txValid = 1; // txValidEn is substate-dependent in REPAIRVAL
       end
       MB_STATE_REVERSALMB, MB_STATE_REPAIRMB: begin
-        exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
+        exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
         exp_rxData=1; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=0;
       end
       MB_STATE_TOMBTRAIN: begin
-        exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
+        exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
         exp_rxData=0; exp_rxClk=0; exp_rxValid=0; exp_rxTrack=0;
       end
       default: return;
     endcase
-    if (tx.mbLaneCtrl_txDataTriState  !== {16{exp_txData}})  mismatch=1;
-    if (tx.mbLaneCtrl_txClkTriState   !== exp_txClk)         mismatch=1;
+    if (tx.mbLaneCtrl_txDataEn  !== {16{exp_txData}})  mismatch=1;
+    if (tx.mbLaneCtrl_txClkEn   !== exp_txClk)         mismatch=1;
     if (!skip_txValid &&
-        tx.mbLaneCtrl_txValidTriState !== exp_txValid)        mismatch=1;
-    if (tx.mbLaneCtrl_txTrackTriState !== exp_txTrack)        mismatch=1;
-    if (tx.mbLaneCtrl_rxDataEn        !== {16{exp_rxData}})   mismatch=1;
-    if (tx.mbLaneCtrl_rxClkEn         !== exp_rxClk)          mismatch=1;
-    if (tx.mbLaneCtrl_rxValidEn       !== exp_rxValid)         mismatch=1;
-    if (tx.mbLaneCtrl_rxTrackEn       !== exp_rxTrack)         mismatch=1;
+        tx.mbLaneCtrl_txValidEn !== exp_txValid)        mismatch=1;
+    if (tx.mbLaneCtrl_txTrackEn !== exp_txTrack)        mismatch=1;
+    if (tx.mbLaneCtrl_rxDataEn  !== {16{exp_rxData}})   mismatch=1;
+    if (tx.mbLaneCtrl_rxClkEn   !== exp_rxClk)          mismatch=1;
+    if (tx.mbLaneCtrl_rxValidEn !== exp_rxValid)         mismatch=1;
+    if (tx.mbLaneCtrl_rxTrackEn !== exp_rxTrack)         mismatch=1;
     if (mismatch && !lane_ctrl_error) begin
       lane_ctrl_error = 1;
       `uvm_error("MB_SB", $sformatf(
         "XC-05: lane ctrl mismatch in state %0d: txData=%04h(exp %04h) txClk=%0b(exp %0b) txValid=%0b(skip=%0b) txTrack=%0b(exp %0b) rxData=%04h(exp %04h) rxClk=%0b(exp %0b) rxValid=%0b(exp %0b) rxTrack=%0b(exp %0b)",
         tx.currentState,
-        tx.mbLaneCtrl_txDataTriState, {16{exp_txData}},
-        tx.mbLaneCtrl_txClkTriState, exp_txClk,
-        tx.mbLaneCtrl_txValidTriState, skip_txValid,
-        tx.mbLaneCtrl_txTrackTriState, exp_txTrack,
+        tx.mbLaneCtrl_txDataEn, {16{exp_txData}},
+        tx.mbLaneCtrl_txClkEn, exp_txClk,
+        tx.mbLaneCtrl_txValidEn, skip_txValid,
+        tx.mbLaneCtrl_txTrackEn, exp_txTrack,
         tx.mbLaneCtrl_rxDataEn, {16{exp_rxData}},
         tx.mbLaneCtrl_rxClkEn, exp_rxClk,
         tx.mbLaneCtrl_rxValidEn, exp_rxValid,
@@ -444,12 +426,6 @@ class mbinit_scoreboard extends uvm_scoreboard;
       `uvm_error("MB_SB","No requester sideband TX was observed")
     if (expect_param_messages && !saw_rsp_tx)
       `uvm_error("MB_SB","No responder sideband TX was observed")
-
-    if (saw_shifted_req_tx || saw_shifted_rsp_tx) begin
-      `uvm_error("MB_SB",
-        "Root cause: DUT-generated sideband messages are not encoded at the UCIe field positions used by SBMsgCompare and the verification plan. Skipping downstream MBINIT phase checks.")
-      return;
-    end
 
     if (expect_param_messages) begin
       if (!saw_param_req_tx)

@@ -16,22 +16,31 @@
 
 `define MB_RCLK_INIT_REQ  128'h00000000_00000000_00000003_00294012
 `define MB_RCLK_INIT_RESP 128'h00000000_00000000_00000003_002A8012
-`define MB_RCLK_RES_REQ   128'h00000000_00000000_00000004_00294012
-`define MB_RCLK_RES_RESP  128'h00000000_00000000_00000004_002A8012
+`define MB_RCLK_RES_REQ        128'h00000000_00000000_00000004_00294012
+// msgInfo[2:0]=0x7 → repairClkSuccess = bits(42)&(41)&(40) = 1
+`define MB_RCLK_RES_RESP       128'h00000000_00000000_00000704_002A8012
+// msgInfo=0 → repairClkSuccess = 0 → errorDetected (RC-03)
+`define MB_RCLK_RES_RESP_FAIL  128'h00000000_00000000_00000004_002A8012
 `define MB_RCLK_DONE_REQ  128'h00000000_00000000_00000008_00294012
 `define MB_RCLK_DONE_RESP 128'h00000000_00000000_00000008_002A8012
 
 `define MB_RVAL_INIT_REQ  128'h00000000_00000000_00000009_00294012
 `define MB_RVAL_INIT_RESP 128'h00000000_00000000_00000009_002A8012
-`define MB_RVAL_RES_REQ   128'h00000000_00000000_0000000A_00294012
-`define MB_RVAL_RES_RESP  128'h00000000_00000000_0000000A_002A8012
+`define MB_RVAL_RES_REQ        128'h00000000_00000000_0000000A_00294012
+// msgInfo[0]=1 → repairValSuccess = bits(40) = 1
+`define MB_RVAL_RES_RESP       128'h00000000_00000000_0000010A_002A8012
+// msgInfo=0 → repairValSuccess = 0 → errorDetected (RV-06)
+`define MB_RVAL_RES_RESP_FAIL  128'h00000000_00000000_0000000A_002A8012
 `define MB_RVAL_DONE_REQ  128'h00000000_00000000_0000000C_00294012
 `define MB_RVAL_DONE_RESP 128'h00000000_00000000_0000000C_002A8012
 
 `define MB_LR_INIT_REQ    128'h00000000_00000000_0000000D_00294012
 `define MB_LR_INIT_RESP   128'h00000000_00000000_0000000D_002A8012
 `define MB_LR_RES_REQ     128'h00000000_00000000_0000000F_00294012
-`define MB_LR_RES_RESP    128'h00000000_00000000_0000000F_002A8012
+// opcode=0x1B (MessageWith64bData); data=0xFFFF → PopCount(bits[78:63])=15 > 8 → success
+`define MB_LR_RES_RESP    128'h00000000_0000FFFF_0000000F_002A801B
+// same opcode; data=0 → PopCount=0 → reversalMbSuccess=0 (LR-07)
+`define MB_LR_RES_RESP_FAIL 128'h00000000_00000000_0000000F_002A801B
 `define MB_LR_DONE_REQ    128'h00000000_00000000_00000010_00294012
 `define MB_LR_DONE_RESP   128'h00000000_00000000_00000010_002A8012
 
@@ -164,6 +173,85 @@ class seq_mbinit_param_only extends mbinit_base_seq;
     send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
               .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
               .delay(5), .hold(50));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbinit_repairclk_fail: RC-03 — unrepairable clock repair
+// PARAM → CAL → REPAIRCLK INIT → REPAIRCLK RESULT (failure)
+// msgInfo=0 → repairClkSuccess=0 → fsmCtrl_error asserted
+// ============================================================
+class seq_mbinit_repairclk_fail extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_repairclk_fail)
+
+  function new(string name = "seq_mbinit_repairclk_fail");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RCLK_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_INIT_REQ),
+              .delay(5), .hold(30));
+
+    // Drive failure result: requester gets msgInfo=0 → errorDetected
+    send_item(.req_valid(1), .req_data(`MB_RCLK_RES_RESP_FAIL),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_RES_REQ),
+              .delay(5), .hold(30));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbinit_repairval_fail: RV-06 — unrepairable valid repair
+// Full REPAIRCLK success → REPAIRVAL INIT → REPAIRVAL RESULT (failure)
+// msgInfo=0 → repairValSuccess=0 → fsmCtrl_error asserted
+// ============================================================
+class seq_mbinit_repairval_fail extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_repairval_fail)
+
+  function new(string name = "seq_mbinit_repairval_fail");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(30));
+
+    // Full REPAIRCLK with success (required before REPAIRVAL)
+    send_item(.req_valid(1), .req_data(`MB_RCLK_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RVAL_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_INIT_REQ),
+              .delay(5), .hold(30));
+
+    // Drive failure result: requester gets msgInfo=0 → errorDetected
+    send_item(.req_valid(1), .req_data(`MB_RVAL_RES_RESP_FAIL),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_RES_REQ),
+              .delay(5), .hold(30));
   endtask
 endclass
 
