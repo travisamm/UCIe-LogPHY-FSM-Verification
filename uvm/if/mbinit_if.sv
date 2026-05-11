@@ -87,5 +87,15 @@ interface mbinit_if(input logic clock, input logic reset);
   logic        txPtTestRespIo_done;
   logic        txPtTestRespIo_start;
 
+  // mbLaneCtrlIo (observed from DUT)
+  logic [15:0] mbLaneCtrl_txDataTriState;
+  logic        mbLaneCtrl_txClkTriState;
+  logic        mbLaneCtrl_txValidTriState;
+  logic        mbLaneCtrl_txTrackTriState;
+  logic [15:0] mbLaneCtrl_rxDataEn;
+  logic        mbLaneCtrl_rxClkEn;
+  logic        mbLaneCtrl_rxValidEn;
+  logic        mbLaneCtrl_rxTrackEn;
+
 endinterface
 `endif

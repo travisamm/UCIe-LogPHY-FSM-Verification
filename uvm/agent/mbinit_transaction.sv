@@ -35,6 +35,25 @@ class mbinit_transaction extends logphy_transaction;
   logic        interoperableParamsNotFound;
   logic        applyLaneReversal;
 
+  // Pattern IO observations (XC-09/10, RC-02, RV-03, LR-02, RM-01)
+  logic        usingPatternWriter;
+  logic        usingPatternReader;
+  logic        patternWriter_req_valid;
+  logic [1:0]  patternWriter_patternType;
+  logic        patternReader_req_valid;
+  logic [1:0]  patternReader_patternType;
+  logic        txPtTest_start;
+
+  // Lane control observations (XC-05)
+  logic [15:0] mbLaneCtrl_txDataTriState;
+  logic        mbLaneCtrl_txClkTriState;
+  logic        mbLaneCtrl_txValidTriState;
+  logic        mbLaneCtrl_txTrackTriState;
+  logic [15:0] mbLaneCtrl_rxDataEn;
+  logic        mbLaneCtrl_rxClkEn;
+  logic        mbLaneCtrl_rxValidEn;
+  logic        mbLaneCtrl_rxTrackEn;
+
   `uvm_object_utils_begin(mbinit_transaction)
     `uvm_field_int(local_voltageSwing,              UVM_ALL_ON)
     `uvm_field_int(local_maxDataRate,               UVM_ALL_ON)

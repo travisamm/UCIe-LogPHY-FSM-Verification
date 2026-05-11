@@ -89,6 +89,23 @@ class mbtrain_scoreboard extends uvm_scoreboard;
   bit saw_ls_start_req, saw_ls_start_rsp;
   bit saw_ls_done_req,  saw_ls_done_rsp;
 
+  // ---- Lane control (XC-05) ----
+  bit lane_ctrl_error;
+
+  // State encoding (matches MBTrainRequester currentState)
+  localparam logic [3:0] MT_ST_VALVREF         = 4'h0;
+  localparam logic [3:0] MT_ST_DATAVREF        = 4'h1;
+  localparam logic [3:0] MT_ST_SPEEDIDLE       = 4'h2;
+  localparam logic [3:0] MT_ST_TXSELFCAL       = 4'h3;
+  localparam logic [3:0] MT_ST_RXCLKCAL        = 4'h4;
+  localparam logic [3:0] MT_ST_VALTRAINCENTER  = 4'h5;
+  localparam logic [3:0] MT_ST_VALTRAINVREF    = 4'h6;
+  localparam logic [3:0] MT_ST_DATATRAINCENTER1= 4'h7;
+  localparam logic [3:0] MT_ST_DATATRAINVREF   = 4'h8;
+  localparam logic [3:0] MT_ST_RXDESKEW        = 4'h9;
+  localparam logic [3:0] MT_ST_DATATRAINCENTER2= 4'hA;
+  localparam logic [3:0] MT_ST_LINKSPEED       = 4'hB;
+
   // ---- Terminal ----
   bit saw_fsm_done;
   bit saw_fsm_error;
@@ -119,7 +136,7 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       if (tx.tx_valid)     decode_req_tx(tx.tx_data);
       if (tx.rsp_tx_valid) decode_rsp_tx(tx.rsp_tx_data);
 
-      // TODO: mbLaneCtrlIo transition checks per spec table (VV-01, DV-01, etc.)
+      check_lane_ctrl(tx);
 
       if (tx.fsm_done && !saw_fsm_done) begin
         `uvm_info("MT_SB", "MBTRAIN fsmCtrl_done asserted", UVM_LOW)
@@ -131,6 +148,80 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       end
     end
   endtask
+
+  // XC-05: per-state lane control check derived from MBTrainRequester RTL.
+  // Expected values per state (all lanes uniform — txDataTriState/rxDataEn are 16-bit):
+  //   States 0-2 (VV/DV/SI):  tx_tri=0  rxData=1 rxClk=1 rxValid=1 rxTrack=0
+  //   State  3   (TC):        tx_tri=1  rxData=0 rxClk=0 rxValid=0 rxTrack=0
+  //   State  4   (RCC):       tx_tri=0  rxData=0 rxClk=1 rxValid=0 rxTrack=1
+  //   States 5-8 (VTC/VTV/DC1/DTV): tx_tri=0 rxData=1 rxClk=1 rxValid=1 rxTrack=0
+  //   State  9   (RDS):       tx_tri=0  rxData=0 rxClk=1 rxValid=0 rxTrack=1
+  //   States A-B (DC2/LS):    tx_tri=0  rxData=1 rxClk=1 rxValid=1 rxTrack=0
+  function void check_lane_ctrl(mbtrain_transaction tx);
+    logic exp_tx_tri;
+    logic exp_rx_data;
+    logic exp_rx_clk;
+    logic exp_rx_valid;
+    logic exp_rx_track;
+    string state_name;
+
+    case (tx.currentState)
+      MT_ST_VALVREF:          begin state_name="VALVREF";          exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_DATAVREF:         begin state_name="DATAVREF";         exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_SPEEDIDLE:        begin state_name="SPEEDIDLE";        exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_TXSELFCAL:        begin state_name="TXSELFCAL";        exp_tx_tri=1; exp_rx_data=0; exp_rx_clk=0; exp_rx_valid=0; exp_rx_track=0; end
+      MT_ST_RXCLKCAL:         begin state_name="RXCLKCAL";         exp_tx_tri=0; exp_rx_data=0; exp_rx_clk=1; exp_rx_valid=0; exp_rx_track=1; end
+      MT_ST_VALTRAINCENTER:   begin state_name="VALTRAINCENTER";   exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_VALTRAINVREF:     begin state_name="VALTRAINVREF";     exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_DATATRAINCENTER1: begin state_name="DATATRAINCENTER1"; exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_DATATRAINVREF:    begin state_name="DATATRAINVREF";    exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_RXDESKEW:         begin state_name="RXDESKEW";         exp_tx_tri=0; exp_rx_data=0; exp_rx_clk=1; exp_rx_valid=0; exp_rx_track=1; end
+      MT_ST_DATATRAINCENTER2: begin state_name="DATATRAINCENTER2"; exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      MT_ST_LINKSPEED:        begin state_name="LINKSPEED";        exp_tx_tri=0; exp_rx_data=1; exp_rx_clk=1; exp_rx_valid=1; exp_rx_track=0; end
+      default: return;
+    endcase
+
+    if (tx.mbLaneCtrl_txDataTriState  !== {16{exp_tx_tri}}) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] txDataTriState: exp=%04h got=%04h",
+        state_name, {16{exp_tx_tri}}, tx.mbLaneCtrl_txDataTriState))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_txClkTriState   !== exp_tx_tri) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] txClkTriState: exp=%0b got=%0b",
+        state_name, exp_tx_tri, tx.mbLaneCtrl_txClkTriState))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_txValidTriState !== exp_tx_tri) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] txValidTriState: exp=%0b got=%0b",
+        state_name, exp_tx_tri, tx.mbLaneCtrl_txValidTriState))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_txTrackTriState !== exp_tx_tri) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] txTrackTriState: exp=%0b got=%0b",
+        state_name, exp_tx_tri, tx.mbLaneCtrl_txTrackTriState))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_rxDataEn  !== {16{exp_rx_data}}) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] rxDataEn: exp=%04h got=%04h",
+        state_name, {16{exp_rx_data}}, tx.mbLaneCtrl_rxDataEn))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_rxClkEn   !== exp_rx_clk) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] rxClkEn: exp=%0b got=%0b",
+        state_name, exp_rx_clk, tx.mbLaneCtrl_rxClkEn))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_rxValidEn !== exp_rx_valid) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] rxValidEn: exp=%0b got=%0b",
+        state_name, exp_rx_valid, tx.mbLaneCtrl_rxValidEn))
+      lane_ctrl_error = 1;
+    end
+    if (tx.mbLaneCtrl_rxTrackEn !== exp_rx_track) begin
+      `uvm_error("MT_SB", $sformatf("XC-05 [%s] rxTrackEn: exp=%0b got=%0b",
+        state_name, exp_rx_track, tx.mbLaneCtrl_rxTrackEn))
+      lane_ctrl_error = 1;
+    end
+  endfunction
 
   function void decode_req_tx(logic [127:0] d);
     if (`MT_OP(d) != `MT_OP_NODATA || `MT_MC(d) != `MT_MC_REQ) return;
@@ -190,7 +281,7 @@ class mbtrain_scoreboard extends uvm_scoreboard;
 
   function void check_phase(uvm_phase phase);
     `uvm_info("MT_SB", $sformatf(
-      "Summary: vv=%0b/%0b dv=%0b/%0b si=%0b tc=%0b rcc=%0b/%0b vtc=%0b/%0b vtv=%0b/%0b dc1=%0b/%0b dtv=%0b/%0b rds=%0b/%0b dc2=%0b/%0b ls=%0b/%0b fsm_done=%0b err=%0b",
+      "Summary: vv=%0b/%0b dv=%0b/%0b si=%0b tc=%0b rcc=%0b/%0b vtc=%0b/%0b vtv=%0b/%0b dc1=%0b/%0b dtv=%0b/%0b rds=%0b/%0b dc2=%0b/%0b ls=%0b/%0b fsm_done=%0b err=%0b lane_ctrl_err=%0b",
       saw_vv_start_req,  saw_vv_end_req,
       saw_dv_start_req,  saw_dv_end_req,
       saw_si_done_req,   saw_tc_done_req,
@@ -202,7 +293,7 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       saw_rds_start_req, saw_rds_end_req,
       saw_dc2_start_req, saw_dc2_end_req,
       saw_ls_start_req,  saw_ls_done_req,
-      saw_fsm_done, saw_fsm_error), UVM_LOW)
+      saw_fsm_done, saw_fsm_error, lane_ctrl_error), UVM_LOW)
 
     if (expect_fsm_done) begin
       if (!saw_vv_start_req)  `uvm_error("MT_SB","VALVREF: requester never sent VALVREF_START_REQ")
@@ -229,6 +320,9 @@ class mbtrain_scoreboard extends uvm_scoreboard;
       if (!saw_ls_done_req)   `uvm_error("MT_SB","LINKSPEED: requester never sent LINKSPEED_DONE_REQ")
       if (!saw_fsm_done)      `uvm_error("MT_SB","MBTRAIN FAILED: fsmCtrl_done never asserted")
     end
+
+    if (lane_ctrl_error)
+      `uvm_error("MT_SB","XC-05 FAILED: mbLaneCtrlIo mismatches detected above (see per-transaction errors)")
 
     if (expect_fsm_error && !saw_fsm_error)
       `uvm_error("MT_SB","Expected fsmCtrl_error but it never asserted")

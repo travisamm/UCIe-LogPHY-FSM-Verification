@@ -106,6 +106,10 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit saw_fsm_done;
   bit saw_fsm_error;
 
+  // ---- Lane control / pattern type error latches (XC-05, RC-02, RV-03, LR-02, RM-01) ----
+  bit lane_ctrl_error;
+  bit pattern_type_error;
+
   // Settable by test to adjust end-of-test checks
   bit expect_param_messages     = 1;
   bit expect_param_common_rate  = 1;
@@ -114,6 +118,8 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit expect_interop_failure    = 0;
   bit expect_fsm_done           = 1;
   bit expect_fsm_error          = 0;
+  bit expect_lane_ctrl_checks   = 1;
+  bit expect_pattern_type_checks = 1;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -157,6 +163,9 @@ class mbinit_scoreboard extends uvm_scoreboard;
         saw_state_repairmb = 1;
       if (tx.currentState == MB_STATE_TOMBTRAIN)
         saw_state_tombtrain = 1;
+
+      check_lane_ctrl(tx);
+      check_pattern_type(tx);
 
       if (tx.negotiatedPhySettings_valid) begin
         if (!mp_02_verified && tx.negotiated_maxDataRate == 4'hF) begin
@@ -326,12 +335,110 @@ class mbinit_scoreboard extends uvm_scoreboard;
     end
   endfunction
 
+  // XC-05: verify mbLaneCtrlIo matches expected values for each MBINIT state
+  function void check_lane_ctrl(mbinit_transaction tx);
+    bit exp_txData, exp_txClk, exp_txValid, exp_txTrack;
+    bit exp_rxData, exp_rxClk, exp_rxValid, exp_rxTrack;
+    bit skip_txValid, mismatch;
+    skip_txValid = 0;
+    mismatch     = 0;
+    case (tx.currentState)
+      MB_STATE_PARAM, MB_STATE_CAL: begin
+        exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
+        exp_rxData=0; exp_rxClk=0; exp_rxValid=0; exp_rxTrack=0;
+      end
+      MB_STATE_REPAIRCLK: begin
+        exp_txData=1; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
+        exp_rxData=0; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=1;
+      end
+      MB_STATE_REPAIRVAL: begin
+        exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=1;
+        exp_rxData=0; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=0;
+        skip_txValid = 1; // txValidTriState is substate-dependent in REPAIRVAL
+      end
+      MB_STATE_REVERSALMB, MB_STATE_REPAIRMB: begin
+        exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
+        exp_rxData=1; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=0;
+      end
+      MB_STATE_TOMBTRAIN: begin
+        exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
+        exp_rxData=0; exp_rxClk=0; exp_rxValid=0; exp_rxTrack=0;
+      end
+      default: return;
+    endcase
+    if (tx.mbLaneCtrl_txDataTriState  !== {16{exp_txData}})  mismatch=1;
+    if (tx.mbLaneCtrl_txClkTriState   !== exp_txClk)         mismatch=1;
+    if (!skip_txValid &&
+        tx.mbLaneCtrl_txValidTriState !== exp_txValid)        mismatch=1;
+    if (tx.mbLaneCtrl_txTrackTriState !== exp_txTrack)        mismatch=1;
+    if (tx.mbLaneCtrl_rxDataEn        !== {16{exp_rxData}})   mismatch=1;
+    if (tx.mbLaneCtrl_rxClkEn         !== exp_rxClk)          mismatch=1;
+    if (tx.mbLaneCtrl_rxValidEn       !== exp_rxValid)         mismatch=1;
+    if (tx.mbLaneCtrl_rxTrackEn       !== exp_rxTrack)         mismatch=1;
+    if (mismatch && !lane_ctrl_error) begin
+      lane_ctrl_error = 1;
+      `uvm_error("MB_SB", $sformatf(
+        "XC-05: lane ctrl mismatch in state %0d: txData=%04h(exp %04h) txClk=%0b(exp %0b) txValid=%0b(skip=%0b) txTrack=%0b(exp %0b) rxData=%04h(exp %04h) rxClk=%0b(exp %0b) rxValid=%0b(exp %0b) rxTrack=%0b(exp %0b)",
+        tx.currentState,
+        tx.mbLaneCtrl_txDataTriState, {16{exp_txData}},
+        tx.mbLaneCtrl_txClkTriState, exp_txClk,
+        tx.mbLaneCtrl_txValidTriState, skip_txValid,
+        tx.mbLaneCtrl_txTrackTriState, exp_txTrack,
+        tx.mbLaneCtrl_rxDataEn, {16{exp_rxData}},
+        tx.mbLaneCtrl_rxClkEn, exp_rxClk,
+        tx.mbLaneCtrl_rxValidEn, exp_rxValid,
+        tx.mbLaneCtrl_rxTrackEn, exp_rxTrack))
+    end
+  endfunction
+
+  // RC-02/RV-03/LR-02/RM-01: verify patternWriter pattern type matches state
+  function void check_pattern_type(mbinit_transaction tx);
+    if (!tx.patternWriter_req_valid) return;
+    case (tx.currentState)
+      MB_STATE_REPAIRCLK: begin
+        if (tx.patternWriter_patternType !== 2'h0 &&
+            tx.patternWriter_patternType !== 2'h1) begin
+          pattern_type_error = 1;
+          `uvm_error("MB_SB", $sformatf(
+            "RC-02: patternWriter type=%0h in REPAIRCLK; expected CLKREPAIR(0) or VALTRAIN(1)",
+            tx.patternWriter_patternType))
+        end
+      end
+      MB_STATE_REPAIRVAL: begin
+        if (tx.patternWriter_patternType !== 2'h1) begin
+          pattern_type_error = 1;
+          `uvm_error("MB_SB", $sformatf(
+            "RV-03: patternWriter type=%0h in REPAIRVAL; expected VALTRAIN(1)",
+            tx.patternWriter_patternType))
+        end
+      end
+      MB_STATE_REVERSALMB: begin
+        if (tx.patternWriter_patternType !== 2'h2) begin
+          pattern_type_error = 1;
+          `uvm_error("MB_SB", $sformatf(
+            "LR-02: patternWriter type=%0h in REVERSALMB; expected PERLANEID(2)",
+            tx.patternWriter_patternType))
+        end
+      end
+      MB_STATE_REPAIRMB: begin
+        if (tx.patternWriter_patternType !== 2'h2) begin
+          pattern_type_error = 1;
+          `uvm_error("MB_SB", $sformatf(
+            "RM-01: patternWriter type=%0h in REPAIRMB; expected PERLANEID(2)",
+            tx.patternWriter_patternType))
+        end
+      end
+      default: ;
+    endcase
+  endfunction
+
   function void check_phase(uvm_phase phase);
     `uvm_info("MB_SB", $sformatf(
-      "Summary: req_tx=%0b rsp_tx=%0b bad_req=%0b bad_rsp=%0b param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b",
+      "Summary: req_tx=%0b rsp_tx=%0b bad_req=%0b bad_rsp=%0b param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b lane_ctrl_err=%0b pat_type_err=%0b",
       saw_req_tx, saw_rsp_tx, saw_bad_req_tx, saw_bad_rsp_tx,
       saw_param_req_tx, saw_param_resp_tx, mp_02_verified, mp_03_verified,
-      saw_cal_req_tx, saw_fsm_done, saw_fsm_error), UVM_LOW)
+      saw_cal_req_tx, saw_fsm_done, saw_fsm_error,
+      lane_ctrl_error, pattern_type_error), UVM_LOW)
 
     if (expect_param_messages && !saw_req_tx)
       `uvm_error("MB_SB","No requester sideband TX was observed")
@@ -408,6 +515,11 @@ class mbinit_scoreboard extends uvm_scoreboard;
       `uvm_error("MB_SB","Expected fsmCtrl_error but it never asserted")
     if (!expect_fsm_error && saw_fsm_error)
       `uvm_error("MB_SB","Unexpected fsmCtrl_error on success-path test")
+
+    if (expect_lane_ctrl_checks && lane_ctrl_error)
+      `uvm_error("MB_SB","XC-05 FAILED: mbLaneCtrlIo mismatch observed (see earlier errors for details)")
+    if (expect_pattern_type_checks && pattern_type_error)
+      `uvm_error("MB_SB","RC-02/RV-03/LR-02/RM-01 FAILED: patternWriter type mismatch observed (see earlier errors)")
   endfunction
 
 endclass

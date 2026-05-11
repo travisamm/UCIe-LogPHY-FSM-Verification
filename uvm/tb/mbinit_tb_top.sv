@@ -26,9 +26,6 @@ module mbinit_tb_top;
 
   mbinit_if vif(clock, reset);
 
-  // Dummy wires for DUT mbLaneCtrlIo outputs (not monitored by TB)
-  wire [15:0] mbLane_rxDataEn;
-  wire        mbLane_rxClkEn, mbLane_rxValidEn, mbLane_rxTrackEn;
 
   MBInitSM dut (
     .clock  (clock),
@@ -73,26 +70,45 @@ module mbinit_tb_top;
     .io_remoteFunctionalLanes       (vif.remoteFunctionalLanes),
     .io_rxWidthChanged              (vif.rxWidthChanged),
 
-    // MbLaneCtrl (outputs tied to dummy wires)
-    .io_mbLaneCtrlIo_rxDataEn_0  (mbLane_rxDataEn[0]),
-    .io_mbLaneCtrlIo_rxDataEn_1  (mbLane_rxDataEn[1]),
-    .io_mbLaneCtrlIo_rxDataEn_2  (mbLane_rxDataEn[2]),
-    .io_mbLaneCtrlIo_rxDataEn_3  (mbLane_rxDataEn[3]),
-    .io_mbLaneCtrlIo_rxDataEn_4  (mbLane_rxDataEn[4]),
-    .io_mbLaneCtrlIo_rxDataEn_5  (mbLane_rxDataEn[5]),
-    .io_mbLaneCtrlIo_rxDataEn_6  (mbLane_rxDataEn[6]),
-    .io_mbLaneCtrlIo_rxDataEn_7  (mbLane_rxDataEn[7]),
-    .io_mbLaneCtrlIo_rxDataEn_8  (mbLane_rxDataEn[8]),
-    .io_mbLaneCtrlIo_rxDataEn_9  (mbLane_rxDataEn[9]),
-    .io_mbLaneCtrlIo_rxDataEn_10 (mbLane_rxDataEn[10]),
-    .io_mbLaneCtrlIo_rxDataEn_11 (mbLane_rxDataEn[11]),
-    .io_mbLaneCtrlIo_rxDataEn_12 (mbLane_rxDataEn[12]),
-    .io_mbLaneCtrlIo_rxDataEn_13 (mbLane_rxDataEn[13]),
-    .io_mbLaneCtrlIo_rxDataEn_14 (mbLane_rxDataEn[14]),
-    .io_mbLaneCtrlIo_rxDataEn_15 (mbLane_rxDataEn[15]),
-    .io_mbLaneCtrlIo_rxClkEn    (mbLane_rxClkEn),
-    .io_mbLaneCtrlIo_rxValidEn  (mbLane_rxValidEn),
-    .io_mbLaneCtrlIo_rxTrackEn  (mbLane_rxTrackEn),
+    // mbLaneCtrlIo — Tx outputs observed via interface; Rx outputs also to interface
+    .io_mbLaneCtrlIo_txDataTriState_0  (vif.mbLaneCtrl_txDataTriState[0]),
+    .io_mbLaneCtrlIo_txDataTriState_1  (vif.mbLaneCtrl_txDataTriState[1]),
+    .io_mbLaneCtrlIo_txDataTriState_2  (vif.mbLaneCtrl_txDataTriState[2]),
+    .io_mbLaneCtrlIo_txDataTriState_3  (vif.mbLaneCtrl_txDataTriState[3]),
+    .io_mbLaneCtrlIo_txDataTriState_4  (vif.mbLaneCtrl_txDataTriState[4]),
+    .io_mbLaneCtrlIo_txDataTriState_5  (vif.mbLaneCtrl_txDataTriState[5]),
+    .io_mbLaneCtrlIo_txDataTriState_6  (vif.mbLaneCtrl_txDataTriState[6]),
+    .io_mbLaneCtrlIo_txDataTriState_7  (vif.mbLaneCtrl_txDataTriState[7]),
+    .io_mbLaneCtrlIo_txDataTriState_8  (vif.mbLaneCtrl_txDataTriState[8]),
+    .io_mbLaneCtrlIo_txDataTriState_9  (vif.mbLaneCtrl_txDataTriState[9]),
+    .io_mbLaneCtrlIo_txDataTriState_10 (vif.mbLaneCtrl_txDataTriState[10]),
+    .io_mbLaneCtrlIo_txDataTriState_11 (vif.mbLaneCtrl_txDataTriState[11]),
+    .io_mbLaneCtrlIo_txDataTriState_12 (vif.mbLaneCtrl_txDataTriState[12]),
+    .io_mbLaneCtrlIo_txDataTriState_13 (vif.mbLaneCtrl_txDataTriState[13]),
+    .io_mbLaneCtrlIo_txDataTriState_14 (vif.mbLaneCtrl_txDataTriState[14]),
+    .io_mbLaneCtrlIo_txDataTriState_15 (vif.mbLaneCtrl_txDataTriState[15]),
+    .io_mbLaneCtrlIo_txClkTriState     (vif.mbLaneCtrl_txClkTriState),
+    .io_mbLaneCtrlIo_txValidTriState   (vif.mbLaneCtrl_txValidTriState),
+    .io_mbLaneCtrlIo_txTrackTriState   (vif.mbLaneCtrl_txTrackTriState),
+    .io_mbLaneCtrlIo_rxDataEn_0  (vif.mbLaneCtrl_rxDataEn[0]),
+    .io_mbLaneCtrlIo_rxDataEn_1  (vif.mbLaneCtrl_rxDataEn[1]),
+    .io_mbLaneCtrlIo_rxDataEn_2  (vif.mbLaneCtrl_rxDataEn[2]),
+    .io_mbLaneCtrlIo_rxDataEn_3  (vif.mbLaneCtrl_rxDataEn[3]),
+    .io_mbLaneCtrlIo_rxDataEn_4  (vif.mbLaneCtrl_rxDataEn[4]),
+    .io_mbLaneCtrlIo_rxDataEn_5  (vif.mbLaneCtrl_rxDataEn[5]),
+    .io_mbLaneCtrlIo_rxDataEn_6  (vif.mbLaneCtrl_rxDataEn[6]),
+    .io_mbLaneCtrlIo_rxDataEn_7  (vif.mbLaneCtrl_rxDataEn[7]),
+    .io_mbLaneCtrlIo_rxDataEn_8  (vif.mbLaneCtrl_rxDataEn[8]),
+    .io_mbLaneCtrlIo_rxDataEn_9  (vif.mbLaneCtrl_rxDataEn[9]),
+    .io_mbLaneCtrlIo_rxDataEn_10 (vif.mbLaneCtrl_rxDataEn[10]),
+    .io_mbLaneCtrlIo_rxDataEn_11 (vif.mbLaneCtrl_rxDataEn[11]),
+    .io_mbLaneCtrlIo_rxDataEn_12 (vif.mbLaneCtrl_rxDataEn[12]),
+    .io_mbLaneCtrlIo_rxDataEn_13 (vif.mbLaneCtrl_rxDataEn[13]),
+    .io_mbLaneCtrlIo_rxDataEn_14 (vif.mbLaneCtrl_rxDataEn[14]),
+    .io_mbLaneCtrlIo_rxDataEn_15 (vif.mbLaneCtrl_rxDataEn[15]),
+    .io_mbLaneCtrlIo_rxClkEn     (vif.mbLaneCtrl_rxClkEn),
+    .io_mbLaneCtrlIo_rxValidEn   (vif.mbLaneCtrl_rxValidEn),
+    .io_mbLaneCtrlIo_rxTrackEn   (vif.mbLaneCtrl_rxTrackEn),
 
     // Cal
     .io_mbInitCalDone  (vif.mbInitCalDone),

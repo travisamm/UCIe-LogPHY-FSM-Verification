@@ -39,6 +39,16 @@ class mbtrain_transaction extends logphy_transaction;
   logic       doElectricalIdleTx;
   logic       doElectricalIdleRx;
 
+  // Lane control observations (XC-05)
+  logic [15:0] mbLaneCtrl_txDataTriState;
+  logic        mbLaneCtrl_txClkTriState;
+  logic        mbLaneCtrl_txValidTriState;
+  logic        mbLaneCtrl_txTrackTriState;
+  logic [15:0] mbLaneCtrl_rxDataEn;
+  logic        mbLaneCtrl_rxClkEn;
+  logic        mbLaneCtrl_rxValidEn;
+  logic        mbLaneCtrl_rxTrackEn;
+
   `uvm_object_utils_begin(mbtrain_transaction)
     `uvm_field_int(pllLock,                    UVM_ALL_ON)
     `uvm_field_int(goToState_valid,            UVM_ALL_ON)
