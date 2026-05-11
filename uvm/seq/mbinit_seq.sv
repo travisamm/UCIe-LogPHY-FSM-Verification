@@ -7,8 +7,11 @@
 // ============================================================
 
 // PARAM (opcode=0x1B with 64b data: voltageSwing=0x1F, maxDataRate=0xF, clockMode=1)
-`define MB_PARAM_REQ  128'h00000000_000021FF_00000000_0029401B
-`define MB_PARAM_RESP 128'h00000000_000021FF_00000000_002A801B
+// Byte-aligned PARAM payload: RTL decodes clockMode from resp_bits[73]
+// (MBInitRequester/MBInitResponder). 0x21FF had bit73=0 → negotiated clockMode 0;
+// use 0x23FF so bit73=1 while keeping bits[67:64]=maxDataRate at 4'hF.
+`define MB_PARAM_REQ  128'h00000000_000023FF_00000000_0029401B
+`define MB_PARAM_RESP 128'h00000000_000023FF_00000000_002A801B
 
 // No-data messages (opcode=0x12, msgCode=0xA5 req / 0xAA resp)
 `define MB_CAL_REQ       128'h00000000_00000000_00000002_00294012
@@ -36,6 +39,8 @@
 
 `define MB_LR_INIT_REQ    128'h00000000_00000000_0000000D_00294012
 `define MB_LR_INIT_RESP   128'h00000000_00000000_0000000D_002A8012
+`define MB_LR_CLR_REQ     128'h00000000_00000000_0000000E_00294012
+`define MB_LR_CLR_RESP    128'h00000000_00000000_0000000E_002A8012
 `define MB_LR_RES_REQ     128'h00000000_00000000_0000000F_00294012
 // opcode=0x1B (MessageWith64bData); data=0xFFFF → PopCount(bits[78:63])=15 > 8 → success
 `define MB_LR_RES_RESP    128'h00000000_0000FFFF_0000000F_002A801B
@@ -46,6 +51,8 @@
 
 `define MB_RM_START_REQ   128'h00000000_00000000_00000011_00294012
 `define MB_RM_START_RESP  128'h00000000_00000000_00000011_002A8012
+`define MB_RM_DEG_REQ     128'h00000000_00000000_00000014_00294012
+`define MB_RM_DEG_RESP    128'h00000000_00000000_00000014_002A8012
 `define MB_RM_END_REQ     128'h00000000_00000000_00000013_00294012
 `define MB_RM_END_RESP    128'h00000000_00000000_00000013_002A8012
 
@@ -91,7 +98,7 @@ endclass
 // seq_mbinit_full: drives the full ideal MBINIT happy path
 // All 6 sub-states: PARAM → CAL → REPAIRCLK → REPAIRVAL →
 //                   REVERSALMB → REPAIRMB → (MBTRAIN)
-// CalDone is auto-stubbed by the driver on mbInitCalStart.
+// CalDone is auto-stubbed by the driver on mbInitCalStart (rising edge).
 // PatternWriter/Reader/PtTest stubs are also in the driver.
 // ============================================================
 class seq_mbinit_full extends mbinit_base_seq;
@@ -137,9 +144,12 @@ class seq_mbinit_full extends mbinit_base_seq;
               .rsp_valid(1), .rsp_data(`MB_RVAL_DONE_REQ),
               .delay(5), .hold(30));
 
-    // 6. REVERSALMB — INIT → RESULT → DONE
+    // 6. REVERSALMB — INIT → CLEAR_ERROR (+ patternWriter) → RESULT → DONE
     send_item(.req_valid(1), .req_data(`MB_LR_INIT_RESP),
               .rsp_valid(1), .rsp_data(`MB_LR_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_CLR_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_CLR_REQ),
               .delay(5), .hold(30));
     send_item(.req_valid(1), .req_data(`MB_LR_RES_RESP),
               .rsp_valid(1), .rsp_data(`MB_LR_RES_REQ),
@@ -148,13 +158,19 @@ class seq_mbinit_full extends mbinit_base_seq;
               .rsp_valid(1), .rsp_data(`MB_LR_DONE_REQ),
               .delay(5), .hold(30));
 
-    // 7. REPAIRMB — START → END
+    // 7. REPAIRMB — START → point test → APPLY_DEGRADE (may repeat s1↔s2) → END
     send_item(.req_valid(1), .req_data(`MB_RM_START_RESP),
               .rsp_valid(1), .rsp_data(`MB_RM_START_REQ),
-              .delay(5), .hold(30));
+              .delay(2), .hold(80));
+    send_item(.req_valid(1), .req_data(`MB_RM_DEG_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_DEG_REQ),
+              .delay(2), .hold(120));
+    send_item(.req_valid(1), .req_data(`MB_RM_DEG_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_DEG_REQ),
+              .delay(2), .hold(120));
     send_item(.req_valid(1), .req_data(`MB_RM_END_RESP),
               .rsp_valid(1), .rsp_data(`MB_RM_END_REQ),
-              .delay(5), .hold(30));
+              .delay(2), .hold(200));
   endtask
 endclass
 
@@ -179,7 +195,7 @@ endclass
 // ============================================================
 // seq_mbinit_repairclk_fail: RC-03 — unrepairable clock repair
 // PARAM → CAL → REPAIRCLK INIT → REPAIRCLK RESULT (failure)
-// msgInfo=0 → repairClkSuccess=0 → fsmCtrl_error asserted
+// msgInfo=0 → repairClkSuccess=0 → errorDetected (RC-03)
 // ============================================================
 class seq_mbinit_repairclk_fail extends mbinit_base_seq;
   `uvm_object_utils(seq_mbinit_repairclk_fail)

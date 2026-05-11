@@ -59,7 +59,8 @@ class mbinit_monitor extends uvm_monitor;
     forever begin
       @(posedge vif.clock);
 
-      if ((vif.currentState              !== prev_state)          ||
+      if ((vif.requesterSbLaneIo_tx_valid || vif.responderSbLaneIo_tx_valid) ||
+          (vif.currentState              !== prev_state)          ||
           (vif.fsmCtrl_done             !== prev_done)            ||
           (vif.fsmCtrl_error            !== prev_error)           ||
           (vif.negotiatedPhySettings_valid !== prev_neg_valid)    ||
