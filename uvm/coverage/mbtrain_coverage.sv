@@ -104,7 +104,7 @@ class mbtrain_coverage extends uvm_component;
 
   function void write(mbtrain_transaction t);
     mbtrain_cg.sample(t);
-    `uvm_info("MBTRAIN_COV", "Coverage sampled!", UVM_HIGH)
+    `uvm_info("MBTRAIN_COV", "Coverage sampled!", UVM_LOW)
   endfunction
 
 endclass
