@@ -44,7 +44,7 @@
 `define MB_LR_RES_REQ     128'h00000000_00000000_0000000F_00294012
 // opcode=0x1B (MessageWith64bData); data=0xFFFF → PopCount(bits[78:63])=15 > 8 → success
 `define MB_LR_RES_RESP    128'h00000000_0000FFFF_0000000F_002A801B
-// same opcode; data=0 → PopCount=0 → reversalMbSuccess=0 (LR-07)
+// same opcode; data=0 → PopCount=0 → reversalMbSuccess=0 (LR-04 retry / LR-07 second fail)
 `define MB_LR_RES_RESP_FAIL 128'h00000000_00000000_0000000F_002A801B
 `define MB_LR_DONE_REQ    128'h00000000_00000000_00000010_00294012
 `define MB_LR_DONE_RESP   128'h00000000_00000000_00000010_002A8012
@@ -173,6 +173,212 @@ class seq_mbinit_full extends mbinit_base_seq;
     send_item(.req_valid(1), .req_data(`MB_RM_END_RESP),
               .rsp_valid(1), .rsp_data(`MB_RM_END_REQ),
               .delay(2), .hold(200));
+  endtask
+endclass
+
+// Same as seq_mbinit_full but REPAIRMB allows many s1↔s2 degrade loops (RM-05 driver inject).
+class seq_mbinit_full_rm05 extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_full_rm05)
+
+  function new(string name = "seq_mbinit_full_rm05");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RCLK_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RVAL_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RVAL_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RVAL_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_LR_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_CLR_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_CLR_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RM_START_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_START_REQ),
+              .delay(2), .hold(80));
+    repeat (4) begin
+      send_item(.req_valid(1), .req_data(`MB_RM_DEG_RESP),
+                .rsp_valid(1), .rsp_data(`MB_RM_DEG_REQ),
+                .delay(2), .hold(160));
+    end
+    send_item(.req_valid(1), .req_data(`MB_RM_END_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_END_REQ),
+              .delay(2), .hold(200));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbinit_full_lr04_retry: same as seq_mbinit_full but first REVERSALMB RESULT
+// fails (MB_LR_RES_RESP_FAIL) so requester sets applyLaneReversal and retries CLEAR;
+// second RESULT succeeds (LR-04). LR-03 path still exercised.
+// ============================================================
+class seq_mbinit_full_lr04_retry extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_full_lr04_retry)
+
+  function new(string name = "seq_mbinit_full_lr04_retry");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RCLK_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RVAL_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RVAL_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RVAL_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_DONE_REQ),
+              .delay(5), .hold(30));
+
+    // REVERSALMB — INIT → CLEAR → RESULT (fail) → CLEAR → RESULT (pass) → DONE
+    send_item(.req_valid(1), .req_data(`MB_LR_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_CLR_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_CLR_REQ),
+              .delay(5), .hold(30));
+    // Short hold: SidebandMessageExchanger clears msgReceived when substate changes; a long
+    // FAIL beat can re-qualify as a second resp in RESULT with applyReversal already set → error.
+    send_item(.req_valid(1), .req_data(`MB_LR_RES_RESP_FAIL),
+              .rsp_valid(1), .rsp_data(`MB_LR_RES_REQ),
+              .delay(5), .hold(2));
+    send_item(.req_valid(1), .req_data(`MB_LR_CLR_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_CLR_REQ),
+              .delay(5), .hold(80));
+    send_item(.req_valid(1), .req_data(`MB_LR_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RM_START_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_START_REQ),
+              .delay(2), .hold(80));
+    send_item(.req_valid(1), .req_data(`MB_RM_DEG_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_DEG_REQ),
+              .delay(2), .hold(120));
+    send_item(.req_valid(1), .req_data(`MB_RM_DEG_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_DEG_REQ),
+              .delay(2), .hold(120));
+    send_item(.req_valid(1), .req_data(`MB_RM_END_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RM_END_REQ),
+              .delay(2), .hold(200));
+  endtask
+endclass
+
+// ============================================================
+// seq_mbinit_lr07_reversal_double_fail: MBINIT through REVERSALMB with two failing RESULTs
+// separated by CLEAR after the first fail (applyLaneReversal latched). Second fail with
+// apply=1 triggers requester errorDetected (MBInitSM); MBINIT-only TB sees fsmCtrl_error
+// (LR-07 / TRAINERROR path in fused LTSM not exercised here).
+// ============================================================
+class seq_mbinit_lr07_reversal_double_fail extends mbinit_base_seq;
+  `uvm_object_utils(seq_mbinit_lr07_reversal_double_fail)
+
+  function new(string name = "seq_mbinit_lr07_reversal_double_fail");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    send_item(.start_fsm(1), .delay(2), .hold(2));
+
+    send_item(.req_valid(1), .req_data(`MB_PARAM_RESP),
+              .rsp_valid(1), .rsp_data(`MB_PARAM_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_CAL_RESP),
+              .rsp_valid(1), .rsp_data(`MB_CAL_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RCLK_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RCLK_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RCLK_DONE_REQ),
+              .delay(5), .hold(30));
+
+    send_item(.req_valid(1), .req_data(`MB_RVAL_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RVAL_RES_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_RES_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_RVAL_DONE_RESP),
+              .rsp_valid(1), .rsp_data(`MB_RVAL_DONE_REQ),
+              .delay(5), .hold(30));
+
+    // REVERSALMB — INIT → CLEAR → RESULT (fail) → CLEAR → RESULT (fail again) → stop
+    send_item(.req_valid(1), .req_data(`MB_LR_INIT_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_INIT_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_CLR_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_CLR_REQ),
+              .delay(5), .hold(30));
+    send_item(.req_valid(1), .req_data(`MB_LR_RES_RESP_FAIL),
+              .rsp_valid(1), .rsp_data(`MB_LR_RES_REQ),
+              .delay(5), .hold(2));
+    send_item(.req_valid(1), .req_data(`MB_LR_CLR_RESP),
+              .rsp_valid(1), .rsp_data(`MB_LR_CLR_REQ),
+              .delay(5), .hold(80));
+    send_item(.req_valid(1), .req_data(`MB_LR_RES_RESP_FAIL),
+              .rsp_valid(1), .rsp_data(`MB_LR_RES_REQ),
+              .delay(5), .hold(2));
   endtask
 endclass
 

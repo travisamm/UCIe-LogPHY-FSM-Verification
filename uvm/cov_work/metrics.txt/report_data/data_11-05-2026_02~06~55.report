@@ -1,0 +1,187 @@
+00000000000000028235[]
+
+[{"title": "   ", "lazy": true, "folder": true}][{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"Verification Metrics","All Average Grd":"20.59%","All Cov":"61 / 93 (65.59%)","Assertion Status Grd":"0%","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"Types","All Average Grd":"41.17%","All Cov":"61 / 92 (66.3%)","Assertion Status Grd":"0%","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"$unit","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"uvm_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"logphy_agent_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_agent_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_env_pkg","All Average Grd":"82.34%","All Cov":"61 / 91 (67.03%)","Assertion Status Grd":"n/a","cov_data":"covData0.json"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_seq_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_test_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"logphy_if","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_state_sync_sva","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Assertion Status Grd":"0%","cov_data":"covData1.json"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_tb_top","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_if","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"MBInitSM","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"MBInitRequester","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"MBInitResponder","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_bind_exports","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+]}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"Instances","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Assertion Status Grd":"0%","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"$unit","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"uvm_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"uvm_test_top","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"env","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"coverage","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+]}
+]}
+]}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"logphy_agent_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_agent_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_env_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_seq_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_test_pkg","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"logphy_if","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_state_sync_sva","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Assertion Status Grd":"0%","cov_data":"covData2.json"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_tb_top","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"vif","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"dut","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a","children"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"requester","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"responder","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"u_mbinit_bind_exports","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Assertion Status Grd":"n/a"}
+]}
+]}
+]}
+]}
+]
+{"cover_group_items"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mbinit_coverage::mbinit_cg","All Average Grd":"82.34%","All Cov":"61 / 91 (67.03%)","Enclosing Entity":"mbinit_env_pkg","Source":"  covergroup mbinit_cg with function sample(mbinit_transaction t);"
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_neg_valid","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"90","At Least":"1","Source":"    // MP-01/02/03/06: PARAM negotiation"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"5","At Least":"1","Source":"    cp_neg_valid: coverpoint t.negotiatedPhySettings_valid {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_neg_max_rate","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":"    }"
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"rate_set","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"90","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"no_rate","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"5","At Least":"1","Source":"    cp_neg_max_rate: coverpoint t.negotiated_maxDataRate {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_neg_clk_mode","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":"    }"
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mode_1","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"90","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"mode_0","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"5","At Least":"1","Source":"    cp_neg_clk_mode: coverpoint t.negotiated_clockMode {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_interop_fail","At Least":"1","All Average Grd":"50%","All Cov":"1 / 2 (50%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":"    // MP-04: Interoperable params not found ￢ﾆﾒ error"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"95","At Least":"1","Source":"    cp_interop_fail: coverpoint t.interoperableParamsNotFound {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_fsm_state","At Least":"1","All Average Grd":"100%","All Cov":"7 / 7 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"PARAM","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"8","At Least":"1","Source":"    // FSM state coverage (MC-01/02, RC-05, RV-07, LR-01/06, RM-08)"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"CAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"7","At Least":"1","Source":"    cp_fsm_state: coverpoint t.currentState {"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"REPAIRCLK","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"17","At Least":"1","Source":"      bins PARAM      = {0};"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"REPAIRVAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"16","At Least":"1","Source":"      bins CAL        = {1};"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"REVERSALMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":"      bins REPAIRCLK  = {2};"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"REPAIRMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"20","At Least":"1","Source":"      bins REPAIRVAL  = {3};"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"TOMBTRAIN","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"6","At Least":"1","Source":"      bins REVERSALMB = {4};"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_tx_clk_en","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"74","At Least":"1","Source":"    // RC-01: Lane enables"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":"    cp_tx_clk_en: coverpoint t.mbLaneCtrl_txClkEn {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_rx_clk_en","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":"    }"
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"74","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":"    cp_rx_clk_en: coverpoint t.mbLaneCtrl_rxClkEn {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_tx_data_en","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":"    }"
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"all_enabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"57","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"38","At Least":"1","Source":"    cp_tx_data_en: coverpoint t.mbLaneCtrl_txDataEn {"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"partial","All Average Grd":"n/a","All Cov":"0 / 0 (n/a)","Score":"0","At Least":"0","Source":"      bins all_enabled = {16'hFFFF};"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_pattern_writer","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"54","At Least":"1","Source":"    // RC-02/RV-03/LR-02/RM-01: Pattern writer used"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"41","At Least":"1","Source":"    cp_pattern_writer: coverpoint t.usingPatternWriter {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_pattern_writer_type","At Least":"1","All Average Grd":"75%","All Cov":"3 / 4 (75%)","Source":"    }"
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"type_0","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"9","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"type_1","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"80","At Least":"1","Source":"    cp_pattern_writer_type: coverpoint t.patternWriter_patternType {"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"type_2","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"6","At Least":"1","Source":"      bins type_0 = {0};"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"type_3","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":"      bins type_1 = {1};"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_pattern_reader","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"78","At Least":"1","Source":"    // LR-03/RM-02: pattern reader / Tx point-test activity (RM-02: scoreboard + `test_mbinit_rm02_per_lane_reader`)"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"17","At Least":"1","Source":"    cp_pattern_reader: coverpoint t.usingPatternReader {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_pttest_start","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"started","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"4","At Least":"1","Source":"    // RC-02: Point test start"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"idle","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"91","At Least":"1","Source":"    cp_pttest_start: coverpoint t.txPtTest_start {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_tx_valid_en","At Least":"1","All Average Grd":"100%","All Cov":"2 / 2 (100%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"66","At Least":"1","Source":"    // RV-02: Data lanes held low during valid repair"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"29","At Least":"1","Source":"    cp_tx_valid_en: coverpoint t.mbLaneCtrl_txValidEn {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cp_lane_reversal","At Least":"1","All Average Grd":"50%","All Cov":"1 / 2 (50%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"reversed","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":"    // LR-04: Lane reversal detection"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"not_reversed","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"95","At Least":"1","Source":"    cp_lane_reversal: coverpoint t.applyLaneReversal {"}
+],"columns":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cx_interop_error","At Least":"1","All Average Grd":"50%","All Cov":"7 / 14 (50%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"interop_fail_in_param","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":"    // MP-04 cross: interop failure must cause fsm error"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed;CAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed;REPAIRCLK","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed;REPAIRVAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed;REVERSALMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed;REPAIRMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"failed;TOMBTRAIN","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;PARAM","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"8","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;CAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"7","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;REPAIRCLK","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"17","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;REPAIRVAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"16","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;REVERSALMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;REPAIRMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"20","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"success;TOMBTRAIN","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"6","At Least":"1","Source":""}
+],"columns":"cp_interop_fail;cp_fsm_state"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cx_neg_valid_in_param","At Least":"1","All Average Grd":"57.14%","All Cov":"8 / 14 (57.14%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"negotiated","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"3","At Least":"1","Source":"    // FSM progression: PARAM → CAL → REPAIRCLK → REPAIRVAL → REVERSALMB → REPAIRMB → TOMBTRAIN"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid;CAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"7","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid;REPAIRCLK","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"17","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid;REPAIRVAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"16","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid;REVERSALMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid;REPAIRMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"20","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"valid;TOMBTRAIN","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"6","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;PARAM","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"5","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;CAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;REPAIRCLK","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;REPAIRVAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;REVERSALMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;REPAIRMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"invalid;TOMBTRAIN","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+],"columns":"cp_neg_valid;cp_fsm_state"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cx_clk_en_in_repairclk","At Least":"1","All Average Grd":"50%","All Cov":"7 / 14 (50%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"clk_enabled_repairclk","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"17","At Least":"1","Source":"    // RC-01 cross: clk lanes enabled in REPAIRCLK"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled;PARAM","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled;CAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled;REPAIRVAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"16","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled;REVERSALMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled;REPAIRMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"20","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"enabled;TOMBTRAIN","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;PARAM","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"8","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;CAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"7","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;REPAIRCLK","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;REPAIRVAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;REVERSALMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;REPAIRMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"disabled;TOMBTRAIN","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"6","At Least":"1","Source":""}
+],"columns":"cp_tx_clk_en;cp_fsm_state"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"cx_pw_in_repairclk","At Least":"1","All Average Grd":"50%","All Cov":"7 / 14 (50%)","Source":""
+,"subitems":[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"pw_active_repairclk","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"17","At Least":"1","Source":"    // RC-02 cross: pattern writer active in REPAIRCLK"}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active;PARAM","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active;CAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active;REPAIRVAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"16","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active;REVERSALMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"21","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active;REPAIRMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"active;TOMBTRAIN","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;PARAM","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"8","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;CAL","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"7","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;REPAIRCLK","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;REPAIRVAL","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;REVERSALMB","All Average Grd":"0%","All Cov":"0 / 1 (0%)","Score":"0","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;REPAIRMB","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"20","At Least":"1","Source":""}
+,{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"inactive;TOMBTRAIN","All Average Grd":"100%","All Cov":"1 / 1 (100%)","Score":"6","At Least":"1","Source":""}
+],"columns":"cp_pattern_writer;cp_fsm_state"}
+]}
+]
+}
+{"assertion_items"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"a_state_sync","All Average Grd":"0%","Assertion Status Grd":"0%","Enclosing Entity":"mbinit_state_sync_sva","Source":"  a_state_sync: assert property (p_state_sync)"}
+]}
+{"assertion_items"
+:[{"expanded":false,"Exclusion Rule Type":"None","UNR":"none","title":"a_state_sync","All Average Grd":"0%","Assertion Status Grd":"0%","Enclosing Entity":"mbinit_state_sync_sva","Source":"  a_state_sync: assert property (p_state_sync)"}
+]}
+{"covData1.json":{"start":27715,"end":27975},"resources/report/lazy.json":{"start":23,"end":72},"resources/report/empty.json":{"start":20,"end":23},"covData2.json":{"start":27975,"end":28235},"tree.json":{"start":72,"end":6107},"covData0.json":{"start":6107,"end":27715}}

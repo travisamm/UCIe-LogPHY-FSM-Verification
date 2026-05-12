@@ -7,7 +7,10 @@ make mbinit MBTEST=test_mbinit_param_mismatch
 make mbinit MBTEST=test_mbinit_param_only
 make mbinit MBTEST=test_mbinit_cal
 make mbinit MBTEST=test_mbinit_repairclk
-make mbinit_regress                          # runs sanity, mismatch, param_only, cal, repairclk, repairclk_unrep, repairval
+make mbinit_all                              # all MBINIT UVM tests (same list as mbinit_regress); logs in run_logs/mbinit
+make mbinit_regress                          # alias for mbinit_all
+Optional REPAIRMB requester trace (FIRRTL names; only while currentState==REPAIRMB):
+  make mbinit MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG' MBTEST=test_mbinit_rm05_post_repair_persist
 
 Run MBTRAIN:
 make mbtrain                                 # default: mbtrain_base_test
@@ -188,6 +191,49 @@ module mbinit_tb_top;
     .io_txPtTestRespInterfaceIo_done       (vif.txPtTestRespIo_done),
     .io_txPtTestRespInterfaceIo_start      (vif.txPtTestRespIo_start)
   );
+
+`ifdef MBINIT_RM05_DEBUG
+  // Hierarchical probe: MBInitRequester (see MBInitRequester.sv). Gated by +define+MBINIT_RM05_DEBUG.
+  logic [10:0] rm05_dbg_prev;
+
+  always_ff @(posedge clock) begin
+    automatic logic [10:0] p;
+    if (reset)
+      rm05_dbg_prev <= '1;
+    else begin
+      p = {
+        dut.requester.currentState,
+        dut.requester.substateReg,
+        dut.requester.faultInLowerLanes,
+        dut.requester.faultInUpperLanes,
+        dut.requester.allLanesFailed,
+        dut.requester._sbMsgExchanger_io_msgSent,
+        dut.requester.errorDetectedWire
+      };
+      if (dut.requester.currentState == 3'h5) begin
+        if (p != rm05_dbg_prev) begin
+          $display(
+            "[MBINIT_RM05_DBG] %0t REPAIRMB subst=%0d fl=%b fu=%b alf=%b msgSent=%b errWire=%b ltf=%0d ptStart=%b ptValid=%b twc=%b fsm_err=%b",
+            $time,
+            dut.requester.substateReg,
+            dut.requester.faultInLowerLanes,
+            dut.requester.faultInUpperLanes,
+            dut.requester.allLanesFailed,
+            dut.requester._sbMsgExchanger_io_msgSent,
+            dut.requester.errorDetectedWire,
+            dut.requester.localTxFunctionalLanesReg,
+            dut.requester.io_txPtTestReqInterfaceIo_start,
+            dut.requester.io_txPtTestReqInterfaceIo_ptTestResults_valid,
+            dut.requester.io_txWidthChanged,
+            vif.fsmCtrl_error);
+          rm05_dbg_prev <= p;
+        end
+      end
+      else
+        rm05_dbg_prev <= '1;
+    end
+  end
+`endif
 
   initial begin
     uvm_config_db#(virtual mbinit_if)::set(null, "*", "mbinit_vif", vif);

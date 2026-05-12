@@ -7,8 +7,21 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
   virtual mbinit_if vif;
   logic prev_mb_init_cal_start;
   logic prev_pattern_reader_req_done;
+  logic prev_tx_pt_start;
   // Pulses mbInitCalDone this many cycles after each rising edge of mbInitCalStart
   int unsigned cal_done_repeat_cycles = 3;
+  // Last seq item fields for patternReader response (sticky across idle cycles)
+  logic [15:0] sticky_pr_per_lane;
+  logic        sticky_pr_aggregate;
+  // Last seq item: Tx point test per-lane result bits (sticky)
+  logic [15:0] sticky_pt_results;
+  // RM-02: first Tx point-test result beat in REPAIRMB uses heterogeneous per-lane bits (TB proxy)
+  bit          rm02_mixed_pt_first;
+  // RM-07: first REPAIRMB Tx point-test returns all-lane faults → allLanesFailed → fsmCtrl_error
+  bit          rm07_first_repairmb_pt_all_fault;
+  // RM-05: first PT upper-half faults only (width degrade), second PT all faults → error (mutually exclusive with RM-02/07 in tests)
+  bit          rm05_post_repair_pt_sequence;
+  int unsigned rm02_repairmb_pt_idx;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -18,11 +31,19 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
     super.build_phase(phase);
     if (!uvm_config_db#(virtual mbinit_if)::get(this, "", "mbinit_vif", vif))
       `uvm_fatal("NO_VIF", {"virtual interface must be set for: ", get_full_name(), ".vif"});
+    sticky_pr_per_lane   = 16'hFFFF;
+    sticky_pr_aggregate  = 1'b1;
+    sticky_pt_results    = 16'h0000;
+    rm02_mixed_pt_first           = 1'b0;
+    rm07_first_repairmb_pt_all_fault = 1'b0;
+    rm05_post_repair_pt_sequence  = 1'b0;
+    rm02_repairmb_pt_idx          = 0;
   endfunction
 
   task run_phase(uvm_phase phase);
     prev_mb_init_cal_start = 1'b0;
     prev_pattern_reader_req_done = 1'b0;
+    prev_tx_pt_start = 1'b0;
 
     // Idle defaults
     vif.fsmCtrl_start                  = 0;
@@ -102,8 +123,8 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
         @(posedge vif.clock);
         if (vif.patternReaderIo_req_bits_done && !prev_pattern_reader_req_done) begin
           vif.patternReaderIo_resp_valid = 1;
-          vif.patternReaderIo_resp_bits_perLaneStatusBits = 16'hFFFF;
-          vif.patternReaderIo_resp_bits_aggregateStatus   = 1'b1;
+          vif.patternReaderIo_resp_bits_perLaneStatusBits = sticky_pr_per_lane;
+          vif.patternReaderIo_resp_bits_aggregateStatus   = sticky_pr_aggregate;
           @(posedge vif.clock);
           vif.patternReaderIo_resp_valid = 0;
         end
@@ -112,14 +133,41 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
 
       // Auto-stub: TxPtTest Requester done
       forever begin
-        @(posedge vif.clock iff vif.txPtTestReqIo_start);
-        repeat (3) @(posedge vif.clock);
-        vif.txPtTestReqIo_done               = 1;
-        vif.txPtTestReqIo_ptTestResults_valid = 1;
-        vif.txPtTestReqIo_ptTestResults_bits  = 16'h0000;
         @(posedge vif.clock);
-        vif.txPtTestReqIo_done               = 0;
-        vif.txPtTestReqIo_ptTestResults_valid = 0;
+        if (vif.currentState != 3'h5)
+          rm02_repairmb_pt_idx = 0;
+        if (vif.txPtTestReqIo_start && !prev_tx_pt_start) begin
+          repeat (3) @(posedge vif.clock);
+          begin
+            logic [15:0] ptb;
+            #0;
+            if (vif.currentState == 3'h5) begin
+              if (rm07_first_repairmb_pt_all_fault && rm02_repairmb_pt_idx == 0)
+                ptb = 16'hFFFF; // faults on all lanes → allLanesFailed → REPAIRMB error path
+              else if (rm05_post_repair_pt_sequence) begin
+                if (rm02_repairmb_pt_idx == 0)
+                  ptb = 16'hFF00; // upper half only → width degrade, loop PT (RM-05)
+                else
+                  ptb = 16'hFFFF; // after repair attempt, faults persist → error
+              end
+              else if (rm02_mixed_pt_first && rm02_repairmb_pt_idx == 0)
+                ptb = 16'h0FF0; // mixed pass(1)/fail(0) across lanes for RM-02 witness
+              else
+                ptb = sticky_pt_results;
+            end
+            else
+              ptb = sticky_pt_results;
+            vif.txPtTestReqIo_done               = 1;
+            vif.txPtTestReqIo_ptTestResults_valid = 1;
+            vif.txPtTestReqIo_ptTestResults_bits  = ptb;
+            @(posedge vif.clock);
+            vif.txPtTestReqIo_done               = 0;
+            vif.txPtTestReqIo_ptTestResults_valid = 0;
+            if (vif.currentState == 3'h5)
+              rm02_repairmb_pt_idx++;
+          end
+        end
+        prev_tx_pt_start = vif.txPtTestReqIo_start;
       end
 
       // Auto-stub: TxPtTest Responder done
@@ -135,6 +183,9 @@ class mbinit_driver extends uvm_driver #(mbinit_transaction);
 
   task drive_item(mbinit_transaction req);
     cal_done_repeat_cycles = req.cal_done_repeat_cycles;
+    sticky_pr_per_lane  = req.patternReader_perLaneStatusBits;
+    sticky_pr_aggregate = req.patternReader_aggregateStatus;
+    sticky_pt_results     = req.pt_test_results_bits;
     if (req.delay > 0) begin
       vif.requesterSbLaneIo_rx_valid = 0;
       vif.responderSbLaneIo_rx_valid = 0;

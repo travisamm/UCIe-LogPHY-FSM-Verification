@@ -28,6 +28,8 @@ class mbinit_transaction extends logphy_transaction;
   // PatternReader result (TB simulates; all lanes pass by default)
   rand logic [15:0] patternReader_perLaneStatusBits;
   rand logic        patternReader_aggregateStatus;
+  // Tx point-test result bits (requester stub; default all-zero / no fault)
+  rand logic [15:0] pt_test_results_bits;
 
   // --- Additional MBINIT observations ---
   logic [2:0]  currentState;
@@ -47,7 +49,16 @@ class mbinit_transaction extends logphy_transaction;
   logic [1:0]  patternWriter_patternType;
   logic        patternReader_req_valid;
   logic [1:0]  patternReader_patternType;
+  // TB→DUT patternReader response (observed on vif)
+  logic        patternReader_resp_valid;
+  logic [15:0] patternReader_resp_perLaneBits;
+  logic        patternReader_resp_aggregate;
   logic        txPtTest_start;
+  // Rising edge of io_txWidthChanged (REPAIRMB width degrade)
+  logic        tx_width_changed_pulse;
+  // TB→DUT Tx point-test results (observed on vif; RM-02 witness in REPAIRMB)
+  logic        txPtTest_results_valid;
+  logic [15:0] txPtTest_results_bits;
 
   // Lane control observations (XC-05)
   logic [15:0] mbLaneCtrl_txDataEn;
@@ -71,6 +82,7 @@ class mbinit_transaction extends logphy_transaction;
     `uvm_field_int(cal_done_repeat_cycles,         UVM_ALL_ON)
     `uvm_field_int(patternReader_perLaneStatusBits, UVM_ALL_ON)
     `uvm_field_int(patternReader_aggregateStatus,   UVM_ALL_ON)
+    `uvm_field_int(pt_test_results_bits,            UVM_ALL_ON)
   `uvm_object_utils_end
 
   function new(string name = "mbinit_transaction");
@@ -86,6 +98,7 @@ class mbinit_transaction extends logphy_transaction;
     mbInitCalDone                   = 0;
     patternReader_perLaneStatusBits = 16'hFFFF; // all lanes pass
     patternReader_aggregateStatus   = 1;
+    pt_test_results_bits            = 16'h0000;
   endfunction
 
 endclass

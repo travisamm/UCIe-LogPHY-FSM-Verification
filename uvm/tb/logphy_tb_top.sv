@@ -22,13 +22,16 @@ module logphy_tb_top;
   // Interface instance
   logphy_if vif(clock, reset);
 
+  // fsmCtrl_error is hardcoded 0 inside SBInitSM (not exposed as a port); tie the interface wire so
+  // the monitor never samples X and cp_fsm_error.no_error is reachable.
+  assign vif.fsmCtrl_error = 1'b0;
+
   // DUT instantiation
+  // SBInitSM exposes only io_fsmCtrl_{start,done}; substateTransitioning/error are tied inside RTL.
   SBInitSM dut (
     .clock(clock),
     .reset(reset),
     .io_fsmCtrl_start(vif.fsmCtrl_start),
-    .io_fsmCtrl_substateTransitioning(vif.fsmCtrl_substateTransitioning),
-    .io_fsmCtrl_error(vif.fsmCtrl_error),
     .io_fsmCtrl_done(vif.fsmCtrl_done),
     .io_sbRxTxMode(vif.sbRxTxMode),
     .io_requesterSbLaneIo_tx_ready(vif.requesterSbLaneIo_tx_ready),
