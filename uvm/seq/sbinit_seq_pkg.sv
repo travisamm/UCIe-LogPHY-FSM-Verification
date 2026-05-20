@@ -1,4 +1,15 @@
-// The Makefile compiles ./seq/logphy_seq_pkg.sv, which contains the
-// `sbinit_seq_pkg` payload. This file exists as a placeholder so the
-// directory layout matches the design document. Do not `include or compile
-// this file — the canonical package definition is in logphy_seq_pkg.sv.
+`ifndef SBINIT_SEQ_PKG_SV
+`define SBINIT_SEQ_PKG_SV
+
+package sbinit_seq_pkg;
+  import uvm_pkg::*;
+  `include "uvm_macros.svh"
+  import sbinit_agent_pkg::*;
+  import sbinit_msg_pkg::*;
+
+  `include "sbinit_base_vseq.sv"
+  `include "sbinit_seq.sv"
+
+endpackage
+
+`endif

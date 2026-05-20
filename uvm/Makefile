@@ -39,10 +39,10 @@ sbinit:
           -y ../elab/generatedVerilog/logphy +libext+.sv \
           ../elab/generatedVerilog/logphy/SBInitSM.sv \
           ./if/logphy_if.sv \
-          ./agent/logphy_agent_pkg.sv \
-          ./env/logphy_env_pkg.sv \
-          ./seq/logphy_seq_pkg.sv \
-          ./tests/logphy_test_pkg.sv \
+          ./agent/sbinit_agent_pkg.sv \
+          ./env/sbinit_env_pkg.sv \
+          ./seq/sbinit_seq_pkg.sv \
+          ./tests/sbinit_test_pkg.sv \
           ./tb/logphy_tb_top.sv \
           ./tb/logphy_sva.sv \
           +UVM_TESTNAME=$(SBTEST) || true
@@ -323,10 +323,10 @@ cov_sbinit:
 	    -y ../elab/generatedVerilog/logphy +libext+.sv \
 	    ../elab/generatedVerilog/logphy/SBInitSM.sv \
 	    ./if/logphy_if.sv \
-	    ./agent/logphy_agent_pkg.sv \
-	    ./env/logphy_env_pkg.sv \
-	    ./seq/logphy_seq_pkg.sv \
-	    ./tests/logphy_test_pkg.sv \
+	    ./agent/sbinit_agent_pkg.sv \
+	    ./env/sbinit_env_pkg.sv \
+	    ./seq/sbinit_seq_pkg.sv \
+	    ./tests/sbinit_test_pkg.sv \
 	    ./tb/logphy_tb_top.sv \
 	    ./tb/logphy_sva.sv \
 	    +UVM_TESTNAME=$$test || true; \

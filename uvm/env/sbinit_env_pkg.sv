@@ -1,4 +1,18 @@
-// The Makefile compiles ./env/logphy_env_pkg.sv, which contains the
-// `sbinit_env_pkg` payload. This file exists as a placeholder so the
-// directory layout matches the design document. Do not `include or compile
-// this file — the canonical package definition is in logphy_env_pkg.sv.
+`ifndef SBINIT_ENV_PKG_SV
+`define SBINIT_ENV_PKG_SV
+
+package sbinit_env_pkg;
+  import uvm_pkg::*;
+  `include "uvm_macros.svh"
+  import sbinit_agent_pkg::*;
+  import sbinit_msg_pkg::*;
+
+  `include "sbinit_env_cfg.sv"
+  `include "sbinit_virtual_sequencer.sv"
+  `include "../coverage/sbinit_coverage.sv"
+  `include "sbinit_scoreboard.sv"
+  `include "sbinit_env.sv"
+
+endpackage
+
+`endif

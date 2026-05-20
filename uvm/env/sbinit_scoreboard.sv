@@ -1,6 +1,19 @@
 `ifndef SBINIT_SCOREBOARD_SV
 `define SBINIT_SCOREBOARD_SV
 
+// ---------------------------------------------------------------------------
+// sbinit_scoreboard
+// ---------------------------------------------------------------------------
+// Watches the requester and responder analysis streams from the two SBINIT
+// agents, tracks which protocol requirements were witnessed, and produces a
+// single human-readable summary at end-of-test. Per-event chatter is kept at
+// UVM_HIGH or higher so that UVM_LOW logs read like a test result, not a
+// trace.
+//
+// Each requirement carries an internal short code (sb_01..09) for code
+// clarity, but the test log only ever uses the descriptive name.
+// ---------------------------------------------------------------------------
+
 class sbinit_scoreboard extends uvm_scoreboard;
   `uvm_component_utils(sbinit_scoreboard)
 
@@ -11,7 +24,21 @@ class sbinit_scoreboard extends uvm_scoreboard;
 
   sbinit_env_cfg cfg;
 
-  // SBINIT verification witnesses
+  // -------- requirement names (human-readable) ---------------------------
+  // Used in both per-event chatter and the end-of-test summary.
+  static const string REQ_NAME_CLK_PATTERN        = "DUT transmits 64-UI clock pattern";
+  static const string REQ_NAME_RX_SAMPLING        = "Partner clock pattern sampled by DUT";
+  static const string REQ_NAME_STOP_ON_DETECT     = "DUT stops transmitting clock pattern after detection";
+  static const string REQ_NAME_TIMEOUT_TRAINERROR = "FSM timeout to TRAINERROR when no pattern detected";
+  static const string REQ_NAME_MODE_TRANSITION    = "Sideband mode transitions to functional";
+  static const string REQ_NAME_OUT_OF_RESET       = "DUT emits SBINIT Out-of-Reset message";
+  static const string REQ_NAME_DONE_HANDSHAKE     = "SBINIT done req/resp handshake completes before exit";
+  static const string REQ_NAME_IGNORE_EARLY       = "DUT ignores early SBINIT done req";
+  static const string REQ_NAME_COLLAPSE_REQS      = "DUT collapses multiple SBINIT done reqs into one resp";
+  static const string REQ_NAME_FSM_DONE           = "fsmCtrl_done asserts at end of SBINIT";
+  static const string REQ_NAME_FSM_ERROR          = "fsmCtrl_error asserts on the error path";
+
+  // -------- witnesses ----------------------------------------------------
   bit saw_clock_pattern;
   bit saw_rx_clock_pattern;
   bit saw_sbinit_done;
@@ -44,7 +71,7 @@ class sbinit_scoreboard extends uvm_scoreboard;
     rsp_fifo   = new("rsp_fifo",   this);
 
     if (!uvm_config_db#(sbinit_env_cfg)::get(this, "", "cfg", cfg)) begin
-      `uvm_info("SBINIT_SB", "No cfg in config_db; using defaults", UVM_LOW)
+      `uvm_info("SBINIT_SB", "No cfg in config_db; using default expectations", UVM_MEDIUM)
       cfg = sbinit_env_cfg::type_id::create("cfg");
     end
   endfunction
@@ -89,185 +116,295 @@ class sbinit_scoreboard extends uvm_scoreboard;
     join_none
   endtask
 
+  // -------------------------------------------------------------------
+  // Per-event processing
+  //
+  // All per-event chatter sits at UVM_HIGH or higher: those edges are
+  // useful when debugging a failure but useless when a test passes.
+  // -------------------------------------------------------------------
   task process_req(sbinit_req_transaction tx);
-    // SB-01: 64-UI clock pattern on TX
+    // Clock-pattern emission on requester TX.
     if (tx.tx_valid && (tx.tx_data == SBINIT_CLK_PATTERN_A  ||
                         tx.tx_data == SBINIT_CLK_PATTERN_A5 ||
                         tx.tx_data == SBINIT_CLK_PATTERN_5A ||
                         tx.tx_data == SBINIT_CLK_PATTERN_5)) begin
       if (!saw_clock_pattern) begin
-        `uvm_info("SBINIT_SB", "SB-01 Verified: Detected 64-UI clock pattern on TX data", UVM_LOW)
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_CLK_PATTERN},
+                  UVM_HIGH)
         saw_clock_pattern = 1;
       end
     end else if (saw_clock_pattern && !sb_03_verified) begin
-      // SB-03: after seeing clock pattern, the DUT stops sending it
       if (saw_rx_clock_pattern) begin
-        `uvm_info("SBINIT_SB", "SB-03 Verified: DUT stopped sending clock pattern after pattern detection", UVM_LOW)
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_STOP_ON_DETECT},
+                  UVM_HIGH)
         sb_03_verified = 1;
       end
     end
 
-    // SB-02 prerequisite: track that TB has driven its clock pattern on the requester RX
-    if (tx.rx_valid && tx.rx_data == SBINIT_CLK_PATTERN_5) begin
+    // Partner clock-pattern arrival on requester RX.
+    if (tx.rx_valid && tx.rx_data == SBINIT_CLK_PATTERN_5)
       saw_rx_clock_pattern = 1;
-    end
 
-    // SB-02 / SB-05: mode transitions to functional sideband
+    // Mode transition: implies both RX sampling and pattern→functional.
     if (saw_clock_pattern && tx.sbRxTxMode == 1) begin
       if (saw_rx_clock_pattern && !sb_02_verified) begin
-        `uvm_info("SBINIT_SB", "SB-02 Verified: DUT successfully sampled incoming SB data patterns with incoming clock", UVM_LOW)
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_RX_SAMPLING},
+                  UVM_HIGH)
         sb_02_verified = 1;
       end
       if (!sb_05_verified) begin
-        `uvm_info("SBINIT_SB", "SB-05 Verified: Transitioned to functional sideband mode", UVM_LOW)
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_MODE_TRANSITION},
+                  UVM_HIGH)
         sb_05_verified = 1;
       end
     end
 
-    // Track TB sending {SBINIT Out of Reset} (on requester RX)
+    // TB drove its own Out-of-Reset on requester RX.
     if (tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR)) begin
+        is_sbinit_msg(tx.rx_data, SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR))
       tb_sent_out_of_reset = 1;
-    end
 
-    // SB-06: DUT sends {SBINIT Out of Reset}
+    // DUT emits Out-of-Reset on requester TX.
     if (tx.tx_valid &&
         is_sbinit_msg(tx.tx_data, SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR)) begin
       if (!sb_06_verified) begin
-        `uvm_info("SBINIT_SB", "SB-06 Verified: DUT sent {SBINIT Out of Reset} message", UVM_LOW)
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_OUT_OF_RESET},
+                  UVM_HIGH)
         sb_06_verified = 1;
       end
     end
 
-    // SB-07: DUT sends {SBINIT done req} on requester TX
+    // Done req emitted on requester TX.
     if (tx.tx_valid &&
-        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE)) begin
-      if (!saw_sbinit_done_req) begin
-        `uvm_info("SBINIT_SB", "SB-07 Partial: DUT sent {SBINIT done req}", UVM_LOW)
-        saw_sbinit_done_req = 1;
-      end
-    end
+        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE))
+      saw_sbinit_done_req = 1;
 
-    // SB-07: TB sends {SBINIT done resp} on requester RX
+    // Done resp received on requester RX.
     if (tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE)) begin
-      if (!saw_sbinit_done_resp) begin
-        `uvm_info("SBINIT_SB", "SB-07 Partial: TB sent {SBINIT done resp}", UVM_LOW)
-        saw_sbinit_done_resp = 1;
-      end
-    end
+        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE))
+      saw_sbinit_done_resp = 1;
 
-    // Track FSM error (currently tied to 0 by RTL)
-    if (tx.fsm_error) begin
-      `uvm_info("SBINIT_SB", "SB-04/FSM Error: Module raised timeout/error flag", UVM_LOW)
+    // FSM error edge (currently tied 0 inside the RTL).
+    if (tx.fsm_error && !fsm_error_raised) begin
+      `uvm_info("SBINIT_SB",
+                "fsmCtrl_error asserted",
+                UVM_MEDIUM)
       fsm_error_raised = 1;
     end
 
-    // FSM done — gate SB-07/SB-08 verification on exit
-    if (tx.fsm_done) begin
-      if (saw_sbinit_done_req && saw_sbinit_done_resp && !sb_07_verified) begin
-        `uvm_info("SBINIT_SB", "SB-07 Verified: DUT sent {SBINIT done req} and waited for {SBINIT done resp} before exiting", UVM_LOW)
+    // FSM done edge — finalize handshake / early-req checks.
+    if (tx.fsm_done && !saw_sbinit_done) begin
+      if (saw_sbinit_done_req && saw_sbinit_done_resp) begin
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_DONE_HANDSHAKE},
+                  UVM_HIGH)
         sb_07_verified = 1;
       end
-
-      if (tb_sent_early_done_req && !dut_sent_early_done_resp && !sb_08_verified) begin
-        `uvm_info("SBINIT_SB", "SB-08 Verified: DUT correctly ignored early {SBINIT done req}", UVM_LOW)
+      if (tb_sent_early_done_req && !dut_sent_early_done_resp) begin
+        `uvm_info("SBINIT_SB",
+                  {"witnessed: ", REQ_NAME_IGNORE_EARLY},
+                  UVM_HIGH)
         sb_08_verified = 1;
-      end
-
-      if (!saw_sbinit_done) begin
-        `uvm_info("SBINIT_SB", "FSM Done: SBINIT sequence completed", UVM_LOW)
       end
       saw_sbinit_done = 1;
     end
   endtask
 
   task process_rsp(sbinit_rsp_transaction tx);
-    // Track TB sending early {SBINIT done req} on responder RX (before Out of Reset went out)
+    // Early {done req} on responder RX (before TB sent Out-of-Reset).
     if (tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE)) begin
-      if (!tb_sent_out_of_reset) begin
-        tb_sent_early_done_req = 1;
-      end
-    end
+        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE) &&
+        !tb_sent_out_of_reset)
+      tb_sent_early_done_req = 1;
 
-    // SB-09: count edge-detected {SBINIT done req} bursts on responder RX after Out of Reset
+    // Edge-detect {done req} bursts on responder RX after Out-of-Reset.
     if (tb_sent_out_of_reset &&
         tx.rx_valid &&
         is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE) &&
         !prev_rsp_done_req_active) begin
       sb_09_done_req_count++;
-      `uvm_info("SBINIT_SB",
-                $sformatf("SB-09 Track: TB sent responder {SBINIT done req} count=%0d", sb_09_done_req_count),
-                UVM_LOW)
     end
     prev_rsp_done_req_active = tb_sent_out_of_reset &&
                                tx.rx_valid &&
                                is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE);
 
-    // SB-08: DUT must NOT emit {SBINIT done resp} before TB has sent Out of Reset
+    // DUT must not respond to an early done req before Out-of-Reset.
     if (tx.tx_valid &&
-        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE)) begin
-      if (tb_sent_early_done_req && !tb_sent_out_of_reset) begin
-        `uvm_error("SBINIT_SB", "SB-08 FAILED: DUT sent {SBINIT done resp} early!")
-        dut_sent_early_done_resp = 1;
-      end
+        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE) &&
+        tb_sent_early_done_req && !tb_sent_out_of_reset) begin
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_IGNORE_EARLY,
+                  "\": DUT sent done resp prematurely"})
+      dut_sent_early_done_resp = 1;
     end
 
-    // SB-09: count accepted {SBINIT done resp} from DUT once multiple done reqs were sent
+    // After multiple done reqs were sent, count accepted done resps.
     if (sb_09_done_req_count > 1 &&
         tx.tx_valid && tx.tx_ready &&
         is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE)) begin
       sb_09_done_resp_count++;
-      `uvm_info("SBINIT_SB",
-                $sformatf("SB-09 Track: DUT accepted responder {SBINIT done resp} count=%0d", sb_09_done_resp_count),
-                UVM_LOW)
     end
   endtask
 
+  // -------------------------------------------------------------------
+  // End-of-test reporting
+  // -------------------------------------------------------------------
+  // Status tag for the summary table.
+  typedef enum {STAT_PASS, STAT_FAIL, STAT_SKIP, STAT_NA} status_e;
+
+  function string status_str(status_e s);
+    case (s)
+      STAT_PASS: return "PASS";
+      STAT_FAIL: return "FAIL";
+      STAT_SKIP: return "skip";
+      STAT_NA:   return "n/a ";
+      default:   return "??? ";
+    endcase
+  endfunction
+
+  // Emit one row of the summary table and return whether it counts as a
+  // FAIL. PASS/SKIP/N/A all return 0; only FAIL returns 1.
+  function bit report_row(string name, bit expected, bit witnessed,
+                          bit not_applicable = 0);
+    status_e s;
+    if (not_applicable)        s = STAT_NA;
+    else if (!expected)        s = STAT_SKIP;
+    else if (witnessed)        s = STAT_PASS;
+    else                       s = STAT_FAIL;
+    `uvm_info("SBINIT_SB",
+              $sformatf("  [ %s ] %s", status_str(s), name),
+              UVM_LOW)
+    return (s == STAT_FAIL);
+  endfunction
+
   function void check_phase(uvm_phase phase);
-    // Derive SB-09 verification from collected counters
+    int unsigned errs_before;
+    int unsigned fail_count;
+    bit          overall_fail;
+
+    errs_before = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
+
+    // Derive SB-09 verification from collected counters before printing.
     if (sb_09_done_req_count > 1) begin
       if (!saw_sbinit_done) begin
-        `uvm_error("SBINIT_SB", "SB-09 FAILED: FSM did not complete after multiple responder {SBINIT done req} messages")
+        `uvm_error("SBINIT_SB",
+                   {"FAILED requirement \"", REQ_NAME_COLLAPSE_REQS,
+                    "\": FSM did not complete after multiple done reqs"})
       end else if (sb_09_done_resp_count == 1) begin
-        `uvm_info("SBINIT_SB", "SB-09 Verified: DUT collapsed multiple {SBINIT done req} messages into one {SBINIT done resp}", UVM_LOW)
         sb_09_verified = 1;
       end else begin
         `uvm_error("SBINIT_SB",
-                   $sformatf("SB-09 FAILED: saw %0d responder done reqs and %0d accepted done resps",
+                   $sformatf("FAILED requirement \"%s\": saw %0d done reqs and %0d done resps",
+                             REQ_NAME_COLLAPSE_REQS,
                              sb_09_done_req_count, sb_09_done_resp_count))
       end
     end
 
-    if (cfg.expect_sb01_clock_pattern && !saw_clock_pattern)
-      `uvm_error("SBINIT_SB", "SB-01 FAILED: DUT never transmitted 64-UI clock pattern")
-    if (cfg.expect_sb02_rx_sampling && !sb_02_verified)
-      `uvm_error("SBINIT_SB", "SB-02 FAILED: sbRxTxMode never went to 1 after incoming pattern")
-    if (cfg.expect_sb03_stop_on_detect && !sb_03_verified)
-      `uvm_error("SBINIT_SB", "SB-03 FAILED: DUT did not stop transmitting after detection")
-    if (cfg.expect_sb05_mode_transition && !sb_05_verified)
-      `uvm_error("SBINIT_SB", "SB-05 FAILED: sbRxTxMode never transitioned to functional sideband")
-    if (cfg.expect_sb06_out_of_reset && !sb_06_verified)
-      `uvm_error("SBINIT_SB", "SB-06 FAILED: DUT never sent {SBINIT Out of Reset} message")
-    if (cfg.expect_sb07_done_handshake && !sb_07_verified)
-      `uvm_error("SBINIT_SB", "SB-07 FAILED: done req/resp handshake not completed before exit")
-    if (cfg.expect_sb08_ignore_early && !sb_08_verified)
-      `uvm_error("SBINIT_SB", "SB-08 FAILED: DUT did not correctly ignore early {SBINIT done req}")
-    if (cfg.expect_sb09_collapse_reqs && !sb_09_verified)
-      `uvm_error("SBINIT_SB", "SB-09 FAILED: DUT did not collapse multiple {SBINIT done req} to one resp")
-    if (cfg.expect_fsm_done && !saw_sbinit_done)
-      `uvm_error("SBINIT_SB", "SBINIT FAILED: fsmCtrl_done never asserted")
-    if (cfg.expect_fsm_error && !fsm_error_raised)
-      `uvm_error("SBINIT_SB", "Expected fsmCtrl_error but it never asserted")
-    if (!cfg.expect_fsm_error && fsm_error_raised)
-      `uvm_error("SBINIT_SB", "Unexpected fsmCtrl_error on success-path test")
+    // -------- summary table --------
+    `uvm_info("SBINIT_SB",
+              "===================================================================",
+              UVM_LOW)
+    `uvm_info("SBINIT_SB",
+              "SBINIT scoreboard summary",
+              UVM_LOW)
+    `uvm_info("SBINIT_SB",
+              "===================================================================",
+              UVM_LOW)
+
+    fail_count = 0;
+    fail_count += report_row(REQ_NAME_CLK_PATTERN,
+                             cfg.expect_sb01_clock_pattern,   saw_clock_pattern);
+    fail_count += report_row(REQ_NAME_RX_SAMPLING,
+                             cfg.expect_sb02_rx_sampling,     sb_02_verified);
+    fail_count += report_row(REQ_NAME_STOP_ON_DETECT,
+                             cfg.expect_sb03_stop_on_detect,  sb_03_verified);
+    // SB-04 timeout is not observable in this RTL (fsmCtrl_error tied 0).
+    fail_count += report_row(REQ_NAME_TIMEOUT_TRAINERROR,
+                             cfg.expect_fsm_error,            fsm_error_raised,
+                             .not_applicable(!cfg.expect_fsm_error));
+    fail_count += report_row(REQ_NAME_MODE_TRANSITION,
+                             cfg.expect_sb05_mode_transition, sb_05_verified);
+    fail_count += report_row(REQ_NAME_OUT_OF_RESET,
+                             cfg.expect_sb06_out_of_reset,    sb_06_verified);
+    fail_count += report_row(REQ_NAME_DONE_HANDSHAKE,
+                             cfg.expect_sb07_done_handshake,  sb_07_verified);
+    fail_count += report_row(REQ_NAME_IGNORE_EARLY,
+                             cfg.expect_sb08_ignore_early,    sb_08_verified);
+    fail_count += report_row(REQ_NAME_COLLAPSE_REQS,
+                             cfg.expect_sb09_collapse_reqs,   sb_09_verified);
+    fail_count += report_row(REQ_NAME_FSM_DONE,
+                             cfg.expect_fsm_done,             saw_sbinit_done);
 
     `uvm_info("SBINIT_SB",
-              $sformatf("Final stats: saw_clock_pattern=%0b, sb_02=%0b, sb_03=%0b, sb_05=%0b, sb_06=%0b, sb_07=%0b, sb_08=%0b, sb_09=%0b, sb_09_req_count=%0d, sb_09_resp_count=%0d, fsm_done=%0b, error=%0b",
-                        saw_clock_pattern, sb_02_verified, sb_03_verified, sb_05_verified, sb_06_verified,
-                        sb_07_verified, sb_08_verified, sb_09_verified,
-                        sb_09_done_req_count, sb_09_done_resp_count, saw_sbinit_done, fsm_error_raised),
+              "-------------------------------------------------------------------",
+              UVM_LOW)
+
+    // Fire any uvm_errors for FAILed expected requirements so the regress
+    // harness picks them up. (The SB-09/SB-08 paths already fire their
+    // own uvm_errors when they fail; these cover the simpler witnesses.)
+    if (cfg.expect_sb01_clock_pattern && !saw_clock_pattern)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_CLK_PATTERN,
+                  "\": never witnessed"})
+    if (cfg.expect_sb02_rx_sampling && !sb_02_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_RX_SAMPLING,
+                  "\": sbRxTxMode never went to 1 after incoming pattern"})
+    if (cfg.expect_sb03_stop_on_detect && !sb_03_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_STOP_ON_DETECT,
+                  "\": DUT kept transmitting after detection"})
+    if (cfg.expect_sb05_mode_transition && !sb_05_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_MODE_TRANSITION,
+                  "\": sbRxTxMode never transitioned to functional"})
+    if (cfg.expect_sb06_out_of_reset && !sb_06_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_OUT_OF_RESET,
+                  "\": DUT never sent Out-of-Reset message"})
+    if (cfg.expect_sb07_done_handshake && !sb_07_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_DONE_HANDSHAKE,
+                  "\": done req/resp handshake not completed before exit"})
+    if (cfg.expect_sb08_ignore_early && !sb_08_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_IGNORE_EARLY,
+                  "\": DUT did not ignore the early done req"})
+    if (cfg.expect_sb09_collapse_reqs && !sb_09_verified)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_COLLAPSE_REQS,
+                  "\": DUT did not collapse multiple done reqs into one resp"})
+    if (cfg.expect_fsm_done && !saw_sbinit_done)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_FSM_DONE,
+                  "\": fsmCtrl_done never asserted"})
+    if (cfg.expect_fsm_error && !fsm_error_raised)
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_FSM_ERROR,
+                  "\": fsmCtrl_error never asserted"})
+    if (!cfg.expect_fsm_error && fsm_error_raised)
+      `uvm_error("SBINIT_SB",
+                 "Unexpected fsmCtrl_error on a success-path test")
+
+    overall_fail = (uvm_report_server::get_server().get_severity_count(UVM_ERROR) > errs_before) ||
+                   (fail_count > 0);
+
+    if (overall_fail) begin
+      `uvm_info("SBINIT_SB",
+                $sformatf("Overall: FAIL  (%0d requirement(s) marked FAIL)", fail_count),
+                UVM_LOW)
+    end else begin
+      `uvm_info("SBINIT_SB",
+                "Overall: PASS  (every expected requirement was witnessed)",
+                UVM_LOW)
+    end
+    `uvm_info("SBINIT_SB",
+              "===================================================================",
               UVM_LOW)
   endfunction
 

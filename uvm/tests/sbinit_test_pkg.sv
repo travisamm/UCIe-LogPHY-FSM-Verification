@@ -1,4 +1,17 @@
-// The Makefile compiles ./tests/logphy_test_pkg.sv, which contains the
-// `sbinit_test_pkg` payload. This file exists as a placeholder so the
-// directory layout matches the design document. Do not `include or compile
-// this file — the canonical package definition is in logphy_test_pkg.sv.
+`ifndef SBINIT_TEST_PKG_SV
+`define SBINIT_TEST_PKG_SV
+
+package sbinit_test_pkg;
+  import uvm_pkg::*;
+  `include "uvm_macros.svh"
+  import sbinit_agent_pkg::*;
+  import sbinit_env_pkg::*;
+  import sbinit_seq_pkg::*;
+  import sbinit_msg_pkg::*;
+
+  `include "sbinit_base_test.sv"
+  `include "sbinit_tests.sv"
+
+endpackage
+
+`endif
