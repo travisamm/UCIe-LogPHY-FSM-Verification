@@ -16,7 +16,7 @@ make sbinit_regress                                 # runs all SBINIT tests in s
 // SB-03: On pattern detection, must stop sending after completing current iteration
 // SB-05: After detection, SB Tx/Rx must be enabled for functional sideband messages
 // SB-07: Must send {SBINIT done req} and wait for {SBINIT done resp} before exiting to MBINIT
-class test_sbinit_sanity extends logphy_base_test;
+class test_sbinit_sanity extends sbinit_base_test;
   `uvm_component_utils(test_sbinit_sanity)
 
   function new(string name, uvm_component parent);
@@ -39,7 +39,7 @@ class test_sbinit_sanity extends logphy_base_test;
 endclass
 
 // SB-04: If pattern not detected, must continue alternating for total of 8ms then timeout to TRAINERROR
-class test_sbinit_timeout extends logphy_base_test;
+class test_sbinit_timeout extends sbinit_base_test;
   // Test should show fsm_done=0, but will not properly error until SBInit.scala line 32
   // is changed so that error is not hardcoded to false.
   `uvm_component_utils(test_sbinit_timeout)
@@ -65,7 +65,7 @@ class test_sbinit_timeout extends logphy_base_test;
 endclass
 
 // SB-06: Must send {SBINIT Out of Reset} sideband message continuously until partner detection
-class test_sbinit_partner_not_ready extends logphy_base_test;
+class test_sbinit_partner_not_ready extends sbinit_base_test;
   `uvm_component_utils(test_sbinit_partner_not_ready)
 
   function new(string name, uvm_component parent);
@@ -88,7 +88,7 @@ class test_sbinit_partner_not_ready extends logphy_base_test;
 endclass
 
 // SB-08: Module partner must ignore received {SBINIT done req} if not ready to proceed
-class test_sbinit_early_req extends logphy_base_test;
+class test_sbinit_early_req extends sbinit_base_test;
   `uvm_component_utils(test_sbinit_early_req)
 
   function new(string name, uvm_component parent);
@@ -111,7 +111,7 @@ class test_sbinit_early_req extends logphy_base_test;
 endclass
 
 // SB-09: Module partner must collapse multiple outstanding {SBINIT done req} messages into single response
-class test_sbinit_multiple_reqs extends logphy_base_test;
+class test_sbinit_multiple_reqs extends sbinit_base_test;
   `uvm_component_utils(test_sbinit_multiple_reqs)
 
   function new(string name, uvm_component parent);
