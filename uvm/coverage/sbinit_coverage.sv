@@ -1,9 +1,7 @@
-class sbinit_coverage extends uvm_component;
+class sbinit_coverage extends uvm_subscriber #(sbinit_req_transaction);
   `uvm_component_utils(sbinit_coverage)
 
-  uvm_analysis_imp #(logphy_transaction, sbinit_coverage) analysis_export;
-
-  covergroup sbinit_cg with function sample(logphy_transaction t);
+  covergroup sbinit_cg with function sample(sbinit_req_transaction t);
     option.per_instance = 1;
     option.name = "sbinit_cg";
     option.cross_auto_bin_max = 0;
@@ -36,19 +34,12 @@ class sbinit_coverage extends uvm_component;
       bins not_done = {0};
     }
 
-    // SB-07: responder SB lane TX (done resp)
-    cp_rsp_tx_valid: coverpoint t.rsp_tx_valid {
-      bins sending = {1};
-      bins idle    = {0};
-    }
-
     // SB-05/SB-07: normal exit — no_error+done.
     // timeout_fail (error+not_done) omitted: error port not exposed by RTL.
     cx_error_vs_done: cross cp_fsm_error, cp_fsm_done {
       bins normal_done = binsof(cp_fsm_error.no_error) &&
                          binsof(cp_fsm_done.done);
     }
-
 
   endgroup : sbinit_cg
 
@@ -57,11 +48,7 @@ class sbinit_coverage extends uvm_component;
     sbinit_cg = new();
   endfunction
 
-  function void build_phase(uvm_phase phase);
-    analysis_export = new("analysis_export", this);
-  endfunction
-
-  function void write(logphy_transaction t);
+  function void write(sbinit_req_transaction t);
     sbinit_cg.sample(t);
     `uvm_info("COVERAGE", "Coverage sampled!", UVM_LOW)
   endfunction
