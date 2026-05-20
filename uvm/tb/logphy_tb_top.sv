@@ -2,7 +2,7 @@
 
 module logphy_tb_top;
   import uvm_pkg::*;
-  import logphy_test_pkg::*;
+  import sbinit_test_pkg::*;
 
   logic clock;
   logic reset;
@@ -50,7 +50,8 @@ module logphy_tb_top;
 
   // Initial UVM config db and start test
   initial begin
-    uvm_config_db#(virtual logphy_if)::set(null, "*", "vif", vif);
+    uvm_config_db#(virtual logphy_if)::set(null, "*", "sbinit_req_vif", vif);
+    uvm_config_db#(virtual logphy_if)::set(null, "*", "sbinit_rsp_vif", vif);
     run_test();
   end
 
