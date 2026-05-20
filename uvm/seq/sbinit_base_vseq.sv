@@ -13,12 +13,12 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
 
   task send_req_item(sbinit_req_transaction t);
     start_item(t, -1, req_seqr);
-    finish_item(t, -1, req_seqr);
+    finish_item(t, -1);
   endtask
 
   task send_rsp_item(sbinit_rsp_transaction t);
     start_item(t, -1, rsp_seqr);
-    finish_item(t, -1, rsp_seqr);
+    finish_item(t, -1);
   endtask
 
   virtual task body();
