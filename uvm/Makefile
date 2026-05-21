@@ -38,7 +38,9 @@ sbinit:
           +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
           -y ../elab/generatedVerilog/logphy +libext+.sv \
           ../elab/generatedVerilog/logphy/SBInitSM.sv \
-          ./if/logphy_if.sv \
+          ./if/sb_ctrl_if.sv \
+          ./if/sb_req_if.sv \
+          ./if/sb_rsp_if.sv \
           ./agent/sbinit_agent_pkg.sv \
           ./env/sbinit_env_pkg.sv \
           ./seq/sbinit_seq_pkg.sv \
@@ -322,7 +324,9 @@ cov_sbinit:
 	    +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
 	    -y ../elab/generatedVerilog/logphy +libext+.sv \
 	    ../elab/generatedVerilog/logphy/SBInitSM.sv \
-	    ./if/logphy_if.sv \
+	    ./if/sb_ctrl_if.sv \
+	    ./if/sb_req_if.sv \
+	    ./if/sb_rsp_if.sv \
 	    ./agent/sbinit_agent_pkg.sv \
 	    ./env/sbinit_env_pkg.sv \
 	    ./seq/sbinit_seq_pkg.sv \

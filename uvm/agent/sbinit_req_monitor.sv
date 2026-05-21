@@ -4,7 +4,8 @@
 class sbinit_req_monitor extends uvm_monitor;
   `uvm_component_utils(sbinit_req_monitor)
 
-  virtual logphy_if vif;
+  virtual sb_req_if  vif;       // requester sideband lane
+  virtual sb_ctrl_if ctrl_vif;  // FSM control (observes done/error/mode/start)
   uvm_analysis_port #(sbinit_req_transaction) req_ap;
 
   function new(string name, uvm_component parent);
@@ -14,8 +15,10 @@ class sbinit_req_monitor extends uvm_monitor;
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    if (!uvm_config_db#(virtual logphy_if)::get(this, "", "sbinit_req_vif", vif))
+    if (!uvm_config_db#(virtual sb_req_if)::get(this, "", "sbinit_req_vif", vif))
       `uvm_fatal("NO_VIF", {"sbinit_req_vif must be set for: ", get_full_name()})
+    if (!uvm_config_db#(virtual sb_ctrl_if)::get(this, "", "sbinit_ctrl_vif", ctrl_vif))
+      `uvm_fatal("NO_VIF", {"sbinit_ctrl_vif must be set for: ", get_full_name()})
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -41,38 +44,38 @@ class sbinit_req_monitor extends uvm_monitor;
     forever begin
       @(posedge vif.clock);
 
-      if ((vif.requesterSbLaneIo_tx_valid !== prev_tx_valid) ||
-          (vif.requesterSbLaneIo_tx_valid && (vif.requesterSbLaneIo_tx_bits_data !== prev_tx_data)) ||
-          (vif.requesterSbLaneIo_rx_valid !== prev_rx_valid) ||
-          (vif.requesterSbLaneIo_rx_valid && (vif.requesterSbLaneIo_rx_bits_data !== prev_rx_data)) ||
-          (vif.requesterSbLaneIo_tx_ready !== prev_tx_ready) ||
-          (vif.sbRxTxMode    !== prev_sb_mode) ||
-          (vif.fsmCtrl_done  !== prev_fsm_done) ||
-          (vif.fsmCtrl_error !== prev_fsm_error) ||
-          vif.fsmCtrl_done   ||
-          vif.fsmCtrl_error) begin
+      if ((vif.tx_valid !== prev_tx_valid) ||
+          (vif.tx_valid && (vif.tx_bits_data !== prev_tx_data)) ||
+          (vif.rx_valid !== prev_rx_valid) ||
+          (vif.rx_valid && (vif.rx_bits_data !== prev_rx_data)) ||
+          (vif.tx_ready !== prev_tx_ready) ||
+          (ctrl_vif.sbRxTxMode    !== prev_sb_mode) ||
+          (ctrl_vif.fsmCtrl_done  !== prev_fsm_done) ||
+          (ctrl_vif.fsmCtrl_error !== prev_fsm_error) ||
+          ctrl_vif.fsmCtrl_done   ||
+          ctrl_vif.fsmCtrl_error) begin
 
         tx = sbinit_req_transaction::type_id::create("tx");
-        tx.tx_valid      = vif.requesterSbLaneIo_tx_valid;
-        tx.tx_data       = vif.requesterSbLaneIo_tx_bits_data;
-        tx.tx_ready      = vif.requesterSbLaneIo_tx_ready;
-        tx.rx_valid      = vif.requesterSbLaneIo_rx_valid;
-        tx.rx_data       = vif.requesterSbLaneIo_rx_bits_data;
-        tx.sbRxTxMode    = vif.sbRxTxMode;
-        tx.fsm_done      = vif.fsmCtrl_done;
-        tx.fsm_error     = vif.fsmCtrl_error;
-        tx.fsmCtrl_start = vif.fsmCtrl_start;
+        tx.tx_valid      = vif.tx_valid;
+        tx.tx_data       = vif.tx_bits_data;
+        tx.tx_ready      = vif.tx_ready;
+        tx.rx_valid      = vif.rx_valid;
+        tx.rx_data       = vif.rx_bits_data;
+        tx.sbRxTxMode    = ctrl_vif.sbRxTxMode;
+        tx.fsm_done      = ctrl_vif.fsmCtrl_done;
+        tx.fsm_error     = ctrl_vif.fsmCtrl_error;
+        tx.fsmCtrl_start = ctrl_vif.fsmCtrl_start;
 
         req_ap.write(tx);
 
-        prev_tx_valid  = vif.requesterSbLaneIo_tx_valid;
-        prev_tx_data   = vif.requesterSbLaneIo_tx_bits_data;
-        prev_rx_valid  = vif.requesterSbLaneIo_rx_valid;
-        prev_rx_data   = vif.requesterSbLaneIo_rx_bits_data;
-        prev_tx_ready  = vif.requesterSbLaneIo_tx_ready;
-        prev_sb_mode   = vif.sbRxTxMode;
-        prev_fsm_done  = vif.fsmCtrl_done;
-        prev_fsm_error = vif.fsmCtrl_error;
+        prev_tx_valid  = vif.tx_valid;
+        prev_tx_data   = vif.tx_bits_data;
+        prev_rx_valid  = vif.rx_valid;
+        prev_rx_data   = vif.rx_bits_data;
+        prev_tx_ready  = vif.tx_ready;
+        prev_sb_mode   = ctrl_vif.sbRxTxMode;
+        prev_fsm_done  = ctrl_vif.fsmCtrl_done;
+        prev_fsm_error = ctrl_vif.fsmCtrl_error;
       end
     end
   endtask

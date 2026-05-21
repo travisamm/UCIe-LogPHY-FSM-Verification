@@ -22,7 +22,8 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
   sbinit_rsp_sequencer rsp_seqr;
 
   // Sampled in pre_body() so derived sequences can wait on protocol events.
-  virtual logphy_if vif;
+  // Only the FSM control bus is needed here (done/error).
+  virtual sb_ctrl_if ctrl_vif;
 
   function new(string name = "sbinit_base_vseq");
     super.new(name);
@@ -30,8 +31,8 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
 
   // -------- protocol-time hooks ------------------------------------------
   virtual task pre_body();
-    if (!uvm_config_db#(virtual logphy_if)::get(null, "*", "sbinit_req_vif", vif))
-      `uvm_fatal("VSEQ", "sbinit_base_vseq: could not get sbinit_req_vif from config_db")
+    if (!uvm_config_db#(virtual sb_ctrl_if)::get(null, "*", "sbinit_ctrl_vif", ctrl_vif))
+      `uvm_fatal("VSEQ", "sbinit_base_vseq: could not get sbinit_ctrl_vif from config_db")
   endtask
 
   // Wait until the DUT raises fsmCtrl_done (or fsmCtrl_error), or a watchdog
@@ -41,7 +42,7 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
     bit timed_out = 0;
     fork
       begin
-        wait (vif.fsmCtrl_done === 1'b1 || vif.fsmCtrl_error === 1'b1);
+        wait (ctrl_vif.fsmCtrl_done === 1'b1 || ctrl_vif.fsmCtrl_error === 1'b1);
       end
       begin
         #(timeout_ns);

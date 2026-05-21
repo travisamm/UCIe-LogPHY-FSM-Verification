@@ -273,6 +273,18 @@ endclass
 //   This vseq is expected to FAIL the new data-stability check (and SB-06)
 //   until the RTL fix lands. It does NOT touch responder back-pressure, so
 //   it does not interact with the SB-09 collapse path.
+//
+//   Structure: with the split interfaces the requester and responder lanes
+//   are independent sequencers, so body() forks a requester-lane thread and
+//   a responder-lane thread. The two run concurrently and rendezvous on the
+//   `oor_exchanged` event so the closing done_resp (req lane) and done_req
+//   (rsp lane) are driven at the same time, the way a real partner would.
+//
+//   TODO(tier1-threading): the back-pressure window below is still expressed
+//   as one inline req item (tx_ready and rx_* are bundled in a single
+//   transaction), so tx_ready cannot be toggled independently of rx_* within
+//   the same lane. Once the driver is split into independent tx-ready / rx
+//   threads, the back-pressure can become its own concurrent sub-sequence.
 // ---------------------------------------------------------------------------
 class sbinit_req_backpressure_vseq extends sbinit_base_vseq;
   `uvm_object_utils(sbinit_req_backpressure_vseq)
@@ -290,62 +302,73 @@ class sbinit_req_backpressure_vseq extends sbinit_base_vseq;
     logic [127:0] out_of_reset;
     logic [127:0] done_resp;
     logic [127:0] done_req;
+    event         oor_exchanged;  // requester rendezvous → responder may close
 
     out_of_reset = make_no_data_msg(SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR);
     done_resp    = make_no_data_msg(SBINIT_MC_DONE_RESP,    SBINIT_SC_DONE);
     done_req     = make_no_data_msg(SBINIT_MC_DONE_REQ,     SBINIT_SC_DONE);
 
-    // 1) Kick FSM and drive partner clock pattern with tx_ready HIGH so the
-    //    DUT's clock-pattern stage progresses normally and ultimately
-    //    transitions into sOUT_OF_RESET.
-    begin
-      sbinit_req_transaction t;
-      t               = sbinit_req_transaction::type_id::create("kick_and_clk");
-      t.fsmCtrl_start = 1;
-      t.rx_valid      = 1;
-      t.rx_data       = SBINIT_CLK_PATTERN_5;
-      t.delay         = 10;
-      t.hold_cycles   = 5;
-      send_req_item(t);
-    end
+    fork
+      // ----- Requester lane: drive protocol + apply the back-pressure window
+      begin : requester_lane
+        // 1) Kick FSM and drive partner clock pattern with tx_ready HIGH so
+        //    the DUT's clock-pattern stage progresses and transitions into
+        //    sOUT_OF_RESET.
+        begin
+          sbinit_req_transaction t;
+          t               = sbinit_req_transaction::type_id::create("kick_and_clk");
+          t.fsmCtrl_start = 1;
+          t.rx_valid      = 1;
+          t.rx_data       = SBINIT_CLK_PATTERN_5;
+          t.delay         = 10;
+          t.hold_cycles   = 5;
+          send_req_item(t);
+        end
 
-    // 2) Brief idle with tx_ready HIGH so fourPatternCounter can reach 3
-    //    and the FSM cleanly enters sOUT_OF_RESET before we back-pressure.
-    begin
-      sbinit_req_transaction t;
-      t             = sbinit_req_transaction::type_id::create("idle_to_oor");
-      t.rx_valid    = 0;
-      t.tx_ready    = 1;
-      t.delay       = 10;
-      t.hold_cycles = 1;
-      send_req_item(t);
-    end
+        // 2) Brief idle with tx_ready HIGH so fourPatternCounter reaches 3
+        //    and the FSM cleanly enters sOUT_OF_RESET before back-pressure.
+        begin
+          sbinit_req_transaction t;
+          t             = sbinit_req_transaction::type_id::create("idle_to_oor");
+          t.rx_valid    = 0;
+          t.tx_ready    = 1;
+          t.delay       = 10;
+          t.hold_cycles = 1;
+          send_req_item(t);
+        end
 
-    // 3) Back-pressure window. tx_ready LOW for `backpressure_hold_cycles`,
-    //    rx_valid LOW so the partner has NOT yet acknowledged the DUT's
-    //    Out-of-Reset. During this window the DUT should hold tx_valid=1
-    //    with tx_data = {SBINIT Out of Reset}; with the RTL bug it holds
-    //    tx_valid=1 with tx_data = 0.
-    begin
-      sbinit_req_transaction t;
-      t             = sbinit_req_transaction::type_id::create("backpressure");
-      t.rx_valid    = 0;
-      t.tx_ready    = 0;
-      t.delay       = 0;
-      t.hold_cycles = backpressure_hold_cycles;
-      send_req_item(t);
-    end
+        // 3) Back-pressure window. tx_ready LOW for backpressure_hold_cycles,
+        //    rx_valid LOW (partner has NOT yet acked). A correct DUT holds
+        //    tx_valid=1 with tx_data={Out of Reset}; the buggy RTL holds
+        //    tx_valid=1 with tx_data=0.
+        begin
+          sbinit_req_transaction t;
+          t             = sbinit_req_transaction::type_id::create("backpressure");
+          t.rx_valid    = 0;
+          t.tx_ready    = 0;
+          t.delay       = 0;
+          t.hold_cycles = backpressure_hold_cycles;
+          send_req_item(t);
+        end
 
-    // 4) Release back-pressure and drive the partner's Out-of-Reset. A
-    //    correct DUT will already have proper tx_data on the bus and the
-    //    handshake completes immediately; a buggy DUT only NOW assigns
-    //    the OoR payload (which may already be too late, since the
-    //    partner's OoR drives outOfResetDetected the same cycle).
-    drive_req_rx(out_of_reset, .delay(5), .hold(5), .tx_ready(1));
+        // 4) Release back-pressure and drive the partner's Out-of-Reset.
+        drive_req_rx(out_of_reset, .delay(5), .hold(5), .tx_ready(1));
 
-    // 5) Finish the handshake on both lanes.
-    drive_req_rx(done_resp, .delay(20), .hold(5));
-    drive_rsp_rx(done_req,  .delay(0),  .hold(5));
+        // Requester has exchanged Out-of-Reset; let the responder lane close
+        // the handshake concurrently with our done_resp.
+        ->oor_exchanged;
+
+        // 5) Drive {done resp} on the requester lane.
+        drive_req_rx(done_resp, .delay(20), .hold(5));
+      end
+
+      // ----- Responder lane: independently close the handshake -----
+      begin : responder_lane
+        @oor_exchanged;
+        // Concurrent with the requester's done_resp above, on its own lane.
+        drive_rsp_rx(done_req, .delay(0), .hold(5));
+      end
+    join
 
     wait_for_fsm_done();
   endtask

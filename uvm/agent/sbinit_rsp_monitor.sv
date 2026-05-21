@@ -4,7 +4,7 @@
 class sbinit_rsp_monitor extends uvm_monitor;
   `uvm_component_utils(sbinit_rsp_monitor)
 
-  virtual logphy_if vif;
+  virtual sb_rsp_if vif;  // responder sideband lane
   uvm_analysis_port #(sbinit_rsp_transaction) rsp_ap;
 
   function new(string name, uvm_component parent);
@@ -14,7 +14,7 @@ class sbinit_rsp_monitor extends uvm_monitor;
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    if (!uvm_config_db#(virtual logphy_if)::get(this, "", "sbinit_rsp_vif", vif))
+    if (!uvm_config_db#(virtual sb_rsp_if)::get(this, "", "sbinit_rsp_vif", vif))
       `uvm_fatal("NO_VIF", {"sbinit_rsp_vif must be set for: ", get_full_name()})
   endfunction
 
@@ -35,27 +35,27 @@ class sbinit_rsp_monitor extends uvm_monitor;
     forever begin
       @(posedge vif.clock);
 
-      if ((vif.responderSbLaneIo_tx_valid !== prev_tx_valid) ||
-          (vif.responderSbLaneIo_tx_valid && (vif.responderSbLaneIo_tx_bits_data !== prev_tx_data)) ||
-          (vif.responderSbLaneIo_rx_valid !== prev_rx_valid) ||
-          (vif.responderSbLaneIo_rx_valid && (vif.responderSbLaneIo_rx_bits_data !== prev_rx_data)) ||
-          (vif.responderSbLaneIo_tx_ready !== prev_tx_ready) ||
-          (vif.responderSbLaneIo_tx_valid && vif.responderSbLaneIo_tx_ready)) begin
+      if ((vif.tx_valid !== prev_tx_valid) ||
+          (vif.tx_valid && (vif.tx_bits_data !== prev_tx_data)) ||
+          (vif.rx_valid !== prev_rx_valid) ||
+          (vif.rx_valid && (vif.rx_bits_data !== prev_rx_data)) ||
+          (vif.tx_ready !== prev_tx_ready) ||
+          (vif.tx_valid && vif.tx_ready)) begin
 
         tx = sbinit_rsp_transaction::type_id::create("tx");
-        tx.tx_valid = vif.responderSbLaneIo_tx_valid;
-        tx.tx_data  = vif.responderSbLaneIo_tx_bits_data;
-        tx.tx_ready = vif.responderSbLaneIo_tx_ready;
-        tx.rx_valid = vif.responderSbLaneIo_rx_valid;
-        tx.rx_data  = vif.responderSbLaneIo_rx_bits_data;
+        tx.tx_valid = vif.tx_valid;
+        tx.tx_data  = vif.tx_bits_data;
+        tx.tx_ready = vif.tx_ready;
+        tx.rx_valid = vif.rx_valid;
+        tx.rx_data  = vif.rx_bits_data;
 
         rsp_ap.write(tx);
 
-        prev_tx_valid = vif.responderSbLaneIo_tx_valid;
-        prev_tx_data  = vif.responderSbLaneIo_tx_bits_data;
-        prev_rx_valid = vif.responderSbLaneIo_rx_valid;
-        prev_rx_data  = vif.responderSbLaneIo_rx_bits_data;
-        prev_tx_ready = vif.responderSbLaneIo_tx_ready;
+        prev_tx_valid = vif.tx_valid;
+        prev_tx_data  = vif.tx_bits_data;
+        prev_rx_valid = vif.rx_valid;
+        prev_rx_data  = vif.rx_bits_data;
+        prev_tx_ready = vif.tx_ready;
       end
     end
   endtask
