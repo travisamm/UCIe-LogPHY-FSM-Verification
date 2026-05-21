@@ -273,4 +273,76 @@ class sbinit_req_backpressure_vseq extends sbinit_base_vseq;
   endtask
 endclass
 
+// ---------------------------------------------------------------------------
+// sbinit_rsp_backpressure_vseq
+//   Responder-side analog of sbinit_req_backpressure_vseq, exercising the
+//   ready/valid stability of SBInitResponder. The responder only owes a
+//   {done resp} once (a) the requester has reached sSBINIT_DONE_MSG, which
+//   asserts responder.start, and (b) a {done req} has arrived on the
+//   responder RX. We hold the responder tx_ready LOW across that window so
+//   the responder asserts tx_valid while it cannot complete the handshake.
+//
+//   With a correct DUT the responder holds the {done resp} payload on tx_data
+//   the whole time tx_valid is high. With the current RTL (SBInit.scala
+//   lines 183-187 assign tx.bits.data inside `when(tx.ready)`) it drives
+//   tx_valid=1 with tx_data=0 during the window, tripping the scoreboard's
+//   responder data-stability check. EXPECTED TO FAIL until the RTL fix lands.
+//
+//   The requester is walked into sSBINIT_DONE_MSG sequentially BEFORE the
+//   fork, so responder.start is already asserted when the concurrent phase
+//   begins. The tx-ready channel then makes the back-pressure genuinely
+//   concurrent: one thread holds rsp tx_ready low on its own sequencer while a
+//   second delivers the done_req on the responder RX and a third closes the
+//   requester's receive side.
+// ---------------------------------------------------------------------------
+class sbinit_rsp_backpressure_vseq extends sbinit_base_vseq;
+  `uvm_object_utils(sbinit_rsp_backpressure_vseq)
+
+  // Cycles to hold responder tx_ready LOW while it owes a {done resp}.
+  int unsigned backpressure_hold_cycles = 30;
+
+  function new(string name = "sbinit_rsp_backpressure_vseq");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    logic [127:0] out_of_reset;
+    logic [127:0] done_resp;
+    logic [127:0] done_req;
+
+    out_of_reset = make_no_data_msg(SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR);
+    done_resp    = make_no_data_msg(SBINIT_MC_DONE_RESP,    SBINIT_SC_DONE);
+    done_req     = make_no_data_msg(SBINIT_MC_DONE_REQ,     SBINIT_SC_DONE);
+
+    // Setup: walk the requester into sSBINIT_DONE_MSG so responder.start is
+    // asserted. fsm_start is held through the clock pattern and dropped by the
+    // OoR item's delay, after the FSM has left sPATTERN.
+    drive_req_rx(SBINIT_CLK_PATTERN_5, .delay(10), .hold(5), .fsm_start(1));
+    drive_req_rx(out_of_reset, .delay(20), .hold(5));
+
+    fork
+      // ----- Requester lane: finish the requester's own receive side -------
+      begin : req_lane
+        drive_req_rx(done_resp, .delay(20), .hold(5));
+      end
+
+      // ----- TX-ready channel: hold responder back-pressure concurrently ----
+      // Assert tx_ready LOW first (and keep it low across the window) so it is
+      // already low when the responder asserts tx_valid after the done_req.
+      begin : rsp_txready_thread
+        set_rsp_tx_ready(.level(0), .hold(backpressure_hold_cycles));
+        set_rsp_tx_ready(.level(1));
+      end
+
+      // ----- Responder RX: deliver the done_req that creates the owed resp --
+      // Small delay so the tx_ready=0 level is established first.
+      begin : rsp_rx_thread
+        drive_rsp_rx(done_req, .delay(2), .hold(5));
+      end
+    join
+
+    wait_for_fsm_done();
+  endtask
+endclass
+
 `endif

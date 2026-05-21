@@ -10,6 +10,7 @@
 //   make sbinit SBTEST=test_sbinit_early_req             # premature done req
 //   make sbinit SBTEST=test_sbinit_multiple_reqs         # collapse done reqs
 //   make sbinit SBTEST=test_sbinit_req_backpressure      # requester back-pressure
+//   make sbinit SBTEST=test_sbinit_rsp_backpressure      # responder back-pressure
 //   make sbinit_regress                                  # all of the above
 //
 // Each test sets sbinit_env_cfg expectations relevant to the scenario, then
@@ -226,6 +227,13 @@ class test_sbinit_req_backpressure extends sbinit_base_test;
     super.new(name, parent);
   endfunction
 
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    // Opt into the requester ready/valid data-stability check (gated so the
+    // other tests, which don't back-pressure the requester, aren't affected).
+    cfg.expect_req_tx_data_stable = 1;
+  endfunction
+
   task run_phase(uvm_phase phase);
     sbinit_req_backpressure_vseq vseq;
     phase.raise_objection(this, "test_sbinit_req_backpressure");
@@ -241,6 +249,53 @@ class test_sbinit_req_backpressure extends sbinit_base_test;
     #(`SBINIT_DRAIN_NS);
     `uvm_info("TEST", "test_sbinit_req_backpressure stimulus complete; entering check_phase", UVM_LOW)
     phase.drop_objection(this, "test_sbinit_req_backpressure");
+  endtask
+endclass
+
+// ---------------------------------------------------------------------------
+// test_sbinit_rsp_backpressure
+//   Responder-side analog of test_sbinit_req_backpressure. Drives the FSM to
+//   the point where the responder has accepted a {done req} and wants to send
+//   {done resp}, while holding the responder tx_ready LOW. With a correct DUT
+//   the responder holds the {done resp} payload on tx_data the whole time
+//   tx_valid is high; with the current RTL (SBInit.scala lines 183-187 assign
+//   tx.bits.data inside `when(tx.ready)`) it drives tx_valid=1 with tx_data=0.
+//
+//   This test is EXPECTED TO FAIL on the current RTL: the scoreboard's
+//   "Responder TX data is stable while valid asserted" check fires. It is a
+//   separate test (and the stability check is opt-in via cfg) so that
+//   test_sbinit_multiple_reqs — which also back-pressures the responder, but
+//   to verify done-req collapse rather than data stability — keeps passing.
+//   Turns green automatically once the Scala fix lands.
+// ---------------------------------------------------------------------------
+class test_sbinit_rsp_backpressure extends sbinit_base_test;
+  `uvm_component_utils(test_sbinit_rsp_backpressure)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    // Opt into the responder ready/valid data-stability check only.
+    cfg.expect_rsp_tx_data_stable = 1;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    sbinit_rsp_backpressure_vseq vseq;
+    phase.raise_objection(this, "test_sbinit_rsp_backpressure");
+
+    `uvm_info("TEST",
+              "Starting test_sbinit_rsp_backpressure: hold responder tx_ready low while it owes a done resp and verify tx_data stays at the done-resp payload",
+              UVM_LOW)
+
+    vseq = sbinit_rsp_backpressure_vseq::type_id::create("vseq");
+    connect_vseq(vseq);
+    vseq.start(env.vseqr);
+
+    #(`SBINIT_DRAIN_NS);
+    `uvm_info("TEST", "test_sbinit_rsp_backpressure stimulus complete; entering check_phase", UVM_LOW)
+    phase.drop_objection(this, "test_sbinit_rsp_backpressure");
   endtask
 endclass
 

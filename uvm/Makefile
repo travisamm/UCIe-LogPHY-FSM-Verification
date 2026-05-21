@@ -309,7 +309,7 @@ mbtrain_regress: mbtrain
 #   make cov_sbinit
 #   make cov_sbinit COV_SBINIT_WORK=my_dir
 
-SBINIT_TESTS ?= test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout test_sbinit_req_backpressure
+SBINIT_TESTS ?= test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout test_sbinit_req_backpressure test_sbinit_rsp_backpressure
 COV_SBINIT_WORK ?= cov_work/sbinit
 
 cov_sbinit:

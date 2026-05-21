@@ -15,6 +15,13 @@ class sbinit_env_cfg extends uvm_object;
   bit expect_fsm_done             = 1;
   bit expect_fsm_error            = 0;
 
+  // Ready/valid data-stability checks. Opt-in per test: the back-pressure
+  // scenarios that expose these bugs are specific, and some tests (e.g. the
+  // collapse test) legitimately back-pressure a lane without asserting the
+  // stability requirement. Each back-pressure test enables only its own.
+  bit expect_req_tx_data_stable   = 0;  // set by test_sbinit_req_backpressure
+  bit expect_rsp_tx_data_stable   = 0;  // set by test_sbinit_rsp_backpressure
+
   function new(string name = "sbinit_env_cfg");
     super.new(name);
   endfunction
