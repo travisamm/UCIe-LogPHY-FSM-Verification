@@ -79,6 +79,7 @@ xcelium.d/
 INCA_libs/
 *.log
 *.history
+uvm/cov_work/
 uvm/run_logs/
 
 out/

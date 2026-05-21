@@ -9,9 +9,9 @@ The UVM environment verifies training logic at several levels:
 
 | Suite | DUT | Testbench top | Main Make target |
 | --- | --- | --- | --- |
-| SBINIT | `SBInitSM.sv` | `tb/logphy_tb_top.sv` | `make sbinit` |
-| MBINIT | `MBInitSM.sv`, requester, responder | `tb/mbinit_tb_top.sv` | `make mbinit` |
-| MBTRAIN | `MBTrainSM.sv` | `tb/mbtrain_tb_top.sv` | `make mbtrain` |
+| SBINIT | `SBInitSM.sv` | `tb/sbinit/logphy_tb_top.sv` | `make sbinit` |
+| MBINIT | `MBInitSM.sv`, requester, responder | `tb/mbinit/mbinit_tb_top.sv` | `make mbinit` |
+| MBTRAIN | `MBTrainSM.sv` | `tb/mbtrain/mbtrain_tb_top.sv` | `make mbtrain` |
 | LTSM | `LinkTrainingSM.sv` with a fused sideband partner | `ltsm/tb/ltsm_tb_top.sv` | `make ltsm` |
 
 The suite-specific testbenches let tests target individual training state
@@ -84,9 +84,9 @@ make ltsm LTSTEST=test_ltsm_mbinit_repairval_trainerror
 
 The available test classes live in:
 
-- `tests/sbinit_tests.sv`
-- `tests/mbinit_tests.sv`
-- `tests/mbtrain_tests.sv`
+- `tests/sbinit/sbinit_tests.sv`
+- `tests/mbinit/mbinit_tests.sv`
+- `tests/mbtrain/mbtrain_tests.sv`
 - `ltsm/tests/ltsm_tests.sv`
 
 ### Regressions and Focused Runs
@@ -189,14 +189,14 @@ The UVM environment follows a layered structure:
 
 ```text
 uvm/
-|-- agent/       drivers, monitors, sequencers, transactions, agent packages
-|-- env/         environments, scoreboards, virtual-sequencer/config classes
-|-- if/          SystemVerilog interfaces for sideband and mainband pins
-|-- seq/         suite sequences and sequence packages
-|-- tb/          suite testbench tops, binds, SVA, standalone TBs
-|-- tests/       suite UVM tests and test packages
+|-- agent/       suite subdirs for agents plus shared LogPHY compatibility code
+|-- env/         suite subdirs for environments, scoreboards, and env config
+|-- if/          suite subdirs for interfaces plus shared LogPHY compatibility code
+|-- seq/         suite subdirs for sequences and sequence packages
+|-- tb/          suite subdirs for testbench tops and standalone TBs; shared SVA
+|-- tests/       suite subdirs for UVM tests and test packages
+|-- coverage/    SBINIT and MBINIT coverage source/config subdirs
 |-- ltsm/        fused LinkTrainingSM interfaces, TB, and tests
-|-- coverage/    coverage sources and coverage configuration
 |-- Makefile     Xcelium compile/run, regression, coverage, and cleanup flows
 `-- logphy_requirements.csv
 ```
@@ -238,20 +238,20 @@ sideband traffic, use the fused LTSM suite rather than an isolated sub-FSM test.
 
 Important interfaces in this directory include:
 
-- `if/sb_ctrl_if.sv`, `if/sb_req_if.sv`, and `if/sb_rsp_if.sv` for SBINIT
-  sideband control and packet exchange.
+- `if/sbinit/sb_ctrl_if.sv`, `if/sbinit/sb_req_if.sv`, and
+  `if/sbinit/sb_rsp_if.sv` for SBINIT sideband control and packet exchange.
 - `if/logphy_if.sv` for shared logical PHY observation and drive signals.
-- `if/mbinit_if.sv` for MBINIT sideband, FSM control, pattern, repair, and
-  lane-control visibility.
-- `if/mbtrain_if.sv` for MBTRAIN control and training observation.
+- `if/mbinit/mbinit_if.sv` for MBINIT sideband, FSM control, pattern, repair,
+  and lane-control visibility.
+- `if/mbtrain/mbtrain_if.sv` for MBTRAIN control and training observation.
 - `ltsm/if/ltsm_obs_if.sv` for fused LinkTrainingSM observation and partner
   stimulus.
 
-Scoreboards live in `env/` and expose expectation flags used by focused tests,
-for example full-flow checks, Vref checks, RXCLKCAL checks, data-center checks,
-lane repair checks, and FSM done/error expectations. Prefer adding targeted
-expectations and sequences for focused requirements instead of making every
-test require a full training pass.
+Scoreboards live in each suite folder under `env/` and expose expectation flags
+used by focused tests, for example full-flow checks, Vref checks, RXCLKCAL
+checks, data-center checks, lane repair checks, and FSM done/error
+expectations. Prefer adding targeted expectations and sequences for focused
+requirements instead of making every test require a full training pass.
 
 SVA sources live in `tb/logphy_sva.sv`. The `mbinit_state_sync_sva` assertion
 is intentionally excluded from coverage reporting because its current state
@@ -281,8 +281,8 @@ requirement-level verification tracking.
 When adding coverage for a requirement:
 
 1. Add or extend an interface only when the DUT signal is not already exposed.
-2. Put reusable stimulus in `seq/` and keep the test class responsible for
-   selecting expectations and the scenario.
+2. Put reusable stimulus in the suite folder under `seq/` and keep the test
+   class responsible for selecting expectations and the scenario.
 3. Add driver, monitor, scoreboard, or SVA checks at the lowest layer that can
    observe the behavior reliably.
 4. Include the test in the relevant `*_TESTS` Makefile list when it should run
