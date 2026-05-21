@@ -1,6 +1,6 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 IMC      := MDV_XLM_HOME=/share/instsww/cadence/XCELIUM2509 /share/instsww/cadence/VMANAGER2509/tools/bin/imc
-XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
+XRUN_OPTS := -sv -coverage all -uvm -access +rwc -timescale 1ns/1ps -64bit
 
 COV_WORK  ?= cov_work
 COV_TEST  ?= default
