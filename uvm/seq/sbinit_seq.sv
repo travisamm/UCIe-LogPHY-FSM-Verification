@@ -220,19 +220,15 @@ class sbinit_collapse_reqs_vseq extends sbinit_base_vseq;
       send_req_item(t);
     end
 
-    // Hold responder tx_ready low so the DUT's outgoing done response gets
-    // back-pressured. Drop Out of Reset on the requester RX while we're at
-    // it (uses tx_ready=0 to keep the back-pressure on the requester side).
-    begin
-      sbinit_req_transaction t;
-      t               = sbinit_req_transaction::type_id::create("oor_with_bp");
-      t.rx_valid      = 1;
-      t.rx_data       = out_of_reset;
-      t.tx_ready      = 0;
-      t.delay         = 20;
-      t.hold_cycles   = 5;
-      send_req_item(t);
-    end
+    // Drop the partner's Out of Reset on the requester RX. Requester
+    // tx_ready must stay HIGH (default) so the DUT can complete its own
+    // Out-of-Reset transmission — back-pressure here would mask SB-06 and
+    // also trip a latent RTL protocol bug in SBInitRequester.sOUT_OF_RESET
+    // where tx.bits.data is only driven inside `when(tx.ready)`.
+    drive_req_rx(out_of_reset, .delay(20), .hold(5));
+
+    // Back-pressure ONLY the responder TX so the DUT's outgoing done
+    // response stalls while multiple done reqs pile up on responder RX.
     rsp_set_tx_ready(.ready(0), .delay(0), .hold(1));
 
     // Fire `num_dupes` consecutive done-req bursts, each separated by a few
@@ -251,6 +247,105 @@ class sbinit_collapse_reqs_vseq extends sbinit_base_vseq;
     // Release back-pressure and let the DUT complete.
     rsp_set_tx_ready(.ready(1), .delay(0), .hold(1));
     drive_req_rx(done_resp, .delay(20), .hold(5));
+
+    wait_for_fsm_done();
+  endtask
+endclass
+
+// ---------------------------------------------------------------------------
+// sbinit_req_backpressure_vseq
+//   Exercises the requester-side ready/valid stability of SBInitRequester
+//   while the DUT is trying to emit {SBINIT Out of Reset}. Holds the
+//   requester's tx_ready low for a window after the FSM has entered the
+//   sOUT_OF_RESET state, then releases it and completes the handshake.
+//
+//   With a correct DUT, the partner observes a stable {SBINIT Out of Reset}
+//   on tx_data the whole time tx_valid is high, and the scoreboard logs
+//   SB-06 + the data-stability check as PASS.
+//
+//   With the current RTL (SBInit.scala lines 128-132), the DUT only drives
+//   tx_data inside `when(tx.ready)`, so the back-pressure window produces
+//   tx_valid=1 with tx_data=0. The scoreboard's data-stability check fires,
+//   and SB-06 (Out-of-Reset emission) fails because the DUT never gets a
+//   chance to drive the proper payload before outOfResetDetected advances
+//   the FSM past sOUT_OF_RESET.
+//
+//   This vseq is expected to FAIL the new data-stability check (and SB-06)
+//   until the RTL fix lands. It does NOT touch responder back-pressure, so
+//   it does not interact with the SB-09 collapse path.
+// ---------------------------------------------------------------------------
+class sbinit_req_backpressure_vseq extends sbinit_base_vseq;
+  `uvm_object_utils(sbinit_req_backpressure_vseq)
+
+  // Cycles to hold requester tx_ready LOW after the FSM has entered the
+  // sOUT_OF_RESET state. Long enough to guarantee the bug surfaces on a
+  // broken RTL but short enough to keep wall-clock sim time reasonable.
+  int unsigned backpressure_hold_cycles = 30;
+
+  function new(string name = "sbinit_req_backpressure_vseq");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    logic [127:0] out_of_reset;
+    logic [127:0] done_resp;
+    logic [127:0] done_req;
+
+    out_of_reset = make_no_data_msg(SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR);
+    done_resp    = make_no_data_msg(SBINIT_MC_DONE_RESP,    SBINIT_SC_DONE);
+    done_req     = make_no_data_msg(SBINIT_MC_DONE_REQ,     SBINIT_SC_DONE);
+
+    // 1) Kick FSM and drive partner clock pattern with tx_ready HIGH so the
+    //    DUT's clock-pattern stage progresses normally and ultimately
+    //    transitions into sOUT_OF_RESET.
+    begin
+      sbinit_req_transaction t;
+      t               = sbinit_req_transaction::type_id::create("kick_and_clk");
+      t.fsmCtrl_start = 1;
+      t.rx_valid      = 1;
+      t.rx_data       = SBINIT_CLK_PATTERN_5;
+      t.delay         = 10;
+      t.hold_cycles   = 5;
+      send_req_item(t);
+    end
+
+    // 2) Brief idle with tx_ready HIGH so fourPatternCounter can reach 3
+    //    and the FSM cleanly enters sOUT_OF_RESET before we back-pressure.
+    begin
+      sbinit_req_transaction t;
+      t             = sbinit_req_transaction::type_id::create("idle_to_oor");
+      t.rx_valid    = 0;
+      t.tx_ready    = 1;
+      t.delay       = 10;
+      t.hold_cycles = 1;
+      send_req_item(t);
+    end
+
+    // 3) Back-pressure window. tx_ready LOW for `backpressure_hold_cycles`,
+    //    rx_valid LOW so the partner has NOT yet acknowledged the DUT's
+    //    Out-of-Reset. During this window the DUT should hold tx_valid=1
+    //    with tx_data = {SBINIT Out of Reset}; with the RTL bug it holds
+    //    tx_valid=1 with tx_data = 0.
+    begin
+      sbinit_req_transaction t;
+      t             = sbinit_req_transaction::type_id::create("backpressure");
+      t.rx_valid    = 0;
+      t.tx_ready    = 0;
+      t.delay       = 0;
+      t.hold_cycles = backpressure_hold_cycles;
+      send_req_item(t);
+    end
+
+    // 4) Release back-pressure and drive the partner's Out-of-Reset. A
+    //    correct DUT will already have proper tx_data on the bus and the
+    //    handshake completes immediately; a buggy DUT only NOW assigns
+    //    the OoR payload (which may already be too late, since the
+    //    partner's OoR drives outOfResetDetected the same cycle).
+    drive_req_rx(out_of_reset, .delay(5), .hold(5), .tx_ready(1));
+
+    // 5) Finish the handshake on both lanes.
+    drive_req_rx(done_resp, .delay(20), .hold(5));
+    drive_rsp_rx(done_req,  .delay(0),  .hold(5));
 
     wait_for_fsm_done();
   endtask

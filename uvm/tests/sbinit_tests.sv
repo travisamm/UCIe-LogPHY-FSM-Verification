@@ -9,6 +9,7 @@
 //   make sbinit SBTEST=test_sbinit_partner_not_ready     # partner delays OoR
 //   make sbinit SBTEST=test_sbinit_early_req             # premature done req
 //   make sbinit SBTEST=test_sbinit_multiple_reqs         # collapse done reqs
+//   make sbinit SBTEST=test_sbinit_req_backpressure      # requester back-pressure
 //   make sbinit_regress                                  # all of the above
 //
 // Each test sets sbinit_env_cfg expectations relevant to the scenario, then
@@ -203,6 +204,49 @@ class test_sbinit_multiple_reqs extends sbinit_base_test;
     #(`SBINIT_DRAIN_NS);
     `uvm_info("TEST", "test_sbinit_multiple_reqs stimulus complete; entering check_phase", UVM_LOW)
     phase.drop_objection(this, "test_sbinit_multiple_reqs");
+  endtask
+endclass
+
+// ---------------------------------------------------------------------------
+// test_sbinit_req_backpressure
+//   Pins down a ready/valid stability requirement that the other tests do
+//   not exercise: while in the sOUT_OF_RESET state the DUT must hold its
+//   {SBINIT Out of Reset} payload on requester tx_data the entire time
+//   tx_valid is high, regardless of tx_ready.
+//
+//   This test is EXPECTED TO FAIL on the current RTL (SBInit.scala
+//   lines 128-132 assign tx.bits.data inside `when(tx.ready)`). The
+//   scoreboard's "Requester TX data is stable while valid asserted" check
+//   fires, and SB-06 also fails because the DUT never gets to drive the
+//   proper payload before outOfResetDetected moves the FSM on.
+//
+//   It is intentionally a separate test so test_sbinit_multiple_reqs (and
+//   every other SBINIT test) can pass independently. Once the Scala fix
+//   lands this test should turn green automatically.
+// ---------------------------------------------------------------------------
+class test_sbinit_req_backpressure extends sbinit_base_test;
+  `uvm_component_utils(test_sbinit_req_backpressure)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    sbinit_req_backpressure_vseq vseq;
+    phase.raise_objection(this, "test_sbinit_req_backpressure");
+
+    `uvm_info("TEST",
+              "Starting test_sbinit_req_backpressure: hold requester tx_ready low during Out-of-Reset and verify tx_data stays at the OoR payload",
+              UVM_LOW)
+
+    vseq = sbinit_req_backpressure_vseq::type_id::create("vseq");
+    vseq.req_seqr = env.vseqr.req_seqr;
+    vseq.rsp_seqr = env.vseqr.rsp_seqr;
+    vseq.start(env.vseqr);
+
+    #(`SBINIT_DRAIN_NS);
+    `uvm_info("TEST", "test_sbinit_req_backpressure stimulus complete; entering check_phase", UVM_LOW)
+    phase.drop_objection(this, "test_sbinit_req_backpressure");
   endtask
 endclass
 

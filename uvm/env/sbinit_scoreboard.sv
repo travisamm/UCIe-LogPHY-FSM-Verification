@@ -37,6 +37,7 @@ class sbinit_scoreboard extends uvm_scoreboard;
   static const string REQ_NAME_COLLAPSE_REQS      = "DUT collapses multiple SBINIT done reqs into one resp";
   static const string REQ_NAME_FSM_DONE           = "fsmCtrl_done asserts at end of SBINIT";
   static const string REQ_NAME_FSM_ERROR          = "fsmCtrl_error asserts on the error path";
+  static const string REQ_NAME_REQ_TX_DATA_STABLE = "Requester TX data is stable while valid asserted";
 
   // -------- witnesses ----------------------------------------------------
   bit saw_clock_pattern;
@@ -58,6 +59,10 @@ class sbinit_scoreboard extends uvm_scoreboard;
   bit prev_rsp_done_req_active;
   int unsigned sb_09_done_req_count;
   int unsigned sb_09_done_resp_count;
+
+  // Sticky witness for the ready/valid stability bug: tx_valid=1 while
+  // tx_data is still at its default of 0. Set on first occurrence.
+  bit req_tx_data_unstable;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -101,6 +106,7 @@ class sbinit_scoreboard extends uvm_scoreboard;
     prev_rsp_done_req_active = 0;
     sb_09_done_req_count     = 0;
     sb_09_done_resp_count    = 0;
+    req_tx_data_unstable     = 0;
 
     fork
       forever begin
@@ -123,6 +129,18 @@ class sbinit_scoreboard extends uvm_scoreboard;
   // useful when debugging a failure but useless when a test passes.
   // -------------------------------------------------------------------
   task process_req(sbinit_req_transaction tx);
+    // Ready/valid stability: tx_valid=1 must imply tx_data is a real
+    // payload, never the default 0. The known RTL bug in SBInitRequester
+    // (tx.bits.data assigned inside `when(tx.ready)`) produces exactly
+    // this pattern when the partner back-pressures. Fires once.
+    if (tx.tx_valid && tx.tx_data === 128'h0 && !req_tx_data_unstable) begin
+      `uvm_error("SBINIT_SB",
+                 {"FAILED requirement \"", REQ_NAME_REQ_TX_DATA_STABLE,
+                  "\": observed tx_valid=1 with tx_data=0 (likely the ",
+                  "ready/valid stability bug in SBInitRequester)"})
+      req_tx_data_unstable = 1;
+    end
+
     // Clock-pattern emission on requester TX.
     if (tx.tx_valid && (tx.tx_data == SBINIT_CLK_PATTERN_A  ||
                         tx.tx_data == SBINIT_CLK_PATTERN_A5 ||
@@ -339,6 +357,10 @@ class sbinit_scoreboard extends uvm_scoreboard;
                              cfg.expect_sb09_collapse_reqs,   sb_09_verified);
     fail_count += report_row(REQ_NAME_FSM_DONE,
                              cfg.expect_fsm_done,             saw_sbinit_done);
+    // Ready/valid stability is always checked (no cfg gate): the rule
+    // applies regardless of whether the test exercises back-pressure.
+    fail_count += report_row(REQ_NAME_REQ_TX_DATA_STABLE,
+                             1'b1,                            !req_tx_data_unstable);
 
     `uvm_info("SBINIT_SB",
               "-------------------------------------------------------------------",
