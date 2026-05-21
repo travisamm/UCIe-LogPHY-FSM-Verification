@@ -1,5 +1,6 @@
 `ifndef SBINIT_TEST_PKG_SV
 `define SBINIT_TEST_PKG_SV
+`timescale 1ns/1ps
 
 package sbinit_test_pkg;
   import uvm_pkg::*;
