@@ -3,6 +3,7 @@ class sbinit_coverage extends uvm_subscriber #(sbinit_req_transaction);
 
   covergroup sbinit_cg with function sample(sbinit_req_transaction t);
     option.per_instance = 1;
+    option.enabled      = 1;
     option.name = "sbinit_cg";
     option.cross_auto_bin_max = 0;
 
