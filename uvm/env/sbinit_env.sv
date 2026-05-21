@@ -39,8 +39,10 @@ class sbinit_env extends uvm_env;
 
   function void connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    vseqr.req_seqr = req_agent.sequencer;
-    vseqr.rsp_seqr = rsp_agent.sequencer;
+    vseqr.req_rx_seqr      = req_agent.rx_seqr;
+    vseqr.req_txready_seqr = req_agent.txready_seqr;
+    vseqr.rsp_rx_seqr      = rsp_agent.rx_seqr;
+    vseqr.rsp_txready_seqr = rsp_agent.txready_seqr;
     req_agent.monitor.req_ap.connect(scoreboard.req_export);
     rsp_agent.monitor.rsp_ap.connect(scoreboard.rsp_export);
     req_agent.monitor.req_ap.connect(coverage.analysis_export);

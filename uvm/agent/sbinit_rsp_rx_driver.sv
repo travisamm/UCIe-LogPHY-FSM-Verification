@@ -1,8 +1,15 @@
-`ifndef SBINIT_RSP_DRIVER_SV
-`define SBINIT_RSP_DRIVER_SV
+`ifndef SBINIT_RSP_RX_DRIVER_SV
+`define SBINIT_RSP_RX_DRIVER_SV
 
-class sbinit_rsp_driver extends uvm_driver #(sbinit_rsp_transaction);
-  `uvm_component_utils(sbinit_rsp_driver)
+// ---------------------------------------------------------------------------
+// sbinit_rsp_rx_driver
+// ---------------------------------------------------------------------------
+// Drives ONLY the responder RX lane (rx_valid/rx_bits_data). Never touches
+// tx_ready (sbinit_rsp_txready_driver owns that), so the two run as
+// independent concurrent channels on the responder lane.
+// ---------------------------------------------------------------------------
+class sbinit_rsp_rx_driver extends uvm_driver #(sbinit_rsp_rx_transaction);
+  `uvm_component_utils(sbinit_rsp_rx_driver)
 
   virtual sb_rsp_if vif;  // responder sideband lane
 
@@ -19,7 +26,6 @@ class sbinit_rsp_driver extends uvm_driver #(sbinit_rsp_transaction);
   task run_phase(uvm_phase phase);
     vif.rx_valid     = 0;
     vif.rx_bits_data = 0;
-    vif.tx_ready     = 1;
 
     wait (vif.reset == 0);
 
@@ -30,12 +36,7 @@ class sbinit_rsp_driver extends uvm_driver #(sbinit_rsp_transaction);
     end
   endtask
 
-  // TODO(tier1-threading): tx_ready and rx_* come from one transaction, so
-  // they cannot be varied independently within the same cycle on this lane.
-  // Split into separate tx-ready and rx threads/sub-sequences later.
-  task drive_item(sbinit_rsp_transaction t);
-    vif.tx_ready = t.tx_ready;
-
+  task drive_item(sbinit_rsp_rx_transaction t);
     if (t.delay > 0) begin
       vif.rx_valid = 0;
       repeat (t.delay) @(posedge vif.clock);

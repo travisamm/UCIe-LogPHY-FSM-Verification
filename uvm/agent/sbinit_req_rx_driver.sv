@@ -1,8 +1,21 @@
-`ifndef SBINIT_REQ_DRIVER_SV
-`define SBINIT_REQ_DRIVER_SV
+`ifndef SBINIT_REQ_RX_DRIVER_SV
+`define SBINIT_REQ_RX_DRIVER_SV
 
-class sbinit_req_driver extends uvm_driver #(sbinit_req_transaction);
-  `uvm_component_utils(sbinit_req_driver)
+// ---------------------------------------------------------------------------
+// sbinit_req_rx_driver
+// ---------------------------------------------------------------------------
+// Drives ONLY the requester RX lane (rx_valid/rx_bits_data) plus the FSM kick
+// (fsmCtrl_start on the control bus). It never touches tx_ready — that is the
+// sbinit_req_txready_driver's job, so the two run as independent concurrent
+// channels on the same lane.
+//
+// fsmCtrl_start is a level the test holds; the rx item carries its value and
+// the driver leaves it asserted across items until a later item clears it
+// (the RTL gates sPATTERN on io.start, so it must stay high until the FSM
+// reaches sOUT_OF_RESET).
+// ---------------------------------------------------------------------------
+class sbinit_req_rx_driver extends uvm_driver #(sbinit_req_rx_transaction);
+  `uvm_component_utils(sbinit_req_rx_driver)
 
   virtual sb_req_if  vif;       // requester sideband lane
   virtual sb_ctrl_if ctrl_vif;  // FSM control (drives fsmCtrl_start)
@@ -23,7 +36,6 @@ class sbinit_req_driver extends uvm_driver #(sbinit_req_transaction);
     ctrl_vif.fsmCtrl_start = 0;
     vif.rx_valid           = 0;
     vif.rx_bits_data       = 0;
-    vif.tx_ready           = 1;
 
     wait (vif.reset == 0);
 
@@ -34,13 +46,7 @@ class sbinit_req_driver extends uvm_driver #(sbinit_req_transaction);
     end
   endtask
 
-  // TODO(tier1-threading): tx_ready and rx_* are applied from one transaction,
-  // so they cannot be varied independently within the same cycle window on
-  // this lane. Split into separate tx-ready and rx threads/sub-sequences when
-  // we tackle that chunk.
-  task drive_item(sbinit_req_transaction t);
-    vif.tx_ready = t.tx_ready;
-
+  task drive_item(sbinit_req_rx_transaction t);
     if (t.delay > 0) begin
       vif.rx_valid = 0;
       repeat (t.delay) @(posedge vif.clock);

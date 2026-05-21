@@ -8,15 +8,31 @@ package sbinit_agent_pkg;
   `include "uvm_macros.svh"
   import sbinit_msg_pkg::*;
 
+  // Observed/analysis transactions (produced by the monitors, consumed by
+  // the scoreboard and coverage).
   `include "sbinit_req_transaction.sv"
-  `include "sbinit_req_sequencer.sv"
-  `include "sbinit_req_driver.sv"
-  `include "sbinit_req_monitor.sv"
-  `include "sbinit_req_agent.sv"
   `include "sbinit_rsp_transaction.sv"
-  `include "sbinit_rsp_sequencer.sv"
-  `include "sbinit_rsp_driver.sv"
+
+  // Drive items: split rx and (shared) tx-ready channels.
+  `include "sbinit_req_rx_transaction.sv"
+  `include "sbinit_rsp_rx_transaction.sv"
+  `include "sbinit_txready_transaction.sv"
+
+  // Sequencers (one per channel; tx-ready sequencer class shared by lanes).
+  `include "sbinit_req_rx_sequencer.sv"
+  `include "sbinit_rsp_rx_sequencer.sv"
+  `include "sbinit_txready_sequencer.sv"
+
+  // Drivers (two per lane: rx + tx-ready).
+  `include "sbinit_req_rx_driver.sv"
+  `include "sbinit_rsp_rx_driver.sv"
+  `include "sbinit_req_txready_driver.sv"
+  `include "sbinit_rsp_txready_driver.sv"
+
+  // Monitors and agents.
+  `include "sbinit_req_monitor.sv"
   `include "sbinit_rsp_monitor.sv"
+  `include "sbinit_req_agent.sv"
   `include "sbinit_rsp_agent.sv"
 
 endpackage
