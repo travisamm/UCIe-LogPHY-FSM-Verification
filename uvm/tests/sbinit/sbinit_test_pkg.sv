@@ -9,9 +9,11 @@ package sbinit_test_pkg;
   import sbinit_env_pkg::*;
   import sbinit_seq_pkg::*;
   import sbinit_msg_pkg::*;
+  import sbinit_event_pkg::*;
 
   `include "sbinit_base_test.sv"
   `include "sbinit_tests.sv"
+  `include "sbinit_decode_test.sv"
 
 endpackage
 
