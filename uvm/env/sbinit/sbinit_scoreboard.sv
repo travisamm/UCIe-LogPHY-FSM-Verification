@@ -4,28 +4,36 @@
 // ---------------------------------------------------------------------------
 // sbinit_scoreboard
 // ---------------------------------------------------------------------------
-// Watches the requester and responder analysis streams from the two SBINIT
-// agents, tracks which protocol requirements were witnessed, and produces a
-// single human-readable summary at end-of-test. Per-event chatter is kept at
-// UVM_HIGH or higher so that UVM_LOW logs read like a test result, not a
-// trace.
+// Consumes the single common sbinit_event stream produced by all SBINIT event
+// producers (requester lane, responder lane, FSM-control monitor), tracks which
+// protocol requirements were witnessed, and prints one human-readable summary
+// at end-of-test. Per-event chatter sits at UVM_HIGH so UVM_LOW logs read like
+// a result, not a trace.
 //
-// Each requirement carries an internal short code (sb_01..09) for code
-// clarity, but the test log only ever uses the descriptive name.
+// What moved OUT of the scoreboard (vs the snapshot era):
+//   * Cycle-level ready/valid payload-stability is now owned by the bound SVA
+//     layer (sbinit_payload_stability_sva); the scoreboard no longer inspects
+//     raw per-cycle data. It keeps only the *semantic* back-pressure check:
+//     the DUT offered a beat under back-pressure and that beat was eventually
+//     accepted (handshake liveness), which holds even on the buggy RTL.
+//
+// Malformed-activity policy: an UNKNOWN event is a hard failure UNLESS it is an
+// OFFERED beat (tx_valid while tx_ready low). An OFFERED-UNKNOWN is exactly the
+// known RTL back-pressure bug (data forced to 0 while valid held) and is owned
+// by the SVA for tests that opt in; other tests legitimately back-pressure a
+// lane (e.g. the collapse test) without asserting payload stability, so they
+// must not fail on it. cfg.allow_unknown_events relaxes even the hard case.
 // ---------------------------------------------------------------------------
 
 class sbinit_scoreboard extends uvm_scoreboard;
   `uvm_component_utils(sbinit_scoreboard)
 
-  uvm_analysis_export  #(sbinit_req_transaction) req_export;
-  uvm_analysis_export  #(sbinit_rsp_transaction) rsp_export;
-  uvm_tlm_analysis_fifo #(sbinit_req_transaction) req_fifo;
-  uvm_tlm_analysis_fifo #(sbinit_rsp_transaction) rsp_fifo;
+  uvm_analysis_export   #(sbinit_event) ev_export;
+  uvm_tlm_analysis_fifo #(sbinit_event) ev_fifo;
 
   sbinit_env_cfg cfg;
 
   // -------- requirement names (human-readable) ---------------------------
-  // Used in both per-event chatter and the end-of-test summary.
   static const string REQ_NAME_CLK_PATTERN        = "DUT transmits 64-UI clock pattern";
   static const string REQ_NAME_RX_SAMPLING        = "Partner clock pattern sampled by DUT";
   static const string REQ_NAME_STOP_ON_DETECT     = "DUT stops transmitting clock pattern after detection";
@@ -37,34 +45,39 @@ class sbinit_scoreboard extends uvm_scoreboard;
   static const string REQ_NAME_COLLAPSE_REQS      = "DUT collapses multiple SBINIT done reqs into one resp";
   static const string REQ_NAME_FSM_DONE           = "fsmCtrl_done asserts at end of SBINIT";
   static const string REQ_NAME_FSM_ERROR          = "fsmCtrl_error asserts on the error path";
-  static const string REQ_NAME_REQ_TX_DATA_STABLE = "Requester TX data is stable while valid asserted";
-  static const string REQ_NAME_RSP_TX_DATA_STABLE = "Responder TX data is stable while valid asserted";
+  static const string REQ_NAME_REQ_BP_LIVENESS    = "Requester TX beat offered under back-pressure was accepted";
+  static const string REQ_NAME_RSP_BP_LIVENESS    = "Responder TX beat offered under back-pressure was accepted";
+  static const string REQ_NAME_NO_MALFORMED       = "No malformed (non-back-pressure) lane activity";
 
   // -------- witnesses ----------------------------------------------------
-  bit saw_clock_pattern;
-  bit saw_rx_clock_pattern;
-  bit saw_sbinit_done;
+  bit saw_clock_pattern;       // CLK_PATTERN on req TX
+  bit saw_rx_clock_pattern;    // CLK_PATTERN on req RX (partner)
   bit sb_02_verified;
   bit sb_03_verified;
   bit sb_05_verified;
   bit sb_06_verified;
-  bit saw_sbinit_done_req;
-  bit saw_sbinit_done_resp;
+  bit saw_done_req_tx;         // DONE_REQ on req TX (DUT requester)
+  bit saw_done_resp_rx;        // DONE_RESP on req RX (partner)
   bit sb_07_verified;
   bit sb_08_verified;
   bit sb_09_verified;
-  bit tb_sent_out_of_reset;
-  bit tb_sent_early_done_req;
+  bit saw_sbinit_done;         // FSM_DONE
+  bit fsm_error_raised;        // FSM_ERROR
+  bit tb_sent_out_of_reset;    // OUT_OF_RESET on req RX (TB drove it)
+  bit tb_sent_early_done_req;  // DONE_REQ on rsp RX before out-of-reset
   bit dut_sent_early_done_resp;
-  bit fsm_error_raised;
-  bit prev_rsp_done_req_active;
   int unsigned sb_09_done_req_count;
   int unsigned sb_09_done_resp_count;
 
-  // Sticky witnesses for the ready/valid stability bug: tx_valid=1 while
-  // tx_data is still at its default of 0. Set on first occurrence, per lane.
-  bit req_tx_data_unstable;
-  bit rsp_tx_data_unstable;
+  // Semantic back-pressure liveness (offer under back-pressure -> accepted).
+  bit saw_req_tx_offer_under_bp;
+  bit saw_req_tx_accept;
+  bit saw_rsp_tx_offer_under_bp;
+  bit saw_rsp_tx_accept;
+
+  // Malformed-activity tracking.
+  bit saw_unknown_hard;     // UNKNOWN that is NOT an offered-under-bp beat
+  bit saw_unknown_offered;  // UNKNOWN offered under back-pressure (SVA owns it)
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -72,10 +85,8 @@ class sbinit_scoreboard extends uvm_scoreboard;
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    req_export = new("req_export", this);
-    rsp_export = new("rsp_export", this);
-    req_fifo   = new("req_fifo",   this);
-    rsp_fifo   = new("rsp_fifo",   this);
+    ev_export = new("ev_export", this);
+    ev_fifo   = new("ev_fifo",   this);
 
     if (!uvm_config_db#(sbinit_env_cfg)::get(this, "", "cfg", cfg)) begin
       `uvm_info("SBINIT_SB", "No cfg in config_db; using default expectations", UVM_MEDIUM)
@@ -84,201 +95,168 @@ class sbinit_scoreboard extends uvm_scoreboard;
   endfunction
 
   function void connect_phase(uvm_phase phase);
-    req_export.connect(req_fifo.analysis_export);
-    rsp_export.connect(rsp_fifo.analysis_export);
+    ev_export.connect(ev_fifo.analysis_export);
   endfunction
 
   task run_phase(uvm_phase phase);
-    saw_clock_pattern        = 0;
-    saw_rx_clock_pattern     = 0;
-    saw_sbinit_done          = 0;
-    sb_02_verified           = 0;
-    sb_03_verified           = 0;
-    sb_05_verified           = 0;
-    sb_06_verified           = 0;
-    saw_sbinit_done_req      = 0;
-    saw_sbinit_done_resp     = 0;
-    sb_07_verified           = 0;
-    sb_08_verified           = 0;
-    sb_09_verified           = 0;
-    tb_sent_out_of_reset     = 0;
-    tb_sent_early_done_req   = 0;
-    dut_sent_early_done_resp = 0;
-    fsm_error_raised         = 0;
-    prev_rsp_done_req_active = 0;
-    sb_09_done_req_count     = 0;
-    sb_09_done_resp_count    = 0;
-    req_tx_data_unstable     = 0;
-    rsp_tx_data_unstable     = 0;
+    sbinit_event ev;
+    saw_clock_pattern         = 0;
+    saw_rx_clock_pattern      = 0;
+    sb_02_verified            = 0;
+    sb_03_verified            = 0;
+    sb_05_verified            = 0;
+    sb_06_verified            = 0;
+    saw_done_req_tx           = 0;
+    saw_done_resp_rx          = 0;
+    sb_07_verified            = 0;
+    sb_08_verified            = 0;
+    sb_09_verified            = 0;
+    saw_sbinit_done           = 0;
+    fsm_error_raised          = 0;
+    tb_sent_out_of_reset      = 0;
+    tb_sent_early_done_req    = 0;
+    dut_sent_early_done_resp  = 0;
+    sb_09_done_req_count      = 0;
+    sb_09_done_resp_count     = 0;
+    saw_req_tx_offer_under_bp = 0;
+    saw_req_tx_accept         = 0;
+    saw_rsp_tx_offer_under_bp = 0;
+    saw_rsp_tx_accept         = 0;
+    saw_unknown_hard          = 0;
+    saw_unknown_offered       = 0;
 
-    fork
-      forever begin
-        sbinit_req_transaction req_tx;
-        req_fifo.get(req_tx);
-        process_req(req_tx);
-      end
-      forever begin
-        sbinit_rsp_transaction rsp_tx;
-        rsp_fifo.get(rsp_tx);
-        process_rsp(rsp_tx);
-      end
-    join_none
+    forever begin
+      ev_fifo.get(ev);
+      process_event(ev);
+    end
   endtask
 
   // -------------------------------------------------------------------
-  // Per-event processing
-  //
-  // All per-event chatter sits at UVM_HIGH or higher: those edges are
-  // useful when debugging a failure but useless when a test passes.
+  // Per-event processing. Chatter sits at UVM_HIGH.
   // -------------------------------------------------------------------
-  task process_req(sbinit_req_transaction tx);
-    // Ready/valid stability: tx_valid=1 must imply tx_data is a real payload,
-    // never the default 0. The known RTL bug in SBInitRequester (tx.bits.data
-    // assigned inside `when(tx.ready)`) produces exactly this pattern when the
-    // partner back-pressures. Recorded here; enforced (gated by cfg) in
-    // check_phase so only the test that asserts the requirement fails on it.
-    if (tx.tx_valid && tx.tx_data === 128'h0)
-      req_tx_data_unstable = 1;
+  function void process_event(sbinit_event ev);
+    // Malformed-activity policy (any source/direction).
+    if (ev.kind == SB_EVT_UNKNOWN) begin
+      if (ev.phase == SB_PHASE_OFFERED) begin
+        // Offered under back-pressure: the known RTL stability bug; owned by
+        // the SVA layer for tests that opt in. Not a hard failure here.
+        saw_unknown_offered = 1;
+      end
+      else begin
+        saw_unknown_hard = 1;
+        if (!cfg.allow_unknown_events)
+          `uvm_error("SBINIT_SB",
+                     {"Malformed lane activity (valid word did not decode): ",
+                      ev.convert2string()})
+      end
+    end
 
-    // Clock-pattern emission on requester TX.
-    if (tx.tx_valid && (tx.tx_data == SBINIT_CLK_PATTERN_A  ||
-                        tx.tx_data == SBINIT_CLK_PATTERN_A5 ||
-                        tx.tx_data == SBINIT_CLK_PATTERN_5A ||
-                        tx.tx_data == SBINIT_CLK_PATTERN_5)) begin
-      if (!saw_clock_pattern) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_CLK_PATTERN},
-                  UVM_HIGH)
+    case (ev.src)
+      SB_SRC_CTRL:     process_ctrl(ev);
+      SB_SRC_REQ_LANE: process_req_lane(ev);
+      SB_SRC_RSP_LANE: process_rsp_lane(ev);
+      default: ;
+    endcase
+  endfunction
+
+  function void process_ctrl(sbinit_event ev);
+    case (ev.kind)
+      SB_EVT_MODE_FUNCTIONAL: begin
+        // Mode functional implies SB-05; combined with partner pattern, SB-02.
+        if (saw_clock_pattern && !sb_05_verified) begin
+          `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_MODE_TRANSITION}, UVM_HIGH)
+          sb_05_verified = 1;
+        end
+        if (saw_clock_pattern && saw_rx_clock_pattern && !sb_02_verified) begin
+          `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_RX_SAMPLING}, UVM_HIGH)
+          sb_02_verified = 1;
+        end
+      end
+      SB_EVT_FSM_DONE: begin
+        if (!saw_sbinit_done) begin
+          if (saw_done_req_tx && saw_done_resp_rx) begin
+            `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_DONE_HANDSHAKE}, UVM_HIGH)
+            sb_07_verified = 1;
+          end
+          if (tb_sent_early_done_req && !dut_sent_early_done_resp) begin
+            `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_IGNORE_EARLY}, UVM_HIGH)
+            sb_08_verified = 1;
+          end
+          saw_sbinit_done = 1;
+        end
+      end
+      SB_EVT_FSM_ERROR: begin
+        if (!fsm_error_raised) begin
+          `uvm_info("SBINIT_SB", "fsmCtrl_error asserted", UVM_MEDIUM)
+          fsm_error_raised = 1;
+        end
+      end
+      default: ;
+    endcase
+  endfunction
+
+  function void process_req_lane(sbinit_event ev);
+    if (ev.dir == SB_DIR_TX) begin
+      // SB-01 clock-pattern emission.
+      if (ev.kind == SB_EVT_CLK_PATTERN && !saw_clock_pattern) begin
+        `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_CLK_PATTERN}, UVM_HIGH)
         saw_clock_pattern = 1;
       end
-    end else if (saw_clock_pattern && !sb_03_verified) begin
-      if (saw_rx_clock_pattern) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_STOP_ON_DETECT},
-                  UVM_HIGH)
+      // SB-03 stop-on-detect: pattern stopped after both TX and RX patterns.
+      if (ev.kind == SB_EVT_CLK_PATTERN_STOP &&
+          saw_clock_pattern && saw_rx_clock_pattern && !sb_03_verified) begin
+        `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_STOP_ON_DETECT}, UVM_HIGH)
         sb_03_verified = 1;
       end
-    end
-
-    // Partner clock-pattern arrival on requester RX.
-    if (tx.rx_valid && tx.rx_data == SBINIT_CLK_PATTERN_5)
-      saw_rx_clock_pattern = 1;
-
-    // Mode transition: implies both RX sampling and pattern→functional.
-    if (saw_clock_pattern && tx.sbRxTxMode == 1) begin
-      if (saw_rx_clock_pattern && !sb_02_verified) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_RX_SAMPLING},
-                  UVM_HIGH)
-        sb_02_verified = 1;
-      end
-      if (!sb_05_verified) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_MODE_TRANSITION},
-                  UVM_HIGH)
-        sb_05_verified = 1;
-      end
-    end
-
-    // TB drove its own Out-of-Reset on requester RX.
-    if (tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR))
-      tb_sent_out_of_reset = 1;
-
-    // DUT emits Out-of-Reset on requester TX.
-    if (tx.tx_valid &&
-        is_sbinit_msg(tx.tx_data, SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR)) begin
-      if (!sb_06_verified) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_OUT_OF_RESET},
-                  UVM_HIGH)
+      // SB-06 Out-of-Reset emission.
+      if (ev.kind == SB_EVT_OUT_OF_RESET && !sb_06_verified) begin
+        `uvm_info("SBINIT_SB", {"witnessed: ", REQ_NAME_OUT_OF_RESET}, UVM_HIGH)
         sb_06_verified = 1;
       end
+      // Done req emitted by the DUT requester.
+      if (ev.kind == SB_EVT_DONE_REQ) saw_done_req_tx = 1;
+      // Back-pressure liveness (offer under bp, then accept).
+      if (ev.phase == SB_PHASE_OFFERED)  saw_req_tx_offer_under_bp = 1;
+      if (ev.phase == SB_PHASE_ACCEPTED) saw_req_tx_accept         = 1;
     end
-
-    // Done req emitted on requester TX.
-    if (tx.tx_valid &&
-        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE))
-      saw_sbinit_done_req = 1;
-
-    // Done resp received on requester RX.
-    if (tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE))
-      saw_sbinit_done_resp = 1;
-
-    // FSM error edge (currently tied 0 inside the RTL).
-    if (tx.fsm_error && !fsm_error_raised) begin
-      `uvm_info("SBINIT_SB",
-                "fsmCtrl_error asserted",
-                UVM_MEDIUM)
-      fsm_error_raised = 1;
+    else if (ev.dir == SB_DIR_RX) begin
+      if (ev.kind == SB_EVT_CLK_PATTERN)  saw_rx_clock_pattern = 1;
+      if (ev.kind == SB_EVT_OUT_OF_RESET) tb_sent_out_of_reset = 1;
+      if (ev.kind == SB_EVT_DONE_RESP)    saw_done_resp_rx     = 1;
     end
+  endfunction
 
-    // FSM done edge — finalize handshake / early-req checks.
-    if (tx.fsm_done && !saw_sbinit_done) begin
-      if (saw_sbinit_done_req && saw_sbinit_done_resp) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_DONE_HANDSHAKE},
-                  UVM_HIGH)
-        sb_07_verified = 1;
+  function void process_rsp_lane(sbinit_event ev);
+    if (ev.dir == SB_DIR_RX) begin
+      // Early done req (before TB sent Out-of-Reset on the requester lane).
+      if (ev.kind == SB_EVT_DONE_REQ && !tb_sent_out_of_reset)
+        tb_sent_early_done_req = 1;
+      // SB-09: count done-req bursts after Out-of-Reset (one event per burst).
+      if (ev.kind == SB_EVT_DONE_REQ && tb_sent_out_of_reset)
+        sb_09_done_req_count++;
+    end
+    else if (ev.dir == SB_DIR_TX) begin
+      // DUT must not answer an early done req before Out-of-Reset.
+      if (ev.kind == SB_EVT_DONE_RESP &&
+          tb_sent_early_done_req && !tb_sent_out_of_reset) begin
+        `uvm_error("SBINIT_SB",
+                   {"FAILED requirement \"", REQ_NAME_IGNORE_EARLY,
+                    "\": DUT sent done resp prematurely"})
+        dut_sent_early_done_resp = 1;
       end
-      if (tb_sent_early_done_req && !dut_sent_early_done_resp) begin
-        `uvm_info("SBINIT_SB",
-                  {"witnessed: ", REQ_NAME_IGNORE_EARLY},
-                  UVM_HIGH)
-        sb_08_verified = 1;
-      end
-      saw_sbinit_done = 1;
+      // SB-09: count accepted done resps once multiple reqs have been seen.
+      if (ev.kind == SB_EVT_DONE_RESP && ev.phase == SB_PHASE_ACCEPTED &&
+          sb_09_done_req_count > 1)
+        sb_09_done_resp_count++;
+      // Back-pressure liveness.
+      if (ev.phase == SB_PHASE_OFFERED)  saw_rsp_tx_offer_under_bp = 1;
+      if (ev.phase == SB_PHASE_ACCEPTED) saw_rsp_tx_accept         = 1;
     end
-  endtask
-
-  task process_rsp(sbinit_rsp_transaction tx);
-    // Responder-side ready/valid stability: SBInitResponder has the same
-    // tx.bits.data-inside-`when(tx.ready)` bug, so under back-pressure it
-    // drives tx_valid=1 with tx_data=0. Recorded here; enforced (gated by
-    // cfg) in check_phase.
-    if (tx.tx_valid && tx.tx_data === 128'h0)
-      rsp_tx_data_unstable = 1;
-
-    // Early {done req} on responder RX (before TB sent Out-of-Reset).
-    if (tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE) &&
-        !tb_sent_out_of_reset)
-      tb_sent_early_done_req = 1;
-
-    // Edge-detect {done req} bursts on responder RX after Out-of-Reset.
-    if (tb_sent_out_of_reset &&
-        tx.rx_valid &&
-        is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE) &&
-        !prev_rsp_done_req_active) begin
-      sb_09_done_req_count++;
-    end
-    prev_rsp_done_req_active = tb_sent_out_of_reset &&
-                               tx.rx_valid &&
-                               is_sbinit_msg(tx.rx_data, SBINIT_MC_DONE_REQ, SBINIT_SC_DONE);
-
-    // DUT must not respond to an early done req before Out-of-Reset.
-    if (tx.tx_valid &&
-        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE) &&
-        tb_sent_early_done_req && !tb_sent_out_of_reset) begin
-      `uvm_error("SBINIT_SB",
-                 {"FAILED requirement \"", REQ_NAME_IGNORE_EARLY,
-                  "\": DUT sent done resp prematurely"})
-      dut_sent_early_done_resp = 1;
-    end
-
-    // After multiple done reqs were sent, count accepted done resps.
-    if (sb_09_done_req_count > 1 &&
-        tx.tx_valid && tx.tx_ready &&
-        is_sbinit_msg(tx.tx_data, SBINIT_MC_DONE_RESP, SBINIT_SC_DONE)) begin
-      sb_09_done_resp_count++;
-    end
-  endtask
+  endfunction
 
   // -------------------------------------------------------------------
   // End-of-test reporting
   // -------------------------------------------------------------------
-  // Status tag for the summary table.
   typedef enum {STAT_PASS, STAT_FAIL, STAT_SKIP, STAT_NA} status_e;
 
   function string status_str(status_e s);
@@ -291,8 +269,7 @@ class sbinit_scoreboard extends uvm_scoreboard;
     endcase
   endfunction
 
-  // Emit one row of the summary table and return whether it counts as a
-  // FAIL. PASS/SKIP/N/A all return 0; only FAIL returns 1.
+  // Emit one summary row; return 1 only when it counts as FAIL.
   function bit report_row(string name, bit expected, bit witnessed,
                           bit not_applicable = 0);
     status_e s;
@@ -313,7 +290,7 @@ class sbinit_scoreboard extends uvm_scoreboard;
 
     errs_before = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
 
-    // Derive SB-09 verification from collected counters before printing.
+    // Derive SB-09 from the collected counters before printing.
     if (sb_09_done_req_count > 1) begin
       if (!saw_sbinit_done) begin
         `uvm_error("SBINIT_SB",
@@ -333,9 +310,7 @@ class sbinit_scoreboard extends uvm_scoreboard;
     `uvm_info("SBINIT_SB",
               "===================================================================",
               UVM_LOW)
-    `uvm_info("SBINIT_SB",
-              "SBINIT scoreboard summary",
-              UVM_LOW)
+    `uvm_info("SBINIT_SB", "SBINIT scoreboard summary", UVM_LOW)
     `uvm_info("SBINIT_SB",
               "===================================================================",
               UVM_LOW)
@@ -363,28 +338,32 @@ class sbinit_scoreboard extends uvm_scoreboard;
                              cfg.expect_sb09_collapse_reqs,   sb_09_verified);
     fail_count += report_row(REQ_NAME_FSM_DONE,
                              cfg.expect_fsm_done,             saw_sbinit_done);
-    // Ready/valid stability is opt-in per lane (see sbinit_env_cfg): only the
-    // back-pressure test that asserts the requirement enables its flag.
-    fail_count += report_row(REQ_NAME_REQ_TX_DATA_STABLE,
-                             cfg.expect_req_tx_data_stable,   !req_tx_data_unstable);
-    fail_count += report_row(REQ_NAME_RSP_TX_DATA_STABLE,
-                             cfg.expect_rsp_tx_data_stable,   !rsp_tx_data_unstable);
+    // Semantic back-pressure liveness is opt-in per lane (same cfg flag that
+    // gates the SVA payload-stability checker). Cycle-level payload stability
+    // itself is owned by the SVA layer, not this row.
+    fail_count += report_row(REQ_NAME_REQ_BP_LIVENESS,
+                             cfg.expect_req_tx_data_stable,
+                             saw_req_tx_offer_under_bp && saw_req_tx_accept);
+    fail_count += report_row(REQ_NAME_RSP_BP_LIVENESS,
+                             cfg.expect_rsp_tx_data_stable,
+                             saw_rsp_tx_offer_under_bp && saw_rsp_tx_accept);
+    // Malformed activity (excluding offered-under-back-pressure beats).
+    fail_count += report_row(REQ_NAME_NO_MALFORMED,
+                             !cfg.allow_unknown_events,       !saw_unknown_hard);
 
     `uvm_info("SBINIT_SB",
               "-------------------------------------------------------------------",
               UVM_LOW)
 
-    // Fire any uvm_errors for FAILed expected requirements so the regress
-    // harness picks them up. (The SB-09/SB-08 paths already fire their
-    // own uvm_errors when they fail; these cover the simpler witnesses.)
+    // Fire uvm_errors for FAILed expected requirements so the regress harness
+    // detects them. (SB-09/SB-08 and malformed-activity already fire inline.)
     if (cfg.expect_sb01_clock_pattern && !saw_clock_pattern)
       `uvm_error("SBINIT_SB",
-                 {"FAILED requirement \"", REQ_NAME_CLK_PATTERN,
-                  "\": never witnessed"})
+                 {"FAILED requirement \"", REQ_NAME_CLK_PATTERN, "\": never witnessed"})
     if (cfg.expect_sb02_rx_sampling && !sb_02_verified)
       `uvm_error("SBINIT_SB",
                  {"FAILED requirement \"", REQ_NAME_RX_SAMPLING,
-                  "\": sbRxTxMode never went to 1 after incoming pattern"})
+                  "\": mode never went functional after incoming pattern"})
     if (cfg.expect_sb03_stop_on_detect && !sb_03_verified)
       `uvm_error("SBINIT_SB",
                  {"FAILED requirement \"", REQ_NAME_STOP_ON_DETECT,
@@ -418,31 +397,29 @@ class sbinit_scoreboard extends uvm_scoreboard;
                  {"FAILED requirement \"", REQ_NAME_FSM_ERROR,
                   "\": fsmCtrl_error never asserted"})
     if (!cfg.expect_fsm_error && fsm_error_raised)
+      `uvm_error("SBINIT_SB", "Unexpected fsmCtrl_error on a success-path test")
+    if (cfg.expect_req_tx_data_stable &&
+        !(saw_req_tx_offer_under_bp && saw_req_tx_accept))
       `uvm_error("SBINIT_SB",
-                 "Unexpected fsmCtrl_error on a success-path test")
-    if (cfg.expect_req_tx_data_stable && req_tx_data_unstable)
+                 {"FAILED requirement \"", REQ_NAME_REQ_BP_LIVENESS,
+                  "\": never saw an offered-under-back-pressure beat accepted"})
+    if (cfg.expect_rsp_tx_data_stable &&
+        !(saw_rsp_tx_offer_under_bp && saw_rsp_tx_accept))
       `uvm_error("SBINIT_SB",
-                 {"FAILED requirement \"", REQ_NAME_REQ_TX_DATA_STABLE,
-                  "\": observed tx_valid=1 with tx_data=0 (ready/valid ",
-                  "stability bug in SBInitRequester)"})
-    if (cfg.expect_rsp_tx_data_stable && rsp_tx_data_unstable)
-      `uvm_error("SBINIT_SB",
-                 {"FAILED requirement \"", REQ_NAME_RSP_TX_DATA_STABLE,
-                  "\": observed tx_valid=1 with tx_data=0 (ready/valid ",
-                  "stability bug in SBInitResponder)"})
+                 {"FAILED requirement \"", REQ_NAME_RSP_BP_LIVENESS,
+                  "\": never saw an offered-under-back-pressure beat accepted"})
 
     overall_fail = (uvm_report_server::get_server().get_severity_count(UVM_ERROR) > errs_before) ||
                    (fail_count > 0);
 
-    if (overall_fail) begin
+    if (overall_fail)
       `uvm_info("SBINIT_SB",
                 $sformatf("Overall: FAIL  (%0d requirement(s) marked FAIL)", fail_count),
                 UVM_LOW)
-    end else begin
+    else
       `uvm_info("SBINIT_SB",
                 "Overall: PASS  (every expected requirement was witnessed)",
                 UVM_LOW)
-    end
     `uvm_info("SBINIT_SB",
               "===================================================================",
               UVM_LOW)

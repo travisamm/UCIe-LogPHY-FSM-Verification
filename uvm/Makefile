@@ -48,6 +48,7 @@ sbinit:
           ./tests/sbinit/sbinit_test_pkg.sv \
           ./tb/sbinit/logphy_tb_top.sv \
           ./tb/logphy_sva.sv \
+          ./tb/sbinit/sbinit_stream_sva.sv \
           +UVM_TESTNAME=$(SBTEST) || true
 
 SBINIT_LOG_DIR ?= run_logs/sbinit
@@ -335,6 +336,7 @@ cov_sbinit:
 	    ./tests/sbinit/sbinit_test_pkg.sv \
 	    ./tb/sbinit/logphy_tb_top.sv \
 	    ./tb/logphy_sva.sv \
+	    ./tb/sbinit/sbinit_stream_sva.sv \
 	    +UVM_TESTNAME=$$test || true; \
 	done
 	$(MAKE) cov_report COV_WORK=$(COV_SBINIT_WORK)

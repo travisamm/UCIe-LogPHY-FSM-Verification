@@ -1,46 +1,67 @@
-class sbinit_coverage extends uvm_subscriber #(sbinit_req_transaction);
+`ifndef SBINIT_COVERAGE_SV
+`define SBINIT_COVERAGE_SV
+
+// ---------------------------------------------------------------------------
+// sbinit_coverage
+// ---------------------------------------------------------------------------
+// Functional coverage over the common sbinit_event stream. Coverpoints follow
+// the event model: what kind of event, from which source/direction, in which
+// handshake lifecycle phase, and which decode layout. The kind x dir cross
+// captures "which protocol messages appeared in which direction", and the
+// kind x phase cross captures offered-vs-accepted behavior (incl. the
+// offered-under-back-pressure case the back-pressure tests exercise).
+// ---------------------------------------------------------------------------
+class sbinit_coverage extends uvm_subscriber #(sbinit_event);
   `uvm_component_utils(sbinit_coverage)
 
-  covergroup sbinit_cg with function sample(sbinit_req_transaction t);
+  sbinit_event ev_h;  // sampled handle (covergroup reads current event)
+
+  covergroup sbinit_cg;
     option.per_instance = 1;
     option.name = "sbinit_cg";
-    option.cross_auto_bin_max = 0;
 
-    // SB-01/SB-02: requester and partner SB lane TX activity
-    cp_tx_valid: coverpoint t.tx_valid {
-      bins sending = {1};
-      bins idle    = {0};
-    }
-    cp_rx_valid: coverpoint t.rx_valid {
-      bins receiving = {1};
-      bins idle      = {0};
-    }
-
-    // SB-05: mode switches from pattern (0) to functional (1) after detection
-    cp_sb_mode: coverpoint t.sbRxTxMode {
-      bins functional = {1};
-      bins pattern    = {0};
+    cp_kind: coverpoint ev_h.kind {
+      bins clk_pattern   = {SB_EVT_CLK_PATTERN};
+      bins clk_stop      = {SB_EVT_CLK_PATTERN_STOP};
+      bins out_of_reset  = {SB_EVT_OUT_OF_RESET};
+      bins done_req      = {SB_EVT_DONE_REQ};
+      bins done_resp     = {SB_EVT_DONE_RESP};
+      bins mode_func     = {SB_EVT_MODE_FUNCTIONAL};
+      bins fsm_done      = {SB_EVT_FSM_DONE};
+      bins fsm_error     = {SB_EVT_FSM_ERROR};
+      bins unknown       = {SB_EVT_UNKNOWN};
     }
 
-    // SB-04: io_fsmCtrl_error is not exposed as a port by SBInitSM (hardcoded 0 in RTL).
-    // ignore_bins excludes error=1 until the RTL exports the port.
-    cp_fsm_error: coverpoint t.fsm_error {
-      ignore_bins error_rtl_na = {1};
-      bins no_error = {0};
+    cp_src: coverpoint ev_h.src {
+      bins req_lane = {SB_SRC_REQ_LANE};
+      bins rsp_lane = {SB_SRC_RSP_LANE};
+      bins ctrl     = {SB_SRC_CTRL};
     }
 
-    cp_fsm_done: coverpoint t.fsm_done {
-      bins done     = {1};
-      bins not_done = {0};
+    cp_dir: coverpoint ev_h.dir {
+      bins tx = {SB_DIR_TX};
+      bins rx = {SB_DIR_RX};
+      bins na = {SB_DIR_NA};
     }
 
-    // SB-05/SB-07: normal exit — no_error+done.
-    // timeout_fail (error+not_done) omitted: error port not exposed by RTL.
-    cx_error_vs_done: cross cp_fsm_error, cp_fsm_done {
-      bins normal_done = binsof(cp_fsm_error.no_error) &&
-                         binsof(cp_fsm_done.done);
+    cp_phase: coverpoint ev_h.phase {
+      bins observed = {SB_PHASE_OBSERVED};
+      bins offered  = {SB_PHASE_OFFERED};   // valid asserted under back-pressure
+      bins accepted = {SB_PHASE_ACCEPTED};
     }
 
+    cp_layout: coverpoint ev_h.layout {
+      bins none    = {SB_LAYOUT_NONE};
+      bins compare = {SB_LAYOUT_COMPARE};
+      bins create  = {SB_LAYOUT_CREATE};
+    }
+
+    // Which messages appear in which direction.
+    cx_kind_dir: cross cp_kind, cp_dir;
+
+    // Offered-vs-accepted behavior per message kind (offered-under-back-pressure
+    // is the interesting corner).
+    cx_kind_phase: cross cp_kind, cp_phase;
   endgroup : sbinit_cg
 
   function new(string name, uvm_component parent);
@@ -48,10 +69,9 @@ class sbinit_coverage extends uvm_subscriber #(sbinit_req_transaction);
     sbinit_cg = new();
   endfunction
 
-  function void write(sbinit_req_transaction t);
-    // Sample silently — per-event chatter buried the useful test/scoreboard
-    // messages. Bump to UVM_DEBUG if you ever need to confirm sampling.
-    sbinit_cg.sample(t);
+  function void write(sbinit_event t);
+    ev_h = t;
+    sbinit_cg.sample();
     `uvm_info("COVERAGE", "sample", UVM_DEBUG)
   endfunction
 
@@ -64,3 +84,5 @@ class sbinit_coverage extends uvm_subscriber #(sbinit_req_transaction);
   endfunction
 
 endclass
+
+`endif

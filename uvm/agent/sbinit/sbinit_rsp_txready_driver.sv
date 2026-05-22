@@ -23,7 +23,7 @@ class sbinit_rsp_txready_driver extends uvm_driver #(sbinit_txready_transaction)
   endfunction
 
   task run_phase(uvm_phase phase);
-    vif.tx_ready = 1;  // partner ready to accept by default
+    vif.drv_cb.tx_ready <= 1;  // partner ready to accept by default
 
     wait (vif.reset == 0);
 
@@ -36,11 +36,11 @@ class sbinit_rsp_txready_driver extends uvm_driver #(sbinit_txready_transaction)
 
   task drive_item(sbinit_txready_transaction t);
     if (t.delay > 0)
-      repeat (t.delay) @(posedge vif.clock);
+      repeat (t.delay) @(vif.drv_cb);
 
-    vif.tx_ready = t.tx_ready;
+    vif.drv_cb.tx_ready <= t.tx_ready;
 
-    repeat (t.hold_cycles > 0 ? t.hold_cycles : 1) @(posedge vif.clock);
+    repeat (t.hold_cycles > 0 ? t.hold_cycles : 1) @(vif.drv_cb);
   endtask
 
 endclass

@@ -211,10 +211,12 @@ endclass
 //   tx_valid is high, regardless of tx_ready.
 //
 //   This test is EXPECTED TO FAIL on the current RTL (SBInit.scala
-//   lines 128-132 assign tx.bits.data inside `when(tx.ready)`). The
-//   scoreboard's "Requester TX data is stable while valid asserted" check
-//   fires, and SB-06 also fails because the DUT never gets to drive the
-//   proper payload before outOfResetDetected moves the FSM on.
+//   lines 128-132 assign tx.bits.data inside `when(tx.ready)`). The bound
+//   payload-stability SVA (sbinit_payload_stability_sva on the requester TX
+//   stream) fires: tx_data changes to 0 while tx_valid is held and tx_ready is
+//   low. The scoreboard's semantic "offered-under-back-pressure was accepted"
+//   liveness row still PASSES (the handshake completes; only the payload is
+//   corrupt), so the failure has exactly one meaningful owner: the SVA.
 //
 //   It is intentionally a separate test so test_sbinit_multiple_reqs (and
 //   every other SBINIT test) can pass independently. Once the Scala fix
@@ -229,8 +231,9 @@ class test_sbinit_req_backpressure extends sbinit_base_test;
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    // Opt into the requester ready/valid data-stability check (gated so the
-    // other tests, which don't back-pressure the requester, aren't affected).
+    // Opt into the requester back-pressure checks: enables the payload-stability
+    // SVA on the requester TX stream and the scoreboard liveness row. Gated so
+    // tests that don't back-pressure the requester are unaffected.
     cfg.expect_req_tx_data_stable = 1;
   endfunction
 
@@ -261,12 +264,14 @@ endclass
 //   tx_valid is high; with the current RTL (SBInit.scala lines 183-187 assign
 //   tx.bits.data inside `when(tx.ready)`) it drives tx_valid=1 with tx_data=0.
 //
-//   This test is EXPECTED TO FAIL on the current RTL: the scoreboard's
-//   "Responder TX data is stable while valid asserted" check fires. It is a
-//   separate test (and the stability check is opt-in via cfg) so that
-//   test_sbinit_multiple_reqs — which also back-pressures the responder, but
-//   to verify done-req collapse rather than data stability — keeps passing.
-//   Turns green automatically once the Scala fix lands.
+//   This test is EXPECTED TO FAIL on the current RTL: the bound payload-
+//   stability SVA on the responder TX stream fires. It is a separate test (and
+//   the check is opt-in via cfg) so that test_sbinit_multiple_reqs — which also
+//   back-pressures the responder, but to verify done-req collapse rather than
+//   data stability — keeps passing (its offered-under-back-pressure UNKNOWN
+//   beats are not hard failures). The scoreboard's responder liveness row still
+//   PASSES, so the SVA is the single failure owner. Turns green automatically
+//   once the Scala fix lands.
 // ---------------------------------------------------------------------------
 class test_sbinit_rsp_backpressure extends sbinit_base_test;
   `uvm_component_utils(test_sbinit_rsp_backpressure)
@@ -277,7 +282,8 @@ class test_sbinit_rsp_backpressure extends sbinit_base_test;
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    // Opt into the responder ready/valid data-stability check only.
+    // Opt into the responder back-pressure checks (payload-stability SVA on the
+    // responder TX stream + scoreboard liveness row).
     cfg.expect_rsp_tx_data_stable = 1;
   endfunction
 

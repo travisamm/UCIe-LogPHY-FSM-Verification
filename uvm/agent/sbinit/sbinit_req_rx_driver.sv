@@ -33,9 +33,10 @@ class sbinit_req_rx_driver extends uvm_driver #(sbinit_req_rx_transaction);
   endfunction
 
   task run_phase(uvm_phase phase);
-    ctrl_vif.fsmCtrl_start = 0;
-    vif.rx_valid           = 0;
-    vif.rx_bits_data       = 0;
+    // Synchronous idle via the clocking block.
+    ctrl_vif.drv_cb.fsmCtrl_start <= 0;
+    vif.drv_cb.rx_valid           <= 0;
+    vif.drv_cb.rx_bits_data       <= 0;
 
     wait (vif.reset == 0);
 
@@ -48,17 +49,17 @@ class sbinit_req_rx_driver extends uvm_driver #(sbinit_req_rx_transaction);
 
   task drive_item(sbinit_req_rx_transaction t);
     if (t.delay > 0) begin
-      vif.rx_valid = 0;
-      repeat (t.delay) @(posedge vif.clock);
+      vif.drv_cb.rx_valid <= 0;
+      repeat (t.delay) @(vif.drv_cb);
     end
 
-    ctrl_vif.fsmCtrl_start = t.fsmCtrl_start;
-    vif.rx_valid           = t.rx_valid;
-    vif.rx_bits_data       = t.rx_data;
+    ctrl_vif.drv_cb.fsmCtrl_start <= t.fsmCtrl_start;
+    vif.drv_cb.rx_valid           <= t.rx_valid;
+    vif.drv_cb.rx_bits_data       <= t.rx_data;
 
-    repeat (t.hold_cycles > 0 ? t.hold_cycles : 1) @(posedge vif.clock);
+    repeat (t.hold_cycles > 0 ? t.hold_cycles : 1) @(vif.drv_cb);
 
-    vif.rx_valid = 0;
+    vif.drv_cb.rx_valid <= 0;
   endtask
 
 endclass

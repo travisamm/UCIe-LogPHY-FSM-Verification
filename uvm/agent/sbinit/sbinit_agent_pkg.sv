@@ -7,11 +7,7 @@ package sbinit_agent_pkg;
   import uvm_pkg::*;
   `include "uvm_macros.svh"
   import sbinit_msg_pkg::*;
-
-  // Observed/analysis transactions (produced by the monitors, consumed by
-  // the scoreboard and coverage).
-  `include "sbinit_req_transaction.sv"
-  `include "sbinit_rsp_transaction.sv"
+  import sbinit_event_pkg::*;   // sbinit_event + sbinit_decoder (monitor output)
 
   // Drive items: split rx and (shared) tx-ready channels.
   `include "sbinit_req_rx_transaction.sv"
@@ -29,9 +25,12 @@ package sbinit_agent_pkg;
   `include "sbinit_req_txready_driver.sv"
   `include "sbinit_rsp_txready_driver.sv"
 
-  // Monitors and agents.
+  // Monitors (event producers) and agents. The lane monitors share a
+  // vif-agnostic base; the control monitor is instantiated by the env.
+  `include "sbinit_lane_monitor_base.sv"
   `include "sbinit_req_monitor.sv"
   `include "sbinit_rsp_monitor.sv"
+  `include "sbinit_ctrl_monitor.sv"
   `include "sbinit_req_agent.sv"
   `include "sbinit_rsp_agent.sv"
 

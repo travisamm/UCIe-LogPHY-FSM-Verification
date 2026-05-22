@@ -18,6 +18,19 @@ class sbinit_base_test extends uvm_test;
     env = sbinit_env::type_id::create("env", this);
   endfunction
 
+  // Push the per-lane SVA enable into the interfaces. Done after build (so
+  // derived tests' build_phase has set the cfg flags) but before assertions
+  // start mattering. The bound payload-stability checker reads stable_chk_en.
+  function void start_of_simulation_phase(uvm_phase phase);
+    virtual sb_req_if req_vif;
+    virtual sb_rsp_if rsp_vif;
+    super.start_of_simulation_phase(phase);
+    if (uvm_config_db#(virtual sb_req_if)::get(this, "", "sbinit_req_vif", req_vif))
+      req_vif.stable_chk_en = cfg.expect_req_tx_data_stable;
+    if (uvm_config_db#(virtual sb_rsp_if)::get(this, "", "sbinit_rsp_vif", rsp_vif))
+      rsp_vif.stable_chk_en = cfg.expect_rsp_tx_data_stable;
+  endfunction
+
   function sbinit_virtual_sequencer get_vseqr();
     return env.vseqr;
   endfunction
