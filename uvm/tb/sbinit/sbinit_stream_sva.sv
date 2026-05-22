@@ -28,7 +28,7 @@
 // added once reset/timeout/abort boundaries are first-class. Keep them out of
 // this generic stream-level rule.
 // ===========================================================================
-module sbinit_payload_stability_sva #(
+checker sbinit_payload_stability_sva #(
   parameter int W = 128
 ) (
   input logic         clock,
@@ -56,7 +56,7 @@ module sbinit_payload_stability_sva #(
       $sformatf("payload not stable under back-pressure: data changed while valid held and ready low (data=0x%0h)",
                 data));
 
-endmodule
+endchecker
 
 // ---------------------------------------------------------------------------
 // Bind the generic checker onto each lane's TX stream. `en` follows the
