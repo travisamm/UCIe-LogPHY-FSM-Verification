@@ -6,6 +6,7 @@ module logphy_tb_top;
 
   logic clock;
   logic reset;
+  logic por_reset;
 
   // Clock generation
   initial begin
@@ -13,11 +14,17 @@ module logphy_tb_top;
     forever #5 clock = ~clock;
   end
 
-  // Reset generation
+  // Reset generation: power-on reset OR a sequence-injected reset. The reset
+  // agent drives rst_if.reset_req; the DUT reset is the OR of the two so
+  // mid-sim resets can be injected WITHOUT touching the DUT port connection.
   initial begin
-    reset = 1;
-    #20 reset = 0;
+    por_reset = 1;
+    #20 por_reset = 0;
   end
+
+  // Reset injection + observation interface, and the combined DUT reset.
+  sb_reset_if rst_if(clock, reset);
+  assign reset = por_reset | rst_if.reset_req;
 
   // Split interfaces: FSM control, requester lane, responder lane.
   sb_ctrl_if ctrl_if(clock, reset);
@@ -52,9 +59,10 @@ module logphy_tb_top;
 
   // Initial UVM config db and start test
   initial begin
-    uvm_config_db#(virtual sb_ctrl_if)::set(null, "*", "sbinit_ctrl_vif", ctrl_if);
-    uvm_config_db#(virtual sb_req_if )::set(null, "*", "sbinit_req_vif",  req_if);
-    uvm_config_db#(virtual sb_rsp_if )::set(null, "*", "sbinit_rsp_vif",  rsp_if);
+    uvm_config_db#(virtual sb_ctrl_if )::set(null, "*", "sbinit_ctrl_vif",  ctrl_if);
+    uvm_config_db#(virtual sb_req_if  )::set(null, "*", "sbinit_req_vif",   req_if);
+    uvm_config_db#(virtual sb_rsp_if  )::set(null, "*", "sbinit_rsp_vif",   rsp_if);
+    uvm_config_db#(virtual sb_reset_if)::set(null, "*", "sbinit_reset_vif", rst_if);
     run_test();
   end
 

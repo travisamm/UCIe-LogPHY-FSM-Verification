@@ -25,6 +25,7 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
   sbinit_txready_sequencer req_txready_seqr;
   sbinit_rsp_rx_sequencer  rsp_rx_seqr;
   sbinit_txready_sequencer rsp_txready_seqr;
+  sbinit_reset_sequencer   reset_seqr;
 
   // Sampled in pre_body() so derived sequences can wait on protocol events.
   virtual sb_ctrl_if ctrl_vif;
@@ -77,6 +78,11 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
 
   task send_rsp_txready(sbinit_txready_transaction t);
     start_item(t, -1, rsp_txready_seqr);
+    finish_item(t, -1);
+  endtask
+
+  task send_reset(sbinit_reset_transaction t);
+    start_item(t, -1, reset_seqr);
     finish_item(t, -1);
   endtask
 
@@ -157,6 +163,19 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
     t.delay       = delay;
     t.hold_cycles = hold;
     send_rsp_txready(t);
+  endtask
+
+  // -------- reset-injection helper ---------------------------------------
+  // Inject a reset pulse: wait `delay` cycles, hold the DUT in reset for
+  // `cycles`, release. Blocks until the combined reset has fallen low again so
+  // the caller can safely start a fresh attempt afterwards.
+  task pulse_reset(int delay = 0, int cycles = 5);
+    sbinit_reset_transaction t;
+    t        = sbinit_reset_transaction::type_id::create("reset");
+    t.delay  = delay;
+    t.cycles = cycles;
+    send_reset(t);
+    wait (ctrl_vif.reset === 1'b0);
   endtask
 
   virtual task body();

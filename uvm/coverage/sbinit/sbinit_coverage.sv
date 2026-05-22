@@ -21,21 +21,24 @@ class sbinit_coverage extends uvm_subscriber #(sbinit_event);
     option.name = "sbinit_cg";
 
     cp_kind: coverpoint ev_h.kind {
-      bins clk_pattern   = {SB_EVT_CLK_PATTERN};
-      bins clk_stop      = {SB_EVT_CLK_PATTERN_STOP};
-      bins out_of_reset  = {SB_EVT_OUT_OF_RESET};
-      bins done_req      = {SB_EVT_DONE_REQ};
-      bins done_resp     = {SB_EVT_DONE_RESP};
-      bins mode_func     = {SB_EVT_MODE_FUNCTIONAL};
-      bins fsm_done      = {SB_EVT_FSM_DONE};
-      bins fsm_error     = {SB_EVT_FSM_ERROR};
-      bins unknown       = {SB_EVT_UNKNOWN};
+      bins clk_pattern      = {SB_EVT_CLK_PATTERN};
+      bins clk_stop         = {SB_EVT_CLK_PATTERN_STOP};
+      bins out_of_reset     = {SB_EVT_OUT_OF_RESET};
+      bins done_req         = {SB_EVT_DONE_REQ};
+      bins done_resp        = {SB_EVT_DONE_RESP};
+      bins mode_func        = {SB_EVT_MODE_FUNCTIONAL};
+      bins fsm_done         = {SB_EVT_FSM_DONE};
+      bins fsm_error        = {SB_EVT_FSM_ERROR};
+      bins reset_asserted   = {SB_EVT_RESET_ASSERTED};
+      bins reset_deasserted = {SB_EVT_RESET_DEASSERTED};
+      bins unknown          = {SB_EVT_UNKNOWN};
     }
 
     cp_src: coverpoint ev_h.src {
       bins req_lane = {SB_SRC_REQ_LANE};
       bins rsp_lane = {SB_SRC_RSP_LANE};
       bins ctrl     = {SB_SRC_CTRL};
+      bins reset    = {SB_SRC_RESET};
     }
 
     cp_dir: coverpoint ev_h.dir {

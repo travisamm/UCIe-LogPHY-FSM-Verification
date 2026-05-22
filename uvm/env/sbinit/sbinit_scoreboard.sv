@@ -79,6 +79,10 @@ class sbinit_scoreboard extends uvm_scoreboard;
   bit saw_unknown_hard;     // UNKNOWN that is NOT an offered-under-bp beat
   bit saw_unknown_offered;  // UNKNOWN offered under back-pressure (SVA owns it)
 
+  // Reset boundaries observed (segments protocol attempts; not cleared on
+  // segmentation so the end-of-test summary can report it).
+  int unsigned reset_count;
+
   function new(string name, uvm_component parent);
     super.new(name, parent);
   endfunction
@@ -98,8 +102,10 @@ class sbinit_scoreboard extends uvm_scoreboard;
     ev_export.connect(ev_fifo.analysis_export);
   endfunction
 
-  task run_phase(uvm_phase phase);
-    sbinit_event ev;
+  // Clear the per-attempt protocol witnesses. Called at start-of-test and again
+  // on every reset boundary so a fresh attempt never reuses pre-reset state.
+  // reset_count is intentionally NOT cleared here.
+  function void clear_witnesses();
     saw_clock_pattern         = 0;
     saw_rx_clock_pattern      = 0;
     sb_02_verified            = 0;
@@ -124,6 +130,12 @@ class sbinit_scoreboard extends uvm_scoreboard;
     saw_rsp_tx_accept         = 0;
     saw_unknown_hard          = 0;
     saw_unknown_offered       = 0;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    sbinit_event ev;
+    reset_count = 0;
+    clear_witnesses();
 
     forever begin
       ev_fifo.get(ev);
@@ -135,6 +147,22 @@ class sbinit_scoreboard extends uvm_scoreboard;
   // Per-event processing. Chatter sits at UVM_HIGH.
   // -------------------------------------------------------------------
   function void process_event(sbinit_event ev);
+    // Reset boundary: segment the protocol attempt. Reset has priority over
+    // protocol events (the lane/control monitors suppress events while reset is
+    // high, so no protocol witnesses race the boundary).
+    if (ev.kind == SB_EVT_RESET_ASSERTED) begin
+      reset_count++;
+      `uvm_info("SBINIT_SB",
+                $sformatf("reset boundary #%0d: segmenting protocol attempt (clearing witnesses)",
+                          reset_count), UVM_MEDIUM)
+      clear_witnesses();
+      return;
+    end
+    if (ev.kind == SB_EVT_RESET_DEASSERTED) begin
+      `uvm_info("SBINIT_SB", "reset released: a fresh SBINIT attempt begins", UVM_HIGH)
+      return;
+    end
+
     // Malformed-activity policy (any source/direction).
     if (ev.kind == SB_EVT_UNKNOWN) begin
       if (ev.phase == SB_PHASE_OFFERED) begin
@@ -350,6 +378,12 @@ class sbinit_scoreboard extends uvm_scoreboard;
     // Malformed activity (excluding offered-under-back-pressure beats).
     fail_count += report_row(REQ_NAME_NO_MALFORMED,
                              !cfg.allow_unknown_events,       !saw_unknown_hard);
+
+    // Informational: reset boundaries observed (witnesses above reflect the
+    // final post-reset attempt).
+    `uvm_info("SBINIT_SB",
+              $sformatf("  [ info ] Reset boundaries observed: %0d", reset_count),
+              UVM_LOW)
 
     `uvm_info("SBINIT_SB",
               "-------------------------------------------------------------------",

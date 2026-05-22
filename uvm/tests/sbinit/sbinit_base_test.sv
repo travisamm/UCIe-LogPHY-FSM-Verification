@@ -42,6 +42,7 @@ class sbinit_base_test extends uvm_test;
     vseq.req_txready_seqr = env.vseqr.req_txready_seqr;
     vseq.rsp_rx_seqr      = env.vseqr.rsp_rx_seqr;
     vseq.rsp_txready_seqr = env.vseqr.rsp_txready_seqr;
+    vseq.reset_seqr       = env.vseqr.reset_seqr;
   endfunction
 
 endclass

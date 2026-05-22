@@ -345,4 +345,59 @@ class sbinit_rsp_backpressure_vseq extends sbinit_base_vseq;
   endtask
 endclass
 
+// ---------------------------------------------------------------------------
+// sbinit_reset_recovery_vseq
+//   Mid-sim reset recovery. Two attempts:
+//     1. Kick the FSM and start streaming the clock pattern, then inject a
+//        reset WHILE that rx item is in flight. The reset-aware drivers must
+//        abort the drive, idle their outputs, and complete the UVM item
+//        handshake (otherwise this vseq would hang at the forked drive_req_rx).
+//     2. After reset releases, run a clean, full SBINIT handshake to
+//        completion. The scoreboard segments on the reset boundary, so the
+//        summary reflects only this second attempt.
+//
+//   Proves: drivers do not strand items across reset; monitors restart event
+//   observation cleanly; scoreboard does not reuse pre-reset witnesses; the
+//   reset boundary is centralized through the reset monitor.
+// ---------------------------------------------------------------------------
+class sbinit_reset_recovery_vseq extends sbinit_base_vseq;
+  `uvm_object_utils(sbinit_reset_recovery_vseq)
+
+  function new(string name = "sbinit_reset_recovery_vseq");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    logic [127:0] out_of_reset;
+    logic [127:0] done_resp;
+    logic [127:0] done_req;
+
+    out_of_reset = make_no_data_msg(SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR);
+    done_resp    = make_no_data_msg(SBINIT_MC_DONE_RESP,    SBINIT_SC_DONE);
+    done_req     = make_no_data_msg(SBINIT_MC_DONE_REQ,     SBINIT_SC_DONE);
+
+    // ---- Attempt 1: start, then reset mid-flight ----
+    // A long clock-pattern drive runs concurrently with a reset pulse that
+    // lands while the rx item is in flight. join completes only if the rx
+    // driver releases the aborted item (no strand) and pulse_reset returns
+    // after reset falls low.
+    fork
+      begin : partial
+        drive_req_rx(SBINIT_CLK_PATTERN_5, .delay(5), .hold(50), .fsm_start(1));
+      end
+      begin : inject
+        pulse_reset(.delay(15), .cycles(5));
+      end
+    join
+
+    // ---- Attempt 2: clean full SBINIT to completion ----
+    drive_req_rx(SBINIT_CLK_PATTERN_5, .delay(10), .hold(5), .fsm_start(1));
+    drive_req_rx(out_of_reset, .delay(20), .hold(5));
+    drive_req_rx(done_resp,    .delay(20), .hold(5));
+    drive_rsp_rx(done_req,     .delay(0),  .hold(5));
+
+    wait_for_fsm_done();
+  endtask
+endclass
+
 `endif

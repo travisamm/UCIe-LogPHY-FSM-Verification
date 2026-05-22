@@ -41,6 +41,7 @@ sbinit:
           ./if/sbinit/sb_ctrl_if.sv \
           ./if/sbinit/sb_req_if.sv \
           ./if/sbinit/sb_rsp_if.sv \
+          ./if/sbinit/sb_reset_if.sv \
           ./agent/sbinit/sbinit_event_pkg.sv \
           ./agent/sbinit/sbinit_agent_pkg.sv \
           ./env/sbinit/sbinit_env_pkg.sv \
@@ -49,6 +50,7 @@ sbinit:
           ./tb/sbinit/logphy_tb_top.sv \
           ./tb/logphy_sva.sv \
           ./tb/sbinit/sbinit_stream_sva.sv \
+          ./tb/sbinit/sbinit_reset_sva.sv \
           +UVM_TESTNAME=$(SBTEST) || true
 
 SBINIT_LOG_DIR ?= run_logs/sbinit
@@ -311,7 +313,7 @@ mbtrain_regress: mbtrain
 #   make cov_sbinit
 #   make cov_sbinit COV_SBINIT_WORK=my_dir
 
-SBINIT_TESTS ?= test_sbinit_decode test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout test_sbinit_req_backpressure test_sbinit_rsp_backpressure
+SBINIT_TESTS ?= test_sbinit_decode test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout test_sbinit_reset test_sbinit_req_backpressure test_sbinit_rsp_backpressure
 COV_SBINIT_WORK ?= cov_work/sbinit
 
 cov_sbinit:
@@ -329,6 +331,7 @@ cov_sbinit:
 	    ./if/sbinit/sb_ctrl_if.sv \
 	    ./if/sbinit/sb_req_if.sv \
 	    ./if/sbinit/sb_rsp_if.sv \
+	    ./if/sbinit/sb_reset_if.sv \
 	    ./agent/sbinit/sbinit_event_pkg.sv \
 	    ./agent/sbinit/sbinit_agent_pkg.sv \
 	    ./env/sbinit/sbinit_env_pkg.sv \
@@ -337,6 +340,7 @@ cov_sbinit:
 	    ./tb/sbinit/logphy_tb_top.sv \
 	    ./tb/logphy_sva.sv \
 	    ./tb/sbinit/sbinit_stream_sva.sv \
+	    ./tb/sbinit/sbinit_reset_sva.sv \
 	    +UVM_TESTNAME=$$test || true; \
 	done
 	$(MAKE) cov_report COV_WORK=$(COV_SBINIT_WORK)

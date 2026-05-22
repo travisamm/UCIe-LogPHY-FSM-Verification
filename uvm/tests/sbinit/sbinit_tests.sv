@@ -305,4 +305,38 @@ class test_sbinit_rsp_backpressure extends sbinit_base_test;
   endtask
 endclass
 
+// ---------------------------------------------------------------------------
+// test_sbinit_reset
+//   Mid-sim reset recovery. Injects a reset while a requester rx item is in
+//   flight, then runs a clean full SBINIT to completion. Verifies the env is
+//   reset-robust: drivers complete the aborted item (no strand), monitors
+//   restart cleanly, and the scoreboard segments its witnesses on the reset
+//   boundary so only the post-reset attempt is graded. Defaults already expect
+//   a full successful handshake (the second attempt).
+// ---------------------------------------------------------------------------
+class test_sbinit_reset extends sbinit_base_test;
+  `uvm_component_utils(test_sbinit_reset)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    sbinit_reset_recovery_vseq vseq;
+    phase.raise_objection(this, "test_sbinit_reset");
+
+    `uvm_info("TEST",
+              "Starting test_sbinit_reset: inject a mid-flight reset, then complete a clean SBINIT handshake",
+              UVM_LOW)
+
+    vseq = sbinit_reset_recovery_vseq::type_id::create("vseq");
+    connect_vseq(vseq);
+    vseq.start(env.vseqr);
+
+    #(`SBINIT_DRAIN_NS);
+    `uvm_info("TEST", "test_sbinit_reset stimulus complete; entering check_phase", UVM_LOW)
+    phase.drop_objection(this, "test_sbinit_reset");
+  endtask
+endclass
+
 `endif

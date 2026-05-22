@@ -32,19 +32,42 @@ class sbinit_req_rx_driver extends uvm_driver #(sbinit_req_rx_transaction);
       `uvm_fatal("NO_VIF", {"sbinit_ctrl_vif must be set for: ", get_full_name()})
   endfunction
 
+  // Reset-aware run loop: idle outputs, run until reset asserts, then abort the
+  // in-flight drive, re-idle, and complete the UVM item handshake so the
+  // sequence is never stranded across a reset boundary.
   task run_phase(uvm_phase phase);
-    // Synchronous idle via the clocking block.
+    bit item_in_flight;
+    forever begin
+      drive_idle();
+      wait (vif.reset == 1'b0);
+      item_in_flight = 0;
+      fork
+        begin : active
+          forever begin
+            seq_item_port.get_next_item(req);
+            item_in_flight = 1;
+            drive_item(req);
+            seq_item_port.item_done();
+            item_in_flight = 0;
+          end
+        end
+        begin : reset_watch
+          @(posedge vif.reset);
+        end
+      join_any
+      disable fork;
+      drive_idle();
+      if (item_in_flight) begin
+        seq_item_port.item_done();  // release the aborted item
+        item_in_flight = 0;
+      end
+    end
+  endtask
+
+  task drive_idle();
     ctrl_vif.drv_cb.fsmCtrl_start <= 0;
     vif.drv_cb.rx_valid           <= 0;
     vif.drv_cb.rx_bits_data       <= 0;
-
-    wait (vif.reset == 0);
-
-    forever begin
-      seq_item_port.get_next_item(req);
-      drive_item(req);
-      seq_item_port.item_done();
-    end
   endtask
 
   task drive_item(sbinit_req_rx_transaction t);

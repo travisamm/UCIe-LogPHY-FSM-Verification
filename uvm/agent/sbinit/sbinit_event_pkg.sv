@@ -45,6 +45,8 @@ package sbinit_event_pkg;
     SB_EVT_MODE_FUNCTIONAL,   // sbRxTxMode transitioned 0 -> 1
     SB_EVT_FSM_DONE,          // fsmCtrl_done asserted
     SB_EVT_FSM_ERROR,         // fsmCtrl_error asserted
+    SB_EVT_RESET_ASSERTED,    // DUT reset went active (boundary)
+    SB_EVT_RESET_DEASSERTED,  // DUT reset released (new attempt begins)
     SB_EVT_UNKNOWN            // valid lane activity that decoded to nothing known
   } sbinit_evt_kind_e;
 
@@ -52,7 +54,8 @@ package sbinit_event_pkg;
   typedef enum {
     SB_SRC_REQ_LANE,  // requester sideband lane monitor
     SB_SRC_RSP_LANE,  // responder sideband lane monitor
-    SB_SRC_CTRL       // FSM-control monitor (mode / done / error)
+    SB_SRC_CTRL,      // FSM-control monitor (mode / done / error)
+    SB_SRC_RESET      // reset monitor (single reset-event source)
   } sbinit_evt_src_e;
 
   // Direction of a lane event, from the testbench's point of view.
