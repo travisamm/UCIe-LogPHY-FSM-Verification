@@ -4,8 +4,8 @@
 // ===========================================================================
 // sbinit_stream_sva
 // ---------------------------------------------------------------------------
-// Reusable, parameterized cycle-level assertion layer for ready/valid sideband
-// streams. This is the home for *generic* stream invariants that the
+// Reusable cycle-level assertion layer for 128-bit ready/valid sideband streams.
+// This is the home for *generic* stream invariants that the
 // scoreboard (which now consumes protocol events, not raw cycles) should not
 // own. It is kept separate from tb/logphy_sva.sv (which is read-only and binds
 // DUT-internal signals) and is bound onto the SBINIT lane interfaces.
@@ -28,14 +28,12 @@
 // added once reset/timeout/abort boundaries are first-class. Keep them out of
 // this generic stream-level rule.
 // ===========================================================================
-checker sbinit_payload_stability_sva #(
-  parameter int W = 128
-) (
+checker sbinit_payload_stability_sva (
   input logic         clock,
   input logic         reset,
   input logic         valid,
   input logic         ready,
-  input logic [W-1:0] data,
+  input logic [127:0] data,
   input logic         en
 );
   import uvm_pkg::*;
@@ -62,7 +60,7 @@ endchecker
 // Bind the generic checker onto each lane's TX stream. `en` follows the
 // interface's stable_chk_en bit (set per test from sbinit_env_cfg).
 // ---------------------------------------------------------------------------
-bind sb_req_if sbinit_payload_stability_sva #(.W(128)) u_req_tx_stability (
+bind sb_req_if sbinit_payload_stability_sva u_req_tx_stability (
   .clock (clock),
   .reset (reset),
   .valid (tx_valid),
@@ -71,7 +69,7 @@ bind sb_req_if sbinit_payload_stability_sva #(.W(128)) u_req_tx_stability (
   .en    (stable_chk_en)
 );
 
-bind sb_rsp_if sbinit_payload_stability_sva #(.W(128)) u_rsp_tx_stability (
+bind sb_rsp_if sbinit_payload_stability_sva u_rsp_tx_stability (
   .clock (clock),
   .reset (reset),
   .valid (tx_valid),
