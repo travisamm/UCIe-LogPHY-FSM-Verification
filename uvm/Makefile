@@ -4,8 +4,9 @@ XRUN_OPTS := -sv -coverage all -covoverwrite -uvm -access +rwc -timescale 1ns/1p
 
 COV_WORK  ?= cov_work
 COV_TEST  ?= default
+IMC_REPORT_CMD ?= report_metrics
 
-.PHONY: sbinit sbinit_all sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 cov_mbinit cov_sbinit cov_report clean
+.PHONY: sbinit sbinit_all sbinit_regress mbinit mbinit_all mbinit_regress mbinit_lr03_lr04 ltsm mbtrain _mbtrain_run mbtrain_regress patternwriter_lr02 cov_mbinit cov_sbinit cov_report cov_report_md clean
 
 SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
@@ -317,7 +318,7 @@ _mbtrain_run:
 mbtrain_regress: mbtrain
 
 # ---- Coverage collection: SBINIT ----
-# Runs all 5 SBINIT tests with functional coverage, merges, and generates an HTML report.
+# Runs SBINIT tests with functional coverage, merges, and generates Markdown.
 # test_sbinit_timeout covers the error path; it may run long but is included for completeness.
 # Note: cp_fsm_error.error will remain 0 until the RTL hardcode in SBInit.scala is fixed.
 #
@@ -335,7 +336,7 @@ cov_sbinit:
 	  echo "=== Coverage run: $$test ==="; \
 	  $(XRUN) $(XRUN_OPTS) \
 	    -coverage u \
-	    -covworkdir $(abspath $(COV_SBINIT_WORK)) \
+	    -covworkdir "$(abspath $(COV_SBINIT_WORK))" \
 	    -covtest $$test \
 	    +incdir+./if/sbinit +incdir+./agent/sbinit +incdir+./env/sbinit +incdir+./seq/sbinit +incdir+./tests/sbinit \
 	    -y ../elab/generatedVerilog/logphy +libext+.sv \
@@ -356,17 +357,16 @@ cov_sbinit:
 	    ./tb/sbinit/sbinit_persistence_sva.sv \
 	    +UVM_TESTNAME=$$test || true; \
 	done
-	$(MAKE) cov_report COV_WORK=$(COV_SBINIT_WORK)
+	$(MAKE) cov_report_md COV_WORK=$(COV_SBINIT_WORK) COV_SUITE=sbinit
 
 # ---- Coverage collection: run mbinit_regress with coverage enabled, then report ----
 # Usage:
-#   make cov_mbinit           — collect + merge + open HTML report
-#   make cov_mbinit COV_WORK=my_cov_dir
+#   make cov_mbinit           - collect + merge + write Markdown report
+#   make cov_mbinit COV_MBINIT_WORK=my_cov_dir
 #
-# Individual tests write to $(COV_WORK)/<testname>/; imc merges them into a
-# single database and generates an HTML report under $(COV_WORK)/report/.
-#
-# The HTML report index is at $(COV_WORK)/report/index.html — open in a browser.
+# Individual tests write to $(COV_MBINIT_WORK)/<testname>/; imc merges them
+# into a single database and generates $(COV_MBINIT_WORK)/coverage.md plus raw
+# text artifacts under $(COV_MBINIT_WORK)/report_raw/.
 
 COV_MBINIT_WORK ?= cov_work/mbinit
 
@@ -377,7 +377,7 @@ cov_mbinit:
 	  echo "=== Coverage run: $$test ==="; \
 	  $(XRUN) $(XRUN_OPTS) \
 	    -coverage u \
-	    -covworkdir $(abspath $(COV_MBINIT_WORK)) \
+	    -covworkdir "$(abspath $(COV_MBINIT_WORK))" \
 	    -covtest $$test \
 	    +incdir+./if/mbinit +incdir+./agent +incdir+./agent/mbinit +incdir+./env/mbinit +incdir+./seq/mbinit +incdir+./tests/mbinit \
 	    -y ../elab/generatedVerilog/logphy +libext+.sv \
@@ -407,25 +407,45 @@ cov_mbinit:
 	    ./tb/mbinit/mbinit_tb_top.sv \
 	    +UVM_TESTNAME=$$test || true; \
 	done
-	$(MAKE) cov_report COV_WORK=$(COV_MBINIT_WORK)
+	$(MAKE) cov_report_md COV_WORK=$(COV_MBINIT_WORK) COV_SUITE=mbinit
 
-cov_report:
+cov_report: cov_report_md
+
+cov_report_md:
 	$(eval ABS_COV := $(abspath $(COV_WORK)))
 	$(eval SCOPE_DIR := $(ABS_COV)/scope)
-	$(eval MERGED := $(ABS_COV)/merged)
-	@echo "=== Merging all runs via runfile ==="
-	@first=""; \
-	ls $(SCOPE_DIR) | grep "^test_" | while read d; do echo "$(SCOPE_DIR)/$$d"; done \
-	  > $(ABS_COV)/runfile.txt; \
-	first=$$(head -1 $(ABS_COV)/runfile.txt); \
+	$(eval RAW_DIR := $(ABS_COV)/report_raw)
+	$(eval COV_SUITE ?= coverage)
+	@echo "=== Merging all $(COV_SUITE) coverage runs via runfile ==="
+	@mkdir -p "$(ABS_COV)" "$(RAW_DIR)"
+	@ls "$(SCOPE_DIR)" | grep "^test_" | while read d; do echo "$(SCOPE_DIR)/$$d"; done \
+	  > "$(ABS_COV)/runfile.txt"
+	@first=$$(head -1 "$(ABS_COV)/runfile.txt"); \
+	if [ -z "$$first" ]; then \
+	  echo "No coverage runs found under $(SCOPE_DIR)"; \
+	  exit 1; \
+	fi; \
 	$(IMC) -load "$$first" \
-	  -execcmd "merge -runfile $(ABS_COV)/runfile.txt -out $(SCOPE_DIR)/merged_all -overwrite; exit"
-	@echo "=== Generating HTML report from merged_all ==="
-	@mkdir -p $(ABS_COV)/report
-	$(IMC) -load $(SCOPE_DIR)/merged_all \
-	  -execcmd "exclude -type mbinit_state_sync_sva -metrics assertion -comment {Intentionally unbound: XC-03 property too tight for RTL substate timing}; report_metrics -overwrite -out $(ABS_COV)/report; exit"
+	  -execcmd "merge -runfile {$(ABS_COV)/runfile.txt} -out {$(SCOPE_DIR)/merged_all} -overwrite; exit"
+	@echo "=== Capturing IMC text coverage report from merged_all ==="
+	@if [ "$(COV_SUITE)" = "mbinit" ]; then \
+	  exclude_cmd="exclude -type mbinit_state_sync_sva -metrics assertion -comment {Intentionally unbound: XC-03 property too tight for RTL substate timing}; "; \
+	else \
+	  exclude_cmd=""; \
+	fi; \
+	$(IMC) -load "$(SCOPE_DIR)/merged_all" \
+	  -execcmd "$${exclude_cmd}$(IMC_REPORT_CMD); exit" \
+	  > "$(RAW_DIR)/imc_report_metrics.txt"
+	@echo "=== Writing Markdown coverage report ==="
+	@python3 ./scripts/coverage_markdown.py \
+	  --suite "$(COV_SUITE)" \
+	  --work "$(ABS_COV)" \
+	  --merged-db "$(SCOPE_DIR)/merged_all" \
+	  --runfile "$(ABS_COV)/runfile.txt" \
+	  --raw "$(RAW_DIR)/imc_report_metrics.txt" \
+	  --output "$(ABS_COV)/coverage.md"
 	@echo ""
-	@echo "Coverage report: $(ABS_COV)/report/index.html"
+	@echo "Coverage report: $(ABS_COV)/coverage.md"
 
 clean:
 	rm -rf *.log *.history INCA_libs xcelium.d run_logs cov_work

@@ -151,7 +151,7 @@ including when `MBTRAINTEST` selects one test.
 ## Coverage
 
 SBINIT and MBINIT coverage targets run the maintained test lists, merge IMC
-coverage data, and emit HTML reports:
+coverage data, and emit Markdown reports:
 
 ```bash
 make cov_sbinit
@@ -161,8 +161,8 @@ make cov_mbinit
 The report entry points are:
 
 ```text
-cov_work/sbinit/report/index.html
-cov_work/mbinit/report/index.html
+cov_work/sbinit/coverage.md
+cov_work/mbinit/coverage.md
 ```
 
 Override the output directory when needed:
@@ -172,8 +172,8 @@ make cov_sbinit COV_SBINIT_WORK=my_sbinit_cov
 make cov_mbinit COV_MBINIT_WORK=my_mbinit_cov
 ```
 
-`open_imc.sh` is available for opening merged IMC data or generated reports on
-systems where the GUI and browser setup support it.
+`open_imc.sh` is available for opening merged IMC data or printing generated
+Markdown reports on systems where the GUI setup supports it.
 
 Remove generated simulation and coverage artifacts with:
 
