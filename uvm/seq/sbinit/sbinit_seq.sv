@@ -400,4 +400,84 @@ class sbinit_reset_recovery_vseq extends sbinit_base_vseq;
   endtask
 endclass
 
+// ---------------------------------------------------------------------------
+// sbinit_random_vseq
+//   Randomized regression: runs several full SBINIT handshakes back-to-back,
+//   each with independently randomized timing (FSM kick delay, clock-pattern
+//   hold, Out-of-Reset gap, and done-handshake interleaving), separated by a
+//   reset so the scoreboard and reference-model predictor segment each attempt.
+//   Every run is a valid (passing) protocol exchange, so this broadens timing,
+//   repetition, and reset-boundary coverage without tripping the stability bug.
+//   Vary run-to-run behavior with the simulator seed (e.g. xrun -svseed).
+//
+//   Timing ranges are kept within the regime that lets the requester reach
+//   sOUT_OF_RESET before fsmCtrl_start drops (detection + four pattern
+//   iterations), so the handshake always completes.
+// ---------------------------------------------------------------------------
+class sbinit_random_vseq extends sbinit_base_vseq;
+  `uvm_object_utils(sbinit_random_vseq)
+
+  rand int unsigned num_runs;      // back-to-back SBINIT attempts
+  rand int unsigned clk_delay;     // idle before the FSM kick + clock pattern
+  rand int unsigned clk_hold;      // cycles the partner clock pattern is held
+  rand int unsigned oor_gap;       // gap before the partner Out-of-Reset
+  rand int unsigned done_gap;      // gap before the partner done-resp (req lane)
+  rand int unsigned rsp_done_gap;  // gap before the partner done-req (rsp lane)
+
+  constraint c_num_runs { num_runs inside {[3:5]}; }
+  constraint c_timing {
+    clk_delay    inside {[5:20]};
+    clk_hold     inside {[4:10]};
+    oor_gap      inside {[10:60]};
+    done_gap     inside {[5:40]};
+    rsp_done_gap inside {[0:20]};
+  }
+
+  function new(string name = "sbinit_random_vseq");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    logic [127:0] out_of_reset;
+    logic [127:0] done_resp;
+    logic [127:0] done_req;
+
+    out_of_reset = make_no_data_msg(SBINIT_MC_OUT_OF_RESET, SBINIT_SC_OOR);
+    done_resp    = make_no_data_msg(SBINIT_MC_DONE_RESP,    SBINIT_SC_DONE);
+    done_req     = make_no_data_msg(SBINIT_MC_DONE_REQ,     SBINIT_SC_DONE);
+
+    if (!this.randomize())
+      `uvm_fatal("RANDVSEQ", "sbinit_random_vseq: randomization failed")
+
+    `uvm_info("RANDVSEQ",
+              $sformatf("randomized regression: %0d back-to-back SBINIT runs", num_runs),
+              UVM_LOW)
+
+    for (int unsigned i = 0; i < num_runs; i++) begin
+      // Re-randomize per-run timing (num_runs is fixed for the loop).
+      if (i > 0)
+        if (!this.randomize(clk_delay, clk_hold, oor_gap, done_gap, rsp_done_gap))
+          `uvm_fatal("RANDVSEQ", "sbinit_random_vseq: per-run randomization failed")
+
+      `uvm_info("RANDVSEQ",
+                $sformatf("run %0d/%0d: clk_delay=%0d clk_hold=%0d oor_gap=%0d done_gap=%0d rsp_done_gap=%0d",
+                          i + 1, num_runs, clk_delay, clk_hold, oor_gap, done_gap, rsp_done_gap),
+                UVM_LOW)
+
+      // Full valid SBINIT handshake with randomized timing.
+      drive_req_rx(SBINIT_CLK_PATTERN_5, .delay(clk_delay), .hold(clk_hold), .fsm_start(1));
+      drive_req_rx(out_of_reset, .delay(oor_gap), .hold(5));
+      fork
+        drive_req_rx(done_resp, .delay(done_gap),     .hold(5));
+        drive_rsp_rx(done_req,  .delay(rsp_done_gap), .hold(5));
+      join
+      wait_for_fsm_done();
+
+      // Segment with a reset before the next randomized run.
+      if (i < num_runs - 1)
+        pulse_reset(.delay(5), .cycles(5));
+    end
+  endtask
+endclass
+
 `endif

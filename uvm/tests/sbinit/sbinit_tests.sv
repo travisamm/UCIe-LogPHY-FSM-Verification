@@ -331,4 +331,37 @@ class test_sbinit_reset extends sbinit_base_test;
   endtask
 endclass
 
+// ---------------------------------------------------------------------------
+// test_sbinit_random
+//   Randomized regression: runs several full SBINIT handshakes with randomized
+//   timing, separated by resets, in a single simulation. Broadens timing,
+//   repetition, and reset-boundary coverage. Each run is a valid exchange, so
+//   the witness scoreboard, reference-model predictor, and assertions all stay
+//   green. Use the simulator seed to vary the scenario across regression runs:
+//     make sbinit SBTEST=test_sbinit_random
+// ---------------------------------------------------------------------------
+class test_sbinit_random extends sbinit_base_test;
+  `uvm_component_utils(test_sbinit_random)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    sbinit_random_vseq vseq;
+    phase.raise_objection(this, "test_sbinit_random");
+
+    `uvm_info("TEST",
+              "Starting test_sbinit_random: randomized multi-run SBINIT regression",
+              UVM_LOW)
+
+    vseq = sbinit_random_vseq::type_id::create("vseq");
+    vseq.start(env.vseqr);
+
+    #(`SBINIT_DRAIN_NS);
+    `uvm_info("TEST", "test_sbinit_random stimulus complete; entering check_phase", UVM_LOW)
+    phase.drop_objection(this, "test_sbinit_random");
+  endtask
+endclass
+
 `endif
