@@ -31,10 +31,6 @@ class sbinit_base_test extends uvm_test;
       rsp_vif.stable_chk_en = cfg.expect_rsp_tx_data_stable;
   endfunction
 
-  function sbinit_virtual_sequencer get_vseqr();
-    return env.vseqr;
-  endfunction
-
   // Note: sub-sequencer handles are no longer wired here. Virtual sequences
   // use the idiomatic p_sequencer pattern (`uvm_declare_p_sequencer in
   // sbinit_base_vseq) and grab their handles in pre_body when started on

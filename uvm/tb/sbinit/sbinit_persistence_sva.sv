@@ -24,11 +24,12 @@
 //   Step 8: "If {SBINIT Out of Reset} ... detection is successful ... the UCIe
 //            Module stops sending the sideband message."
 //
-// Message encodings are spec-grounded (UCIe 3.0 Table 7-9 "messages without
-// data", and Figure 7-3 / Figure 7-5 field positions):
-//   opcode  -> bits [4:0]
-//   msgcode -> bits [21:14]      (confirmed in Figure 7-5 text)
-//   subcode -> bits [39:32]
+// Message encodings are spec-grounded. Confirmed against UCIe 3.0 Figure 7-3
+// "Format for Messages without Data" (Phase0/Phase1 stacked as the 64-bit
+// header) and Table 7-9:
+//   opcode[4:0]      -> bits [4:0]    (Phase0)
+//   msgcode[7:0]     -> bits [21:14]  (Phase0)
+//   MsgSubcode[7:0]  -> bits [39:32]  (Phase1[7:0])
 //   {SBINIT Out of Reset} : msgcode 0x91, subcode 0x00
 //
 // Kept separate from the generic ready/valid stream stability checker
@@ -42,10 +43,9 @@
 //       (Section 5/7), not here. We accept BOTH phases below; tighten once the
 //       order is confirmed. The "32-UI low" framing (upper bits) is likewise not
 //       constrained here, so this checker only constrains the lower 64 UI.
-//   (b) subcode bit position [39:32] is taken from the spec-aligned
-//       sbinit_msg_pkg slice; Figure 7-3 is a bitfield graphic that did not
-//       extract as machine-readable text - visually confirm [39:32] against the
-//       published figure.
+//   (b) RESOLVED: the message field positions (opcode [4:0], msgcode [21:14],
+//       subcode [39:32]) are confirmed against Figure 7-3, and the elaborated
+//       OoR/done message constants were verified to use this spec layout.
 //   (c) Step 4's "stop after FOUR more iterations" exact count is not asserted
 //       here: an "iteration" (64-UI pattern + 32-UI low) boundary is not cleanly
 //       observable at the 128-bit lane-word granularity. Needs a spec-defined
@@ -67,9 +67,17 @@ checker sbinit_persistence_sva (
 );
   import uvm_pkg::*;
 
-  // ---- spec-grounded message identity (UCIe 3.0 Table 7-9, Fig 7-3/7-5) ----
+  // ---- spec-grounded message identity (UCIe 3.0 Table 7-9, Figure 7-3) ----
+  // {SBINIT Out of Reset}: msgcode 0x91 @ [21:14], subcode 0x00 @ [39:32].
+  //
+  // Dual-layout note: sbinit_msg_pkg's decoder also accepts a second "create"
+  // layout (msgcode @ [24:17], opcode widened to 8 bits) that the elaborated
+  // SBMsgCreate path can theoretically produce. We deliberately match ONLY the
+  // spec layout here because UCIe 3.0 Figure 7-3 defines exactly one encoding,
+  // and the elaborated OoR message was verified to use that spec layout. If the
+  // create layout is ever legitimately emitted this matcher would miss it - that
+  // is intended (a non-spec encoding should not satisfy a spec-grounded check).
   function automatic bit is_oor(logic [127:0] d);
-    // {SBINIT Out of Reset}: msgcode 0x91 @ [21:14], subcode 0x00 @ [39:32].
     return (d[21:14] == 8'h91) && (d[39:32] == 8'h00);
   endfunction
 
@@ -145,6 +153,73 @@ bind logphy_tb_top sbinit_persistence_sva u_sbinit_persistence (
   .tx_data  (req_if.tx_bits_data),
   .rx_valid (req_if.rx_valid),
   .rx_data  (req_if.rx_bits_data)
+);
+
+// ===========================================================================
+// sbinit_rsp_persistence_sva
+// ---------------------------------------------------------------------------
+// Responder-lane protocol persistence (UCIe 3.0 Section 4.5.3.2 Step 10). The
+// responder answers a received {SBINIT done req} with {SBINIT done resp}. Once
+// it begins transmitting the {done resp}, it must hold that response until the
+// beat is accepted (tx_ready), then stop - it may neither retract the offer
+// before acceptance nor keep re-sending it afterward.
+//
+// This is the responder analog of the requester's Out-of-Reset persistence: the
+// "exit" event here is acceptance (the handshake completing) rather than a
+// received message. Bound onto the responder lane only - no cross-interface
+// signals are needed.
+//
+// This is protocol persistence (the response is held until the handshake
+// completes), distinct from the generic ready/valid payload-stability rule in
+// sbinit_stream_sva. Under the current RTL back-pressure bug the offered beat is
+// corrupted to zero, so is_done_resp() is false during that window and these
+// properties are vacuous there (that failure is owned by the stream SVA and the
+// reference model); they become fully active once the payload is held stable.
+// ===========================================================================
+checker sbinit_rsp_persistence_sva (
+  input logic         clock,
+  input logic         reset,
+  input logic         tx_valid,
+  input logic         tx_ready,
+  input logic [127:0] tx_data
+);
+  import uvm_pkg::*;
+
+  // {SBINIT done resp}: msgcode 0x9A @ [21:14], subcode 0x01 @ [39:32]
+  // (UCIe 3.0 Figure 7-3 / Table 7-9; same spec layout as is_oor above).
+  function automatic bit is_done_resp(logic [127:0] d);
+    return (d[21:14] == 8'h9A) && (d[39:32] == 8'h01);
+  endfunction
+
+  // Persist: while offering {done resp} and not yet accepted (ready low), the
+  // responder must still be offering it next cycle - no premature retraction.
+  property p_done_resp_persist_until_accept;
+    @(posedge clock) disable iff (reset)
+    (tx_valid && is_done_resp(tx_data) && !tx_ready) |=>
+      (tx_valid && is_done_resp(tx_data));
+  endproperty
+  a_done_resp_persist: assert property (p_done_resp_persist_until_accept)
+    else uvm_report_error("SBINIT_SVA",
+      "UCIe 4.5.3.2 Step10: responder retracted {done resp} before it was accepted");
+
+  // Stop: once the {done resp} is accepted, the responder stops sending it.
+  property p_done_resp_stop_after_accept;
+    @(posedge clock) disable iff (reset)
+    (tx_valid && is_done_resp(tx_data) && tx_ready) |=>
+      !(tx_valid && is_done_resp(tx_data));
+  endproperty
+  a_done_resp_stop: assert property (p_done_resp_stop_after_accept)
+    else uvm_report_error("SBINIT_SVA",
+      "UCIe 4.5.3.2 Step10: responder kept sending {done resp} after it was accepted");
+
+endchecker
+
+bind sb_rsp_if sbinit_rsp_persistence_sva u_sbinit_rsp_persistence (
+  .clock    (clock),
+  .reset    (reset),
+  .tx_valid (tx_valid),
+  .tx_ready (tx_ready),
+  .tx_data  (tx_bits_data)
 );
 
 `endif
