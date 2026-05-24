@@ -35,15 +35,10 @@ class sbinit_base_test extends uvm_test;
     return env.vseqr;
   endfunction
 
-  // Wire a virtual sequence's sub-sequencer handles from env.vseqr. Tests call
-  // this on their vseq before .start() so they don't repeat the wiring.
-  function void connect_vseq(sbinit_base_vseq vseq);
-    vseq.req_rx_seqr      = env.vseqr.req_rx_seqr;
-    vseq.req_txready_seqr = env.vseqr.req_txready_seqr;
-    vseq.rsp_rx_seqr      = env.vseqr.rsp_rx_seqr;
-    vseq.rsp_txready_seqr = env.vseqr.rsp_txready_seqr;
-    vseq.reset_seqr       = env.vseqr.reset_seqr;
-  endfunction
+  // Note: sub-sequencer handles are no longer wired here. Virtual sequences
+  // use the idiomatic p_sequencer pattern (`uvm_declare_p_sequencer in
+  // sbinit_base_vseq) and grab their handles in pre_body when started on
+  // env.vseqr.
 
 endclass
 

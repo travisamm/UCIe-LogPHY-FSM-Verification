@@ -22,6 +22,7 @@ class sbinit_env extends uvm_env;
   sbinit_reset_sequencer    reset_seqr;
   sbinit_virtual_sequencer  vseqr;
   sbinit_scoreboard         scoreboard;
+  sbinit_predictor          predictor;
   sbinit_coverage           coverage;
   sbinit_env_cfg            cfg;
 
@@ -35,6 +36,7 @@ class sbinit_env extends uvm_env;
     if (!uvm_config_db#(sbinit_env_cfg)::get(this, "", "cfg", cfg))
       cfg = sbinit_env_cfg::type_id::create("cfg");
     uvm_config_db#(sbinit_env_cfg)::set(this, "scoreboard", "cfg", cfg);
+    uvm_config_db#(sbinit_env_cfg)::set(this, "predictor",  "cfg", cfg);
 
     req_agent     = sbinit_req_agent::type_id::create("req_agent", this);
     rsp_agent     = sbinit_rsp_agent::type_id::create("rsp_agent", this);
@@ -44,6 +46,7 @@ class sbinit_env extends uvm_env;
     reset_seqr    = sbinit_reset_sequencer::type_id::create("reset_seqr", this);
     vseqr         = sbinit_virtual_sequencer::type_id::create("vseqr", this);
     scoreboard    = sbinit_scoreboard::type_id::create("scoreboard", this);
+    predictor     = sbinit_predictor::type_id::create("predictor", this);
     coverage      = sbinit_coverage::type_id::create("coverage", this);
   endfunction
 
@@ -58,11 +61,17 @@ class sbinit_env extends uvm_env;
     // The reset driver pulls from the env-level reset sequencer.
     reset_driver.seq_item_port.connect(reset_seqr.seq_item_export);
 
-    // Fan every event producer into the single scoreboard input and coverage.
+    // Fan every event producer into the scoreboard, the reference-model
+    // predictor, and the coverage subscriber.
     req_agent.monitor.ev_ap.connect(scoreboard.ev_export);
     rsp_agent.monitor.ev_ap.connect(scoreboard.ev_export);
     ctrl_monitor.ev_ap.connect(scoreboard.ev_export);
     reset_monitor.ev_ap.connect(scoreboard.ev_export);
+
+    req_agent.monitor.ev_ap.connect(predictor.ev_export);
+    rsp_agent.monitor.ev_ap.connect(predictor.ev_export);
+    ctrl_monitor.ev_ap.connect(predictor.ev_export);
+    reset_monitor.ev_ap.connect(predictor.ev_export);
 
     req_agent.monitor.ev_ap.connect(coverage.analysis_export);
     rsp_agent.monitor.ev_ap.connect(coverage.analysis_export);

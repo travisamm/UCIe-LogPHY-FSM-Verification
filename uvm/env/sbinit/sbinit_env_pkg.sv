@@ -12,6 +12,7 @@ package sbinit_env_pkg;
   `include "sbinit_virtual_sequencer.sv"
   `include "../../coverage/sbinit/sbinit_coverage.sv"
   `include "sbinit_scoreboard.sv"
+  `include "sbinit_predictor.sv"
   `include "sbinit_env.sv"
 
 endpackage

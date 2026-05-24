@@ -48,7 +48,6 @@ class test_sbinit_sanity extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_sanity_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -91,7 +90,6 @@ class test_sbinit_timeout extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_timeout_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -122,7 +120,6 @@ class test_sbinit_partner_not_ready extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_partner_not_ready_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -158,7 +155,6 @@ class test_sbinit_early_req extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_early_req_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -194,7 +190,6 @@ class test_sbinit_multiple_reqs extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_collapse_reqs_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -246,7 +241,6 @@ class test_sbinit_req_backpressure extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_req_backpressure_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -296,7 +290,6 @@ class test_sbinit_rsp_backpressure extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_rsp_backpressure_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);
@@ -330,7 +323,6 @@ class test_sbinit_reset extends sbinit_base_test;
               UVM_LOW)
 
     vseq = sbinit_reset_recovery_vseq::type_id::create("vseq");
-    connect_vseq(vseq);
     vseq.start(env.vseqr);
 
     #(`SBINIT_DRAIN_NS);

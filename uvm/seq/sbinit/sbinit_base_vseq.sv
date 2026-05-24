@@ -19,8 +19,10 @@
 
 class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
   `uvm_object_utils(sbinit_base_vseq)
+  `uvm_declare_p_sequencer(sbinit_virtual_sequencer)
 
-  // Drive-channel sequencers (wired from env.vseqr by the test).
+  // Drive-channel sequencer handles. Aliased from p_sequencer in pre_body so
+  // the send_* helpers below stay readable; the test no longer wires them.
   sbinit_req_rx_sequencer  req_rx_seqr;
   sbinit_txready_sequencer req_txready_seqr;
   sbinit_rsp_rx_sequencer  rsp_rx_seqr;
@@ -36,6 +38,13 @@ class sbinit_base_vseq extends uvm_sequence #(uvm_sequence_item);
 
   // -------- protocol-time hooks ------------------------------------------
   virtual task pre_body();
+    // p_sequencer is set by start() (m_set_p_sequencer) before pre_body runs.
+    req_rx_seqr      = p_sequencer.req_rx_seqr;
+    req_txready_seqr = p_sequencer.req_txready_seqr;
+    rsp_rx_seqr      = p_sequencer.rsp_rx_seqr;
+    rsp_txready_seqr = p_sequencer.rsp_txready_seqr;
+    reset_seqr       = p_sequencer.reset_seqr;
+
     if (!uvm_config_db#(virtual sb_ctrl_if)::get(null, "*", "sbinit_ctrl_vif", ctrl_vif))
       `uvm_fatal("VSEQ", "sbinit_base_vseq: could not get sbinit_ctrl_vif from config_db")
   endtask
