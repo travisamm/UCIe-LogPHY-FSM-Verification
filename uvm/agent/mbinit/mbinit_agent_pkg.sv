@@ -10,6 +10,10 @@ package mbinit_agent_pkg;
 
   // MBINIT-specific transaction (extends logphy_transaction)
   `include "mbinit_transaction.sv"
+  // Pass 3: split-channel drive items + shared service policy
+  `include "mbinit_rx_transaction.sv"
+  `include "mbinit_ctrl_transaction.sv"
+  `include "mbinit_service_cfg.sv"
 
   // Inline sequencer typed to the MBINIT transaction
   class mbinit_sequencer extends uvm_sequencer #(mbinit_transaction);
@@ -19,7 +23,24 @@ package mbinit_agent_pkg;
     endfunction
   endclass
 
+  // Pass 3: new split-channel sequencers
+  `include "mbinit_rx_sequencer.sv"
+  `include "mbinit_ctrl_sequencer.sv"
+
+  // Legacy driver + new split drivers + legacy adapter (extends mbinit_driver)
   `include "mbinit_driver.sv"
+  `include "mbinit_req_rx_driver.sv"
+  `include "mbinit_rsp_rx_driver.sv"
+  `include "mbinit_ctrl_driver.sv"
+  `include "mbinit_legacy_adapter.sv"
+
+  // Pass 3: autonomous service stubs (replace the legacy driver's stub forks)
+  `include "mbinit_cal_stub.sv"
+  `include "mbinit_pw_stub.sv"
+  `include "mbinit_pr_stub.sv"
+  `include "mbinit_pttest_req_stub.sv"
+  `include "mbinit_pttest_rsp_stub.sv"
+
   `include "mbinit_monitor.sv"
 
   // Agent — same structure as logphy_agent, typed to MBINIT classes

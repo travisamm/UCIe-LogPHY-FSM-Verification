@@ -13,7 +13,11 @@
 - [x] Pass 2: Split interfaces + TB wiring (10 split ifs as passive mirrors;
       DUT stays on mbinit_if; DUT-port migration + bridge flip deferred to Pass 3
       per "mirror now" decision). Pending user compile verification.
-- [ ] Pass 3: New agents behind legacy facade
+- [x] Pass 3: New agents behind legacy facade + bridge flip. Decisions: DUT
+      stays on vif + bidirectional bridge (temporary; remove ~Pass 8/9); legacy
+      adapter `extends mbinit_driver`; tx_ready auto-stub (per-lane tx_ready
+      seqrs deferred). Drivers use the simple structure (reset-aware drivers are
+      Pass 6). Pending user compile verification.
 - [ ] Pass 4: Event-producing monitors
 - [ ] Pass 5: Event-driven scoreboard and coverage
 - [ ] Pass 6: Reset and assertion layer

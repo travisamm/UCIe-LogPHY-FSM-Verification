@@ -11,6 +11,7 @@ package mbinit_env_pkg;
   `include "mbinit_env_cfg.sv"
   `include "mbinit_scoreboard.sv"
   `include "../../coverage/mbinit/mbinit_coverage.sv"
+  `include "mbinit_virtual_sequencer.sv"
   `include "mbinit_env.sv"
 
 endpackage

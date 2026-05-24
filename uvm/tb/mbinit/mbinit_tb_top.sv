@@ -211,42 +211,47 @@ module mbinit_tb_top;
   );
 
   // -------------------------------------------------------------------------
-  // Pass 2 passive mirror: copy the live mbinit_if nets into the split
-  // interfaces (one direction only). These are the sole drivers of the split
-  // interface signals in Pass 2, so there is no multiple-driver conflict. When
-  // Pass 3 brings up the new drivers, the input-side mirrors flip to bridge the
-  // other way (vif <= split) and the legacy driver's direct vif writes are
-  // removed. mb_reset_if observes the combined `reset` through its port; its
-  // reset_req is undriven until Pass 6.
+  // Pass 3 bidirectional bridge between mbinit_if (DUT) and the split VIP
+  // interfaces. The DUT instantiation above is untouched (still on vif).
+  //   * DUT outputs  : split <= vif   (mirror, for monitors)
+  //   * DUT inputs   : vif   <= split (the new split drivers/stubs reach the DUT)
+  // The DUT-input direction was the Pass 2 ICDCBA culprit (a clocking output
+  // continuously assigned); flipping it to vif <= split makes the split signal's
+  // sole driver the new driver's clocking block. The legacy driver no longer
+  // drives vif (env factory-overrides it with mbinit_legacy_adapter).
+  // mb_reset_if observes the combined `reset` through its port; reset_req stays
+  // undriven until Pass 6.
+  // TODO(pass>=8/9): once tests run on env.vseqr and the legacy facade is
+  // retired, move the DUT ports onto the split interfaces and delete this bridge.
   // -------------------------------------------------------------------------
   // Requester sideband lane
-  assign req_if.tx_ready     = vif.requesterSbLaneIo_tx_ready;
-  assign req_if.tx_valid     = vif.requesterSbLaneIo_tx_valid;
-  assign req_if.tx_bits_data = vif.requesterSbLaneIo_tx_bits_data;
-  assign req_if.rx_ready     = vif.requesterSbLaneIo_rx_ready;
-  assign req_if.rx_valid     = vif.requesterSbLaneIo_rx_valid;
-  assign req_if.rx_bits_data = vif.requesterSbLaneIo_rx_bits_data;
+  assign req_if.tx_valid     = vif.requesterSbLaneIo_tx_valid;       // DUT out -> split
+  assign req_if.tx_bits_data = vif.requesterSbLaneIo_tx_bits_data;   // DUT out -> split
+  assign req_if.rx_ready     = vif.requesterSbLaneIo_rx_ready;       // DUT out -> split
+  assign vif.requesterSbLaneIo_tx_ready     = req_if.tx_ready;       // split -> DUT in
+  assign vif.requesterSbLaneIo_rx_valid     = req_if.rx_valid;       // split -> DUT in
+  assign vif.requesterSbLaneIo_rx_bits_data = req_if.rx_bits_data;   // split -> DUT in
   // Responder sideband lane
-  assign rsp_if.tx_ready     = vif.responderSbLaneIo_tx_ready;
-  assign rsp_if.tx_valid     = vif.responderSbLaneIo_tx_valid;
-  assign rsp_if.tx_bits_data = vif.responderSbLaneIo_tx_bits_data;
-  assign rsp_if.rx_ready     = vif.responderSbLaneIo_rx_ready;
-  assign rsp_if.rx_valid     = vif.responderSbLaneIo_rx_valid;
-  assign rsp_if.rx_bits_data = vif.responderSbLaneIo_rx_bits_data;
-  // FSM control + PHY settings + state/status
-  assign ctrl_if.fsmCtrl_start                 = vif.fsmCtrl_start;
-  assign ctrl_if.fsmCtrl_substateTransitioning = vif.fsmCtrl_substateTransitioning;
+  assign rsp_if.tx_valid     = vif.responderSbLaneIo_tx_valid;       // DUT out -> split
+  assign rsp_if.tx_bits_data = vif.responderSbLaneIo_tx_bits_data;   // DUT out -> split
+  assign rsp_if.rx_ready     = vif.responderSbLaneIo_rx_ready;       // DUT out -> split
+  assign vif.responderSbLaneIo_tx_ready     = rsp_if.tx_ready;       // split -> DUT in
+  assign vif.responderSbLaneIo_rx_valid     = rsp_if.rx_valid;       // split -> DUT in
+  assign vif.responderSbLaneIo_rx_bits_data = rsp_if.rx_bits_data;   // split -> DUT in
+  // FSM control: start + local PHY settings driven from split; status mirrored.
+  assign vif.fsmCtrl_start                  = ctrl_if.fsmCtrl_start;            // split -> DUT in
+  assign vif.localPhySettings_valid        = ctrl_if.localPhySettings_valid;        // split -> DUT in
+  assign vif.localPhySettings_voltageSwing = ctrl_if.localPhySettings_voltageSwing; // split -> DUT in
+  assign vif.localPhySettings_maxDataRate  = ctrl_if.localPhySettings_maxDataRate;  // split -> DUT in
+  assign vif.localPhySettings_clockMode    = ctrl_if.localPhySettings_clockMode;    // split -> DUT in
+  assign vif.localPhySettings_clockPhase   = ctrl_if.localPhySettings_clockPhase;   // split -> DUT in
+  assign vif.localPhySettings_ucieSx8      = ctrl_if.localPhySettings_ucieSx8;      // split -> DUT in
+  assign vif.localPhySettings_sbFeatExt    = ctrl_if.localPhySettings_sbFeatExt;    // split -> DUT in
+  assign vif.localPhySettings_txAdjRuntime = ctrl_if.localPhySettings_txAdjRuntime; // split -> DUT in
+  assign vif.localPhySettings_moduleId     = ctrl_if.localPhySettings_moduleId;     // split -> DUT in
+  assign ctrl_if.fsmCtrl_substateTransitioning = vif.fsmCtrl_substateTransitioning; // DUT out -> split
   assign ctrl_if.fsmCtrl_error                 = vif.fsmCtrl_error;
   assign ctrl_if.fsmCtrl_done                  = vif.fsmCtrl_done;
-  assign ctrl_if.localPhySettings_valid        = vif.localPhySettings_valid;
-  assign ctrl_if.localPhySettings_voltageSwing = vif.localPhySettings_voltageSwing;
-  assign ctrl_if.localPhySettings_maxDataRate  = vif.localPhySettings_maxDataRate;
-  assign ctrl_if.localPhySettings_clockMode    = vif.localPhySettings_clockMode;
-  assign ctrl_if.localPhySettings_clockPhase   = vif.localPhySettings_clockPhase;
-  assign ctrl_if.localPhySettings_ucieSx8      = vif.localPhySettings_ucieSx8;
-  assign ctrl_if.localPhySettings_sbFeatExt    = vif.localPhySettings_sbFeatExt;
-  assign ctrl_if.localPhySettings_txAdjRuntime = vif.localPhySettings_txAdjRuntime;
-  assign ctrl_if.localPhySettings_moduleId     = vif.localPhySettings_moduleId;
   assign ctrl_if.negotiatedPhySettings_valid       = vif.negotiatedPhySettings_valid;
   assign ctrl_if.negotiatedPhySettings_voltageSwing= vif.negotiatedPhySettings_voltageSwing;
   assign ctrl_if.negotiatedPhySettings_maxDataRate = vif.negotiatedPhySettings_maxDataRate;
@@ -263,30 +268,30 @@ module mbinit_tb_top;
   assign ctrl_if.remoteFunctionalLanes       = vif.remoteFunctionalLanes;
   assign ctrl_if.rxWidthChanged              = vif.rxWidthChanged;
   // Calibration handshake
-  assign cal_if.cal_start = vif.mbInitCalStart;
-  assign cal_if.cal_done  = vif.mbInitCalDone;
+  assign cal_if.cal_start = vif.mbInitCalStart;   // DUT out -> split
+  assign vif.mbInitCalDone = cal_if.cal_done;     // split -> DUT in
   // PatternWriter service
-  assign pw_if.req_ready       = vif.patternWriterIo_req_ready;
-  assign pw_if.req_valid       = vif.patternWriterIo_req_valid;
-  assign pw_if.req_patternType = vif.patternWriterIo_req_bits_patternType;
-  assign pw_if.resp_complete   = vif.patternWriterIo_resp_complete;
+  assign pw_if.req_valid       = vif.patternWriterIo_req_valid;             // DUT out -> split
+  assign pw_if.req_patternType = vif.patternWriterIo_req_bits_patternType;  // DUT out -> split
+  assign vif.patternWriterIo_req_ready     = pw_if.req_ready;               // split -> DUT in
+  assign vif.patternWriterIo_resp_complete = pw_if.resp_complete;           // split -> DUT in
   // PatternReader service
-  assign pr_if.req_ready       = vif.patternReaderIo_req_ready;
-  assign pr_if.req_valid       = vif.patternReaderIo_req_valid;
-  assign pr_if.req_patternType = vif.patternReaderIo_req_bits_patternType;
-  assign pr_if.req_done        = vif.patternReaderIo_req_bits_done;
-  assign pr_if.req_clear       = vif.patternReaderIo_req_bits_clear;
-  assign pr_if.resp_valid      = vif.patternReaderIo_resp_valid;
-  assign pr_if.resp_perLane    = vif.patternReaderIo_resp_bits_perLaneStatusBits;
-  assign pr_if.resp_aggregate  = vif.patternReaderIo_resp_bits_aggregateStatus;
+  assign pr_if.req_valid       = vif.patternReaderIo_req_valid;             // DUT out -> split
+  assign pr_if.req_patternType = vif.patternReaderIo_req_bits_patternType;  // DUT out -> split
+  assign pr_if.req_done        = vif.patternReaderIo_req_bits_done;         // DUT out -> split
+  assign pr_if.req_clear       = vif.patternReaderIo_req_bits_clear;        // DUT out -> split
+  assign vif.patternReaderIo_req_ready                  = pr_if.req_ready;       // split -> DUT in
+  assign vif.patternReaderIo_resp_valid                 = pr_if.resp_valid;      // split -> DUT in
+  assign vif.patternReaderIo_resp_bits_perLaneStatusBits = pr_if.resp_perLane;   // split -> DUT in
+  assign vif.patternReaderIo_resp_bits_aggregateStatus  = pr_if.resp_aggregate;  // split -> DUT in
   // Tx point-test (requester)
-  assign pttest_req_if.start         = vif.txPtTestReqIo_start;
-  assign pttest_req_if.done          = vif.txPtTestReqIo_done;
-  assign pttest_req_if.results_valid = vif.txPtTestReqIo_ptTestResults_valid;
-  assign pttest_req_if.results_bits  = vif.txPtTestReqIo_ptTestResults_bits;
+  assign pttest_req_if.start = vif.txPtTestReqIo_start;                          // DUT out -> split
+  assign vif.txPtTestReqIo_done                 = pttest_req_if.done;            // split -> DUT in
+  assign vif.txPtTestReqIo_ptTestResults_valid  = pttest_req_if.results_valid;   // split -> DUT in
+  assign vif.txPtTestReqIo_ptTestResults_bits   = pttest_req_if.results_bits;    // split -> DUT in
   // Tx point-test (responder)
-  assign pttest_rsp_if.start = vif.txPtTestRespIo_start;
-  assign pttest_rsp_if.done  = vif.txPtTestRespIo_done;
+  assign pttest_rsp_if.start = vif.txPtTestRespIo_start;                         // DUT out -> split
+  assign vif.txPtTestRespIo_done = pttest_rsp_if.done;                           // split -> DUT in
   // Mainband lane control (observe-only, XC-05)
   assign lane_ctrl_if.tx_data_en  = vif.mbLaneCtrl_txDataEn;
   assign lane_ctrl_if.tx_clk_en   = vif.mbLaneCtrl_txClkEn;
