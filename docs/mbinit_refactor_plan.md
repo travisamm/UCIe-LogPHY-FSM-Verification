@@ -10,7 +10,9 @@
 ## Progress tracker
 - [x] Pass 0: Baseline (documented below; no sim available locally)
 - [x] Pass 1: Add foundation (msg pkg, event pkg, env_cfg, decode smoke test)
-- [ ] Pass 2: Split interfaces and TB wiring
+- [x] Pass 2: Split interfaces + TB wiring (10 split ifs as passive mirrors;
+      DUT stays on mbinit_if; DUT-port migration + bridge flip deferred to Pass 3
+      per "mirror now" decision). Pending user compile verification.
 - [ ] Pass 3: New agents behind legacy facade
 - [ ] Pass 4: Event-producing monitors
 - [ ] Pass 5: Event-driven scoreboard and coverage

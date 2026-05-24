@@ -131,6 +131,16 @@ mbinit:
 	  ../elab/generatedVerilog/logphy/MBInitResponder.sv \
 	  ./if/logphy_if.sv \
 	  ./if/mbinit/mbinit_if.sv \
+	  ./if/mbinit/mb_ctrl_if.sv \
+	  ./if/mbinit/mb_req_if.sv \
+	  ./if/mbinit/mb_rsp_if.sv \
+	  ./if/mbinit/mb_reset_if.sv \
+	  ./if/mbinit/mb_cal_if.sv \
+	  ./if/mbinit/mb_pattern_writer_if.sv \
+	  ./if/mbinit/mb_pattern_reader_if.sv \
+	  ./if/mbinit/mb_pttest_req_if.sv \
+	  ./if/mbinit/mb_pttest_rsp_if.sv \
+	  ./if/mbinit/mb_lane_ctrl_if.sv \
 	  ./agent/logphy_agent_pkg.sv \
 	  ./agent/mbinit/mbinit_event_pkg.sv \
 	  ./agent/mbinit/mbinit_agent_pkg.sv \
@@ -376,6 +386,16 @@ cov_mbinit:
 	    ../elab/generatedVerilog/logphy/MBInitResponder.sv \
 	    ./if/logphy_if.sv \
 	    ./if/mbinit/mbinit_if.sv \
+	    ./if/mbinit/mb_ctrl_if.sv \
+	    ./if/mbinit/mb_req_if.sv \
+	    ./if/mbinit/mb_rsp_if.sv \
+	    ./if/mbinit/mb_reset_if.sv \
+	    ./if/mbinit/mb_cal_if.sv \
+	    ./if/mbinit/mb_pattern_writer_if.sv \
+	    ./if/mbinit/mb_pattern_reader_if.sv \
+	    ./if/mbinit/mb_pttest_req_if.sv \
+	    ./if/mbinit/mb_pttest_rsp_if.sv \
+	    ./if/mbinit/mb_lane_ctrl_if.sv \
 	    ./agent/logphy_agent_pkg.sv \
 	    ./agent/mbinit/mbinit_event_pkg.sv \
 	    ./agent/mbinit/mbinit_agent_pkg.sv \

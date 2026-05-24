@@ -31,6 +31,24 @@ module mbinit_tb_top;
 
   mbinit_if vif(clock, reset);
 
+  // -------------------------------------------------------------------------
+  // Pass 2: split interfaces (clocking blocks + drv/mon modports). Staged as
+  // PASSIVE OBSERVATION MIRRORS of the monolithic mbinit_if - the DUT still
+  // binds to vif below, untouched, so every existing test stays green. The
+  // mirror assigns (one direction only: split <= vif) live after the DUT
+  // instantiation. The DUT-port migration + bridge flip happens in Pass 3.
+  // -------------------------------------------------------------------------
+  mb_ctrl_if           ctrl_if      (clock, reset);
+  mb_req_if            req_if       (clock, reset);
+  mb_rsp_if            rsp_if       (clock, reset);
+  mb_reset_if          rst_if       (clock, reset);
+  mb_cal_if            cal_if       (clock, reset);
+  mb_pattern_writer_if pw_if        (clock, reset);
+  mb_pattern_reader_if pr_if        (clock, reset);
+  mb_pttest_req_if     pttest_req_if(clock, reset);
+  mb_pttest_rsp_if     pttest_rsp_if(clock, reset);
+  mb_lane_ctrl_if      lane_ctrl_if (clock, reset);
+
 
   MBInitSM dut (
     .clock  (clock),
@@ -192,6 +210,93 @@ module mbinit_tb_top;
     .io_txPtTestRespInterfaceIo_start      (vif.txPtTestRespIo_start)
   );
 
+  // -------------------------------------------------------------------------
+  // Pass 2 passive mirror: copy the live mbinit_if nets into the split
+  // interfaces (one direction only). These are the sole drivers of the split
+  // interface signals in Pass 2, so there is no multiple-driver conflict. When
+  // Pass 3 brings up the new drivers, the input-side mirrors flip to bridge the
+  // other way (vif <= split) and the legacy driver's direct vif writes are
+  // removed. mb_reset_if observes the combined `reset` through its port; its
+  // reset_req is undriven until Pass 6.
+  // -------------------------------------------------------------------------
+  // Requester sideband lane
+  assign req_if.tx_ready     = vif.requesterSbLaneIo_tx_ready;
+  assign req_if.tx_valid     = vif.requesterSbLaneIo_tx_valid;
+  assign req_if.tx_bits_data = vif.requesterSbLaneIo_tx_bits_data;
+  assign req_if.rx_ready     = vif.requesterSbLaneIo_rx_ready;
+  assign req_if.rx_valid     = vif.requesterSbLaneIo_rx_valid;
+  assign req_if.rx_bits_data = vif.requesterSbLaneIo_rx_bits_data;
+  // Responder sideband lane
+  assign rsp_if.tx_ready     = vif.responderSbLaneIo_tx_ready;
+  assign rsp_if.tx_valid     = vif.responderSbLaneIo_tx_valid;
+  assign rsp_if.tx_bits_data = vif.responderSbLaneIo_tx_bits_data;
+  assign rsp_if.rx_ready     = vif.responderSbLaneIo_rx_ready;
+  assign rsp_if.rx_valid     = vif.responderSbLaneIo_rx_valid;
+  assign rsp_if.rx_bits_data = vif.responderSbLaneIo_rx_bits_data;
+  // FSM control + PHY settings + state/status
+  assign ctrl_if.fsmCtrl_start                 = vif.fsmCtrl_start;
+  assign ctrl_if.fsmCtrl_substateTransitioning = vif.fsmCtrl_substateTransitioning;
+  assign ctrl_if.fsmCtrl_error                 = vif.fsmCtrl_error;
+  assign ctrl_if.fsmCtrl_done                  = vif.fsmCtrl_done;
+  assign ctrl_if.localPhySettings_valid        = vif.localPhySettings_valid;
+  assign ctrl_if.localPhySettings_voltageSwing = vif.localPhySettings_voltageSwing;
+  assign ctrl_if.localPhySettings_maxDataRate  = vif.localPhySettings_maxDataRate;
+  assign ctrl_if.localPhySettings_clockMode    = vif.localPhySettings_clockMode;
+  assign ctrl_if.localPhySettings_clockPhase   = vif.localPhySettings_clockPhase;
+  assign ctrl_if.localPhySettings_ucieSx8      = vif.localPhySettings_ucieSx8;
+  assign ctrl_if.localPhySettings_sbFeatExt    = vif.localPhySettings_sbFeatExt;
+  assign ctrl_if.localPhySettings_txAdjRuntime = vif.localPhySettings_txAdjRuntime;
+  assign ctrl_if.localPhySettings_moduleId     = vif.localPhySettings_moduleId;
+  assign ctrl_if.negotiatedPhySettings_valid       = vif.negotiatedPhySettings_valid;
+  assign ctrl_if.negotiatedPhySettings_voltageSwing= vif.negotiatedPhySettings_voltageSwing;
+  assign ctrl_if.negotiatedPhySettings_maxDataRate = vif.negotiatedPhySettings_maxDataRate;
+  assign ctrl_if.negotiatedPhySettings_clockMode   = vif.negotiatedPhySettings_clockMode;
+  assign ctrl_if.negotiatedPhySettings_clockPhase  = vif.negotiatedPhySettings_clockPhase;
+  assign ctrl_if.negotiatedPhySettings_moduleId    = vif.negotiatedPhySettings_moduleId;
+  assign ctrl_if.currentState                = vif.currentState;
+  assign ctrl_if.interoperableParamsNotFound = vif.interoperableParamsNotFound;
+  assign ctrl_if.usingPatternWriter          = vif.usingPatternWriter;
+  assign ctrl_if.usingPatternReader          = vif.usingPatternReader;
+  assign ctrl_if.applyLaneReversal           = vif.applyLaneReversal;
+  assign ctrl_if.localFunctionalLanes        = vif.localFunctionalLanes;
+  assign ctrl_if.txWidthChanged              = vif.txWidthChanged;
+  assign ctrl_if.remoteFunctionalLanes       = vif.remoteFunctionalLanes;
+  assign ctrl_if.rxWidthChanged              = vif.rxWidthChanged;
+  // Calibration handshake
+  assign cal_if.cal_start = vif.mbInitCalStart;
+  assign cal_if.cal_done  = vif.mbInitCalDone;
+  // PatternWriter service
+  assign pw_if.req_ready       = vif.patternWriterIo_req_ready;
+  assign pw_if.req_valid       = vif.patternWriterIo_req_valid;
+  assign pw_if.req_patternType = vif.patternWriterIo_req_bits_patternType;
+  assign pw_if.resp_complete   = vif.patternWriterIo_resp_complete;
+  // PatternReader service
+  assign pr_if.req_ready       = vif.patternReaderIo_req_ready;
+  assign pr_if.req_valid       = vif.patternReaderIo_req_valid;
+  assign pr_if.req_patternType = vif.patternReaderIo_req_bits_patternType;
+  assign pr_if.req_done        = vif.patternReaderIo_req_bits_done;
+  assign pr_if.req_clear       = vif.patternReaderIo_req_bits_clear;
+  assign pr_if.resp_valid      = vif.patternReaderIo_resp_valid;
+  assign pr_if.resp_perLane    = vif.patternReaderIo_resp_bits_perLaneStatusBits;
+  assign pr_if.resp_aggregate  = vif.patternReaderIo_resp_bits_aggregateStatus;
+  // Tx point-test (requester)
+  assign pttest_req_if.start         = vif.txPtTestReqIo_start;
+  assign pttest_req_if.done          = vif.txPtTestReqIo_done;
+  assign pttest_req_if.results_valid = vif.txPtTestReqIo_ptTestResults_valid;
+  assign pttest_req_if.results_bits  = vif.txPtTestReqIo_ptTestResults_bits;
+  // Tx point-test (responder)
+  assign pttest_rsp_if.start = vif.txPtTestRespIo_start;
+  assign pttest_rsp_if.done  = vif.txPtTestRespIo_done;
+  // Mainband lane control (observe-only, XC-05)
+  assign lane_ctrl_if.tx_data_en  = vif.mbLaneCtrl_txDataEn;
+  assign lane_ctrl_if.tx_clk_en   = vif.mbLaneCtrl_txClkEn;
+  assign lane_ctrl_if.tx_valid_en = vif.mbLaneCtrl_txValidEn;
+  assign lane_ctrl_if.tx_track_en = vif.mbLaneCtrl_txTrackEn;
+  assign lane_ctrl_if.rx_data_en  = vif.mbLaneCtrl_rxDataEn;
+  assign lane_ctrl_if.rx_clk_en   = vif.mbLaneCtrl_rxClkEn;
+  assign lane_ctrl_if.rx_valid_en = vif.mbLaneCtrl_rxValidEn;
+  assign lane_ctrl_if.rx_track_en = vif.mbLaneCtrl_rxTrackEn;
+
 `ifdef MBINIT_RM05_DEBUG
   // Hierarchical probe: MBInitRequester (see MBInitRequester.sv). Gated by +define+MBINIT_RM05_DEBUG.
   logic [10:0] rm05_dbg_prev;
@@ -237,6 +342,18 @@ module mbinit_tb_top;
 
   initial begin
     uvm_config_db#(virtual mbinit_if)::set(null, "*", "mbinit_vif", vif);
+    // Pass 2: publish the split interfaces for the Pass 4 monitors. No component
+    // fetches these yet, so this is additive and behavior-neutral.
+    uvm_config_db#(virtual mb_ctrl_if)::set          (null, "*", "mbinit_ctrl_vif",       ctrl_if);
+    uvm_config_db#(virtual mb_req_if)::set           (null, "*", "mbinit_req_vif",        req_if);
+    uvm_config_db#(virtual mb_rsp_if)::set           (null, "*", "mbinit_rsp_vif",        rsp_if);
+    uvm_config_db#(virtual mb_reset_if)::set         (null, "*", "mbinit_reset_vif",      rst_if);
+    uvm_config_db#(virtual mb_cal_if)::set           (null, "*", "mbinit_cal_vif",        cal_if);
+    uvm_config_db#(virtual mb_pattern_writer_if)::set(null, "*", "mbinit_pw_vif",         pw_if);
+    uvm_config_db#(virtual mb_pattern_reader_if)::set(null, "*", "mbinit_pr_vif",         pr_if);
+    uvm_config_db#(virtual mb_pttest_req_if)::set    (null, "*", "mbinit_pttest_req_vif", pttest_req_if);
+    uvm_config_db#(virtual mb_pttest_rsp_if)::set    (null, "*", "mbinit_pttest_rsp_vif", pttest_rsp_if);
+    uvm_config_db#(virtual mb_lane_ctrl_if)::set     (null, "*", "mbinit_lane_ctrl_vif",  lane_ctrl_if);
     run_test();
   end
 
