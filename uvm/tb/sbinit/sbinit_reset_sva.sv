@@ -11,6 +11,14 @@
 //   * the testbench drives its inputs idle (rx_valid / fsmCtrl_start are not
 //     asserted) - i.e. the reset-aware drivers actually idle.
 //
+// Spec grounding: UCIe 3.0 Section 4.5.3.1 (RESET) requires "Data, Valid,
+// Clock, and Track Transmitters are tri-stated" and (for the relevant case)
+// "Sideband Transmitters are held low"; Section 4.5.3.2 (SBINIT) similarly
+// holds SB Transmitters low when not performing state actions. The DUT-quiesce
+// rules below check that the DUT is not actively driving while reset is held.
+// The TB-idle rules are testbench hygiene (verify our own reset-aware drivers),
+// not a DUT spec requirement.
+//
 // Each rule is qualified by `(reset && $past(reset))` so it only fires once
 // reset has been stable for >=2 cycles. That tolerates the one cycle of
 // register/driver reaction latency at the reset edge (a synchronous output
