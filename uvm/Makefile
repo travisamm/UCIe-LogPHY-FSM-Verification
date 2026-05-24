@@ -12,7 +12,7 @@ MBTEST ?= test_mbinit_sanity
 # Optional xrun args for mbinit (e.g. MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG')
 MBINIT_XRUN_EXTRA ?=
 # All MBINIT UVM tests (see tests/mbinit/mbinit_tests.sv). Override to run a subset.
-MBINIT_TESTS ?= test_mbinit_sanity test_mbinit_param_mismatch test_mbinit_param_only test_mbinit_cal test_mbinit_repairclk test_mbinit_repairclk_unrep test_mbinit_repairval_unrep test_mbinit_lr04_reversal_apply test_mbinit_lr07_reversal_trainerror test_mbinit_rm02_per_lane_reader test_mbinit_rm07_unrepairable test_mbinit_rm05_post_repair_persist
+MBINIT_TESTS ?= test_mbinit_decode test_mbinit_sanity test_mbinit_param_mismatch test_mbinit_param_only test_mbinit_cal test_mbinit_repairclk test_mbinit_repairclk_unrep test_mbinit_repairval_unrep test_mbinit_lr04_reversal_apply test_mbinit_lr07_reversal_trainerror test_mbinit_rm02_per_lane_reader test_mbinit_rm07_unrepairable test_mbinit_rm05_post_repair_persist
 MBINIT_LOG_DIR ?= run_logs/mbinit
 MBINIT_SUBMAKE ?= $(MAKE)
 MBTRAINTEST ?=
@@ -132,6 +132,7 @@ mbinit:
 	  ./if/logphy_if.sv \
 	  ./if/mbinit/mbinit_if.sv \
 	  ./agent/logphy_agent_pkg.sv \
+	  ./agent/mbinit/mbinit_event_pkg.sv \
 	  ./agent/mbinit/mbinit_agent_pkg.sv \
 	  ./env/mbinit/mbinit_env_pkg.sv \
 	  ./seq/mbinit/mbinit_seq_pkg.sv \
@@ -376,6 +377,7 @@ cov_mbinit:
 	    ./if/logphy_if.sv \
 	    ./if/mbinit/mbinit_if.sv \
 	    ./agent/logphy_agent_pkg.sv \
+	    ./agent/mbinit/mbinit_event_pkg.sv \
 	    ./agent/mbinit/mbinit_agent_pkg.sv \
 	    ./env/mbinit/mbinit_env_pkg.sv \
 	    ./seq/mbinit/mbinit_seq_pkg.sv \
