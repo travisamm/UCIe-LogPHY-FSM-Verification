@@ -1,6 +1,6 @@
 XRUN     := /share/instsww/cadence/XCELIUM2509/tools/bin/xrun
 IMC      := MDV_XLM_HOME=/share/instsww/cadence/XCELIUM2509 /share/instsww/cadence/VMANAGER2509/tools/bin/imc
-XRUN_OPTS := -sv -uvm -access +rwc -timescale 1ns/1ps -64bit
+XRUN_OPTS := -sv -coverage all -covoverwrite -uvm -access +rwc -timescale 1ns/1ps -64bit 
 
 COV_WORK  ?= cov_work
 COV_TEST  ?= default
@@ -11,7 +11,7 @@ SBTEST ?= test_sbinit_sanity
 MBTEST ?= test_mbinit_sanity
 # Optional xrun args for mbinit (e.g. MBINIT_XRUN_EXTRA='+define+MBINIT_RM05_DEBUG')
 MBINIT_XRUN_EXTRA ?=
-# All MBINIT UVM tests (see tests/mbinit_tests.sv). Override to run a subset.
+# All MBINIT UVM tests (see tests/mbinit/mbinit_tests.sv). Override to run a subset.
 MBINIT_TESTS ?= test_mbinit_sanity test_mbinit_param_mismatch test_mbinit_param_only test_mbinit_cal test_mbinit_repairclk test_mbinit_repairclk_unrep test_mbinit_repairval_unrep test_mbinit_lr04_reversal_apply test_mbinit_lr07_reversal_trainerror test_mbinit_rm02_per_lane_reader test_mbinit_rm07_unrepairable test_mbinit_rm05_post_repair_persist
 MBINIT_LOG_DIR ?= run_logs/mbinit
 MBINIT_SUBMAKE ?= $(MAKE)
@@ -29,22 +29,29 @@ patternwriter_lr02:
 	$(PW_XRUN) -sv -64bit -timescale 1ns/1ps \
 	  ../elab/generatedVerilog/logphy/CircularShiftRegister.sv \
 	  ../elab/generatedVerilog/logphy/PatternWriter.sv \
-	  ./tb/patternwriter_tb_lr02.sv \
+	  ./tb/patternwriter/patternwriter_tb_lr02.sv \
 	  +access+r
 
 # ---- SBINIT ----
 sbinit:
 	$(XRUN) $(XRUN_OPTS) \
-          +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+          +incdir+./if/sbinit +incdir+./agent/sbinit +incdir+./env/sbinit +incdir+./seq/sbinit +incdir+./tests/sbinit \
           -y ../elab/generatedVerilog/logphy +libext+.sv \
           ../elab/generatedVerilog/logphy/SBInitSM.sv \
-          ./if/logphy_if.sv \
-          ./agent/logphy_agent_pkg.sv \
-          ./env/logphy_env_pkg.sv \
-          ./seq/logphy_seq_pkg.sv \
-          ./tests/logphy_test_pkg.sv \
-          ./tb/logphy_tb_top.sv \
+          ./if/sbinit/sb_ctrl_if.sv \
+          ./if/sbinit/sb_req_if.sv \
+          ./if/sbinit/sb_rsp_if.sv \
+          ./if/sbinit/sb_reset_if.sv \
+          ./agent/sbinit/sbinit_event_pkg.sv \
+          ./agent/sbinit/sbinit_agent_pkg.sv \
+          ./env/sbinit/sbinit_env_pkg.sv \
+          ./seq/sbinit/sbinit_seq_pkg.sv \
+          ./tests/sbinit/sbinit_test_pkg.sv \
+          ./tb/sbinit/logphy_tb_top.sv \
           ./tb/logphy_sva.sv \
+          ./tb/sbinit/sbinit_stream_sva.sv \
+          ./tb/sbinit/sbinit_reset_sva.sv \
+          ./tb/sbinit/sbinit_persistence_sva.sv \
           +UVM_TESTNAME=$(SBTEST) || true
 
 SBINIT_LOG_DIR ?= run_logs/sbinit
@@ -117,21 +124,21 @@ sbinit_regress: sbinit_all
 # ---- MBINIT ----
 mbinit:
 	$(XRUN) $(XRUN_OPTS) \
-	  +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+	  +incdir+./if/mbinit +incdir+./agent +incdir+./agent/mbinit +incdir+./env/mbinit +incdir+./seq/mbinit +incdir+./tests/mbinit \
 	  -y ../elab/generatedVerilog/logphy +libext+.sv \
 	  ../elab/generatedVerilog/logphy/MBInitSM.sv \
 	  ../elab/generatedVerilog/logphy/MBInitRequester.sv \
 	  ../elab/generatedVerilog/logphy/MBInitResponder.sv \
 	  ./if/logphy_if.sv \
-	  ./if/mbinit_if.sv \
+	  ./if/mbinit/mbinit_if.sv \
 	  ./agent/logphy_agent_pkg.sv \
-	  ./agent/mbinit_agent_pkg.sv \
-	  ./env/mbinit_env_pkg.sv \
-	  ./seq/mbinit_seq_pkg.sv \
-	  ./tests/mbinit_test_pkg.sv \
-	  ./tb/mbinit_bind_exports.sv \
+	  ./agent/mbinit/mbinit_agent_pkg.sv \
+	  ./env/mbinit/mbinit_env_pkg.sv \
+	  ./seq/mbinit/mbinit_seq_pkg.sv \
+	  ./tests/mbinit/mbinit_test_pkg.sv \
+	  ./tb/mbinit/mbinit_bind_exports.sv \
       ./tb/logphy_sva.sv \
-	  ./tb/mbinit_tb_top.sv \
+	  ./tb/mbinit/mbinit_tb_top.sv \
 	  $(MBINIT_XRUN_EXTRA) \
 	  +UVM_TESTNAME=$(MBTEST)
 
@@ -283,17 +290,17 @@ mbtrain:
 
 _mbtrain_run:
 	$(XRUN) $(XRUN_OPTS) \
-	  +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+	  +incdir+./if/mbtrain +incdir+./agent +incdir+./agent/mbtrain +incdir+./env/mbtrain +incdir+./seq/mbtrain +incdir+./tests/mbtrain \
 	  -y ../elab/generatedVerilog/logphy +libext+.sv \
 	  ../elab/generatedVerilog/logphy/MBTrainSM.sv \
 	  ./if/logphy_if.sv \
-	  ./if/mbtrain_if.sv \
+	  ./if/mbtrain/mbtrain_if.sv \
 	  ./agent/logphy_agent_pkg.sv \
-	  ./agent/mbtrain_agent_pkg.sv \
-	  ./env/mbtrain_env_pkg.sv \
-	  ./seq/mbtrain_seq_pkg.sv \
-	  ./tests/mbtrain_test_pkg.sv \
-	  ./tb/mbtrain_tb_top.sv \
+	  ./agent/mbtrain/mbtrain_agent_pkg.sv \
+	  ./env/mbtrain/mbtrain_env_pkg.sv \
+	  ./seq/mbtrain/mbtrain_seq_pkg.sv \
+	  ./tests/mbtrain/mbtrain_test_pkg.sv \
+	  ./tb/mbtrain/mbtrain_tb_top.sv \
 	  +UVM_TESTNAME=$(MBTRAINTEST)
 
 mbtrain_regress: mbtrain
@@ -307,7 +314,7 @@ mbtrain_regress: mbtrain
 #   make cov_sbinit
 #   make cov_sbinit COV_SBINIT_WORK=my_dir
 
-SBINIT_TESTS ?= test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout
+SBINIT_TESTS ?= test_sbinit_decode test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout test_sbinit_reset test_sbinit_random test_sbinit_req_backpressure test_sbinit_rsp_backpressure
 COV_SBINIT_WORK ?= cov_work/sbinit
 
 cov_sbinit:
@@ -319,16 +326,23 @@ cov_sbinit:
 	    -coverage u \
 	    -covworkdir $(abspath $(COV_SBINIT_WORK)) \
 	    -covtest $$test \
-	    +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+	    +incdir+./if/sbinit +incdir+./agent/sbinit +incdir+./env/sbinit +incdir+./seq/sbinit +incdir+./tests/sbinit \
 	    -y ../elab/generatedVerilog/logphy +libext+.sv \
 	    ../elab/generatedVerilog/logphy/SBInitSM.sv \
-	    ./if/logphy_if.sv \
-	    ./agent/logphy_agent_pkg.sv \
-	    ./env/logphy_env_pkg.sv \
-	    ./seq/logphy_seq_pkg.sv \
-	    ./tests/logphy_test_pkg.sv \
-	    ./tb/logphy_tb_top.sv \
+	    ./if/sbinit/sb_ctrl_if.sv \
+	    ./if/sbinit/sb_req_if.sv \
+	    ./if/sbinit/sb_rsp_if.sv \
+	    ./if/sbinit/sb_reset_if.sv \
+	    ./agent/sbinit/sbinit_event_pkg.sv \
+	    ./agent/sbinit/sbinit_agent_pkg.sv \
+	    ./env/sbinit/sbinit_env_pkg.sv \
+	    ./seq/sbinit/sbinit_seq_pkg.sv \
+	    ./tests/sbinit/sbinit_test_pkg.sv \
+	    ./tb/sbinit/logphy_tb_top.sv \
 	    ./tb/logphy_sva.sv \
+	    ./tb/sbinit/sbinit_stream_sva.sv \
+	    ./tb/sbinit/sbinit_reset_sva.sv \
+	    ./tb/sbinit/sbinit_persistence_sva.sv \
 	    +UVM_TESTNAME=$$test || true; \
 	done
 	$(MAKE) cov_report COV_WORK=$(COV_SBINIT_WORK)
@@ -354,21 +368,21 @@ cov_mbinit:
 	    -coverage u \
 	    -covworkdir $(abspath $(COV_MBINIT_WORK)) \
 	    -covtest $$test \
-	    +incdir+./if +incdir+./agent +incdir+./env +incdir+./seq +incdir+./tests \
+	    +incdir+./if/mbinit +incdir+./agent +incdir+./agent/mbinit +incdir+./env/mbinit +incdir+./seq/mbinit +incdir+./tests/mbinit \
 	    -y ../elab/generatedVerilog/logphy +libext+.sv \
 	    ../elab/generatedVerilog/logphy/MBInitSM.sv \
 	    ../elab/generatedVerilog/logphy/MBInitRequester.sv \
 	    ../elab/generatedVerilog/logphy/MBInitResponder.sv \
 	    ./if/logphy_if.sv \
-	    ./if/mbinit_if.sv \
+	    ./if/mbinit/mbinit_if.sv \
 	    ./agent/logphy_agent_pkg.sv \
-	    ./agent/mbinit_agent_pkg.sv \
-	    ./env/mbinit_env_pkg.sv \
-	    ./seq/mbinit_seq_pkg.sv \
-	    ./tests/mbinit_test_pkg.sv \
-	    ./tb/mbinit_bind_exports.sv \
+	    ./agent/mbinit/mbinit_agent_pkg.sv \
+	    ./env/mbinit/mbinit_env_pkg.sv \
+	    ./seq/mbinit/mbinit_seq_pkg.sv \
+	    ./tests/mbinit/mbinit_test_pkg.sv \
+	    ./tb/mbinit/mbinit_bind_exports.sv \
 	    ./tb/logphy_sva.sv \
-	    ./tb/mbinit_tb_top.sv \
+	    ./tb/mbinit/mbinit_tb_top.sv \
 	    +UVM_TESTNAME=$$test || true; \
 	done
 	$(MAKE) cov_report COV_WORK=$(COV_MBINIT_WORK)

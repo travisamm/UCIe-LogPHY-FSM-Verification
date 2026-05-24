@@ -1,5 +1,0 @@
-/scratch/cs199-akc/ucie/uvm/cov_work/sbinit/scope/test_sbinit_early_req
-/scratch/cs199-akc/ucie/uvm/cov_work/sbinit/scope/test_sbinit_multiple_reqs
-/scratch/cs199-akc/ucie/uvm/cov_work/sbinit/scope/test_sbinit_partner_not_ready
-/scratch/cs199-akc/ucie/uvm/cov_work/sbinit/scope/test_sbinit_sanity
-/scratch/cs199-akc/ucie/uvm/cov_work/sbinit/scope/test_sbinit_timeout
