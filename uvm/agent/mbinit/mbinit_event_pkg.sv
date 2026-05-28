@@ -12,9 +12,10 @@
 //   * mbinit_event   - one common observed type carried on analysis ports
 //   * mbinit_decoder - centralized classification of sideband lane words
 //
-// Pass 1 is purely additive: nothing here is wired into the live monitor,
-// scoreboard, or coverage yet (that begins at Pass 4/5). The only consumer
-// today is the focused decoder unit test (test_mbinit_decode).
+// Pass 4 wires the producer side of this event stream (lane / control / reset
+// / service / lane-control monitors -> mbinit_event_audit) in shadow mode; the
+// legacy mbinit_monitor + transaction scoreboard + coverage remain authoritative
+// until Pass 5. The decode-unit test (test_mbinit_decode) also consumes this.
 //
 // Why separate from mbinit_msg_pkg: keep the on-the-wire message format
 // (mbinit_msg_pkg, no UVM) separate from the observation/event model (this
@@ -97,7 +98,8 @@ package mbinit_event_pkg;
     MB_SRC_PARAMS,          // negotiated-params monitor
     MB_SRC_PATTERN_WRITER,  // pattern-writer service monitor
     MB_SRC_PATTERN_READER,  // pattern-reader service monitor
-    MB_SRC_PTTEST,          // Tx point-test service monitor
+    MB_SRC_PTTEST_REQ,      // Tx point-test requester-side service monitor
+    MB_SRC_PTTEST_RSP,      // Tx point-test responder-side service monitor
     MB_SRC_CAL,             // calibration service monitor
     MB_SRC_LANE_CTRL,       // mbLaneCtrlIo monitor
     MB_SRC_RESET            // reset monitor
@@ -120,6 +122,26 @@ package mbinit_event_pkg;
     MB_PHASE_ACCEPTED
   } mbinit_evt_phase_e;
 
+  // Service-handshake edge (Pass 4). Lane transfer lifecycle stays on `phase`;
+  // service handshakes use this to label which edge of the cal / pattern-writer
+  // / pattern-reader / point-test handshake an event represents. NONE for non-
+  // service events (lane / state / reset / lane-ctrl).
+  //   REQ    : service request edge      (e.g. PW req_valid offered/accepted)
+  //   RESP   : service response edge     (reserved for symmetric req/resp)
+  //   START  : start-side pulse          (cal_start, pttest start)
+  //   DONE   : completion pulse          (cal_done, resp_complete, req_done, pttest done)
+  //   RESULT : result-bearing pulse      (PR resp_valid, PTtest results_valid)
+  //   CLEAR  : substate-clear pulse      (PR req_clear)
+  typedef enum {
+    MB_SVC_NONE,
+    MB_SVC_REQ,
+    MB_SVC_RESP,
+    MB_SVC_START,
+    MB_SVC_DONE,
+    MB_SVC_RESULT,
+    MB_SVC_CLEAR
+  } mbinit_evt_svc_e;
+
   // Which on-the-wire layout decoded. MBINIT uses only the spec compare layout
   // today; the enum keeps the SBINIT-parallel shape for forward-compat.
   typedef enum {
@@ -140,6 +162,7 @@ package mbinit_event_pkg;
     mbinit_evt_dir_e    dir      = MB_DIR_NA;
     mbinit_evt_phase_e  phase    = MB_PHASE_OBSERVED;
     mbinit_evt_layout_e layout   = MB_LAYOUT_NONE;
+    mbinit_evt_svc_e    svc_kind = MB_SVC_NONE;   // Pass 4: service-edge label
 
     // Decoded sideband-message fields (valid when kind == MB_EVT_SB_MSG).
     logic [127:0] raw      = 128'h0;
@@ -153,6 +176,8 @@ package mbinit_event_pkg;
     bit  [2:0]    state          = 3'h0;   // currentState at observation
     bit  [1:0]    pattern_type   = 2'h0;   // patternWriter/Reader type
     bit  [15:0]   pt_results     = 16'h0;  // Tx point-test per-lane bits
+    bit  [15:0]   pr_per_lane    = 16'h0;  // PatternReader resp per-lane bits
+    bit           pr_aggregate   = 1'b0;   // PatternReader resp aggregate status
     bit  [3:0]    neg_data_rate  = 4'h0;   // negotiated maxDataRate
     bit           neg_clock_mode = 1'b0;   // negotiated clockMode
     bit           neg_clock_phase= 1'b0;   // negotiated clockPhase
@@ -180,6 +205,7 @@ package mbinit_event_pkg;
       `uvm_field_enum(mbinit_evt_dir_e,    dir,      UVM_ALL_ON)
       `uvm_field_enum(mbinit_evt_phase_e,  phase,    UVM_ALL_ON)
       `uvm_field_enum(mbinit_evt_layout_e, layout,   UVM_ALL_ON)
+      `uvm_field_enum(mbinit_evt_svc_e,    svc_kind, UVM_ALL_ON)
       `uvm_field_int (raw,            UVM_ALL_ON | UVM_HEX)
       `uvm_field_int (opcode,         UVM_ALL_ON | UVM_HEX)
       `uvm_field_int (msg_code,       UVM_ALL_ON | UVM_HEX)
@@ -189,6 +215,8 @@ package mbinit_event_pkg;
       `uvm_field_int (state,          UVM_ALL_ON | UVM_DEC)
       `uvm_field_int (pattern_type,   UVM_ALL_ON | UVM_HEX)
       `uvm_field_int (pt_results,     UVM_ALL_ON | UVM_HEX)
+      `uvm_field_int (pr_per_lane,    UVM_ALL_ON | UVM_HEX)
+      `uvm_field_int (pr_aggregate,   UVM_ALL_ON)
       `uvm_field_int (neg_data_rate,  UVM_ALL_ON | UVM_HEX)
       `uvm_field_int (neg_clock_mode, UVM_ALL_ON)
       `uvm_field_int (neg_clock_phase,UVM_ALL_ON)
@@ -206,13 +234,14 @@ package mbinit_event_pkg;
     function string convert2string();
       if (kind == MB_EVT_SB_MSG)
         return $sformatf(
-          "%s msg=%s role=%s src=%s dir=%s phase=%s mc=0x%02h sc=0x%02h info=0x%01h seq=%0d raw=0x%032h",
+          "%s msg=%s role=%s src=%s dir=%s phase=%s mc=0x%02h sc=0x%02h info=0x%01h seq=%0d lid=%0d raw=0x%032h",
           kind.name(), msg_kind.name(), role.name(), src.name(), dir.name(),
-          phase.name(), msg_code, subcode, msg_info, seq_num, raw);
+          phase.name(), msg_code, subcode, msg_info, seq_num, lifecycle_id, raw);
       else
         return $sformatf(
-          "%s src=%s dir=%s phase=%s state=%0d seq=%0d",
-          kind.name(), src.name(), dir.name(), phase.name(), state, seq_num);
+          "%s src=%s dir=%s phase=%s svc=%s state=%0d ptype=%0h pt=0x%04h pr=0x%04h/%0b seq=%0d",
+          kind.name(), src.name(), dir.name(), phase.name(), svc_kind.name(),
+          state, pattern_type, pt_results, pr_per_lane, pr_aggregate, seq_num);
     endfunction
 
   endclass

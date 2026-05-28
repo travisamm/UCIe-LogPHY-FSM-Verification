@@ -41,6 +41,20 @@ class mbinit_env extends uvm_env;
   mbinit_service_cfg       svc_cfg;
   mbinit_virtual_sequencer vseqr;
 
+  // Pass 4: event-producing monitors + passive audit subscriber (shadow stream;
+  // legacy monitor/scoreboard/coverage stay authoritative).
+  mbinit_req_monitor        evt_req_mon;
+  mbinit_rsp_monitor        evt_rsp_mon;
+  mbinit_ctrl_monitor       evt_ctrl_mon;
+  mbinit_reset_monitor      evt_reset_mon;
+  mbinit_cal_monitor        evt_cal_mon;
+  mbinit_pw_monitor         evt_pw_mon;
+  mbinit_pr_monitor         evt_pr_mon;
+  mbinit_pttest_req_monitor evt_pttest_req_mon;
+  mbinit_pttest_rsp_monitor evt_pttest_rsp_mon;
+  mbinit_lane_ctrl_monitor  evt_lane_ctrl_mon;
+  mbinit_event_audit        evt_audit;
+
   function new(string name, uvm_component parent);
     super.new(name, parent);
   endfunction
@@ -72,6 +86,19 @@ class mbinit_env extends uvm_env;
     pttest_req_stub = mbinit_pttest_req_stub::type_id::create("pttest_req_stub", this);
     pttest_rsp_stub = mbinit_pttest_rsp_stub::type_id::create("pttest_rsp_stub", this);
     vseqr           = mbinit_virtual_sequencer::type_id::create("vseqr", this);
+
+    // Pass 4 event producers + audit subscriber.
+    evt_req_mon         = mbinit_req_monitor::type_id::create("evt_req_mon", this);
+    evt_rsp_mon         = mbinit_rsp_monitor::type_id::create("evt_rsp_mon", this);
+    evt_ctrl_mon        = mbinit_ctrl_monitor::type_id::create("evt_ctrl_mon", this);
+    evt_reset_mon       = mbinit_reset_monitor::type_id::create("evt_reset_mon", this);
+    evt_cal_mon         = mbinit_cal_monitor::type_id::create("evt_cal_mon", this);
+    evt_pw_mon          = mbinit_pw_monitor::type_id::create("evt_pw_mon", this);
+    evt_pr_mon          = mbinit_pr_monitor::type_id::create("evt_pr_mon", this);
+    evt_pttest_req_mon  = mbinit_pttest_req_monitor::type_id::create("evt_pttest_req_mon", this);
+    evt_pttest_rsp_mon  = mbinit_pttest_rsp_monitor::type_id::create("evt_pttest_rsp_mon", this);
+    evt_lane_ctrl_mon   = mbinit_lane_ctrl_monitor::type_id::create("evt_lane_ctrl_mon", this);
+    evt_audit           = mbinit_event_audit::type_id::create("evt_audit", this);
   endfunction
 
   function void connect_phase(uvm_phase phase);
@@ -100,6 +127,18 @@ class mbinit_env extends uvm_env;
     ad.rsp_rx_seqr = rsp_rx_seqr;
     ad.ctrl_seqr   = ctrl_seqr;
     ad.svc_cfg     = svc_cfg;
+
+    // Pass 4: fan all event producers into the single audit subscriber.
+    evt_req_mon.ev_ap.connect       (evt_audit.analysis_export);
+    evt_rsp_mon.ev_ap.connect       (evt_audit.analysis_export);
+    evt_ctrl_mon.ev_ap.connect      (evt_audit.analysis_export);
+    evt_reset_mon.ev_ap.connect     (evt_audit.analysis_export);
+    evt_cal_mon.ev_ap.connect       (evt_audit.analysis_export);
+    evt_pw_mon.ev_ap.connect        (evt_audit.analysis_export);
+    evt_pr_mon.ev_ap.connect        (evt_audit.analysis_export);
+    evt_pttest_req_mon.ev_ap.connect(evt_audit.analysis_export);
+    evt_pttest_rsp_mon.ev_ap.connect(evt_audit.analysis_export);
+    evt_lane_ctrl_mon.ev_ap.connect (evt_audit.analysis_export);
   endfunction
 
 endclass

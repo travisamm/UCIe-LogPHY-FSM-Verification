@@ -11,14 +11,19 @@
 - [x] Pass 0: Baseline (documented below; no sim available locally)
 - [x] Pass 1: Add foundation (msg pkg, event pkg, env_cfg, decode smoke test)
 - [x] Pass 2: Split interfaces + TB wiring (10 split ifs as passive mirrors;
-      DUT stays on mbinit_if; DUT-port migration + bridge flip deferred to Pass 3
-      per "mirror now" decision). Pending user compile verification.
+      DUT stayed on mbinit_if; ICDCBA double-driver error surfaced and was
+      deferred to Pass 3 per "mirror now" decision).
 - [x] Pass 3: New agents behind legacy facade + bridge flip. Decisions: DUT
       stays on vif + bidirectional bridge (temporary; remove ~Pass 8/9); legacy
       adapter `extends mbinit_driver`; tx_ready auto-stub (per-lane tx_ready
-      seqrs deferred). Drivers use the simple structure (reset-aware drivers are
-      Pass 6). Pending user compile verification.
-- [ ] Pass 4: Event-producing monitors
+      seqrs deferred); simple driver structure (reset-aware drivers are Pass 6).
+      ICDCBA resolved. All 12 tests pass under make mbinit_all.
+- [x] Pass 4: Event-producing monitors (shadow). 11 monitors (lane base + req/rsp
+      + ctrl + reset + cal/pw/pr/pttest_req/pttest_rsp + lane_ctrl) feed a single
+      passive `mbinit_event_audit` subscriber. Event model extended with
+      `svc_kind`, `pr_per_lane`/`pr_aggregate`, and split `MB_SRC_PTTEST` ->
+      `_REQ`/`_RSP`. Legacy monitor/scoreboard/coverage untouched and still
+      authoritative. Pending user `make mbinit_all` verification.
 - [ ] Pass 5: Event-driven scoreboard and coverage
 - [ ] Pass 6: Reset and assertion layer
 - [ ] Pass 7: MBINIT reference predictor

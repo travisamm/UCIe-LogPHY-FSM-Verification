@@ -7,6 +7,8 @@ package mbinit_agent_pkg;
 
   // Base transaction (logphy_transaction) must be defined first
   import logphy_agent_pkg::*;
+  // Pass 4: event/decoder types for the new monitors.
+  import mbinit_event_pkg::*;
 
   // MBINIT-specific transaction (extends logphy_transaction)
   `include "mbinit_transaction.sv"
@@ -42,6 +44,20 @@ package mbinit_agent_pkg;
   `include "mbinit_pttest_rsp_stub.sv"
 
   `include "mbinit_monitor.sv"
+
+  // Pass 4: event-producing monitors (shadow stream, fed to mbinit_event_audit).
+  // Base must come before the lane monitors that extend it.
+  `include "mbinit_lane_monitor_base.sv"
+  `include "mbinit_req_monitor.sv"
+  `include "mbinit_rsp_monitor.sv"
+  `include "mbinit_ctrl_monitor.sv"
+  `include "mbinit_reset_monitor.sv"
+  `include "mbinit_cal_monitor.sv"
+  `include "mbinit_pw_monitor.sv"
+  `include "mbinit_pr_monitor.sv"
+  `include "mbinit_pttest_req_monitor.sv"
+  `include "mbinit_pttest_rsp_monitor.sv"
+  `include "mbinit_lane_ctrl_monitor.sv"
 
   // Agent — same structure as logphy_agent, typed to MBINIT classes
   class mbinit_agent extends uvm_agent;
