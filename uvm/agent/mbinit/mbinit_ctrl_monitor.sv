@@ -6,8 +6,14 @@
 // ---------------------------------------------------------------------------
 // Dedicated passive monitor for the FSM-control / PHY-status bus (mb_ctrl_if).
 // Turns control-bus edges into events on the common mbinit_event stream:
-//   * MB_EVT_STATE           on first post-reset state sample and every
-//                            currentState change (src=MB_SRC_CTRL, evidence=state)
+//   * MB_EVT_STATE           CONTROL/STATE SNAPSHOT. Emitted on the first
+//                            post-reset sample and whenever currentState OR any
+//                            of {usingPatternWriter, usingPatternReader,
+//                            applyLaneReversal, localPhySettings_clockPhase}
+//                            changes. Each event carries the FULL snapshot
+//                            (state + the 4 bits), so the scoreboard/coverage
+//                            keep coherent rolling context without peeking at
+//                            ctrl_vif. (src=MB_SRC_CTRL)
 //   * MB_EVT_NEG_PARAMS      on negotiatedPhySettings_valid 0->1 OR change of
 //                            negotiated rate/mode/phase while valid is high
 //                            (src=MB_SRC_PARAMS, evidence=neg_*)
@@ -28,6 +34,11 @@ class mbinit_ctrl_monitor extends uvm_monitor;
   protected int unsigned seq_counter;
   protected bit          state_init;
   protected logic [2:0]  prev_state;
+  // Control/state snapshot bits tracked for the MB_EVT_STATE trigger set.
+  protected logic        prev_using_pw;
+  protected logic        prev_using_pr;
+  protected logic        prev_alr;
+  protected logic        prev_lphase;
   protected logic        prev_neg_valid;
   protected logic [3:0]  prev_neg_rate;
   protected logic        prev_neg_mode;
@@ -51,6 +62,10 @@ class mbinit_ctrl_monitor extends uvm_monitor;
   protected function void reset_state();
     state_init     = 1'b0;
     prev_state     = 3'h0;
+    prev_using_pw  = 1'b0;
+    prev_using_pr  = 1'b0;
+    prev_alr       = 1'b0;
+    prev_lphase    = 1'b0;
     prev_neg_valid = 1'b0;
     prev_neg_rate  = 4'h0;
     prev_neg_mode  = 1'b0;
@@ -85,6 +100,7 @@ class mbinit_ctrl_monitor extends uvm_monitor;
   task run_phase(uvm_phase phase);
     mbinit_event ev;
     logic [2:0]  st;
+    logic        upw, upr, alr, lph;
     logic        nv, nm, np, ipf, twc, dn, er;
     logic [3:0]  nr;
     reset_state();
@@ -96,6 +112,10 @@ class mbinit_ctrl_monitor extends uvm_monitor;
       end
 
       st  = vif.mon_cb.currentState;
+      upw = vif.mon_cb.usingPatternWriter;
+      upr = vif.mon_cb.usingPatternReader;
+      alr = vif.mon_cb.applyLaneReversal;
+      lph = vif.mon_cb.localPhySettings_clockPhase;
       nv  = vif.mon_cb.negotiatedPhySettings_valid;
       nr  = vif.mon_cb.negotiatedPhySettings_maxDataRate;
       nm  = vif.mon_cb.negotiatedPhySettings_clockMode;
@@ -105,12 +125,19 @@ class mbinit_ctrl_monitor extends uvm_monitor;
       dn  = vif.mon_cb.fsmCtrl_done;
       er  = vif.mon_cb.fsmCtrl_error;
 
-      // STATE: first post-reset sample and every subsequent change.
-      if (!state_init || (st !== prev_state)) begin
+      // STATE (control/state snapshot): first post-reset sample and whenever
+      // currentState OR any tracked control bit changes. Carries the full snapshot.
+      if (!state_init || (st !== prev_state) ||
+          (upw !== prev_using_pw) || (upr !== prev_using_pr) ||
+          (alr !== prev_alr) || (lph !== prev_lphase)) begin
         prev_state = st;
         state_init = 1'b1;
         ev = mk(MB_EVT_STATE, MB_SRC_CTRL);
-        ev.state = st;
+        ev.state               = st;
+        ev.using_pw            = upw;
+        ev.using_pr            = upr;
+        ev.apply_lane_reversal = alr;
+        ev.local_clock_phase   = lph;
         ev_ap.write(ev);
       end
 
@@ -135,6 +162,10 @@ class mbinit_ctrl_monitor extends uvm_monitor;
       if ((er  === 1'b1) && (prev_error !== 1'b1))
         ev_ap.write(mk(MB_EVT_FSM_ERROR,       MB_SRC_CTRL));
 
+      prev_using_pw  = upw;
+      prev_using_pr  = upr;
+      prev_alr       = alr;
+      prev_lphase    = lph;
       prev_neg_valid = nv;
       prev_neg_rate  = nr;
       prev_neg_mode  = nm;

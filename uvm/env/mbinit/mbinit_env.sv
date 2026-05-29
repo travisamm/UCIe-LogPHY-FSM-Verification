@@ -2,9 +2,9 @@
 `define MBINIT_ENV_SV
 
 // ---------------------------------------------------------------------------
-// mbinit_env  (Pass 3)
+// mbinit_env  (Pass 5)
 // ---------------------------------------------------------------------------
-// Legacy facade + new split drive path coexisting:
+// Legacy drive facade + event-driven checking:
 //   * agent (mbinit_agent): legacy sequencer + driver + monitor. The driver is
 //     factory-overridden to mbinit_legacy_adapter, so env.agent.driver is still
 //     a mbinit_driver (the rm02/rm07/rm05 tests' $cast + flag-set keep working)
@@ -13,10 +13,18 @@
 //   * new split drive components drive the split interfaces (which tb_top
 //     bridges to the DUT): requester/responder RX drivers, FSM-control driver,
 //     and autonomous cal/pattern-writer/pattern-reader/point-test stubs.
-//   * scoreboard + coverage are UNCHANGED and still fed by the legacy monitor
-//     (which reads the monolithic vif). Event-producing monitors are Pass 4.
+//   * the 10 event-producing monitors (Pass 4) now feed the EVENT-DRIVEN
+//     scoreboard + coverage (Pass 5). The legacy agent.monitor is still
+//     instantiated but its analysis port is left UNCONNECTED (retired with the
+//     rest of the legacy facade in Pass 8). The mbinit_event_audit subscriber
+//     stays connected as a passive diagnostic.
 //
-// TODO(pass 8): once tests run on env.vseqr, retire the legacy agent + adapter.
+// cfg: mbinit_env_cfg is published to the scoreboard before it is built, so the
+// scoreboard pulls its expect_* defaults from cfg; tests may still mutate
+// env.scoreboard.expect_* afterward.
+//
+// TODO(pass 8): once tests run on env.vseqr, retire the legacy agent + adapter
+// + legacy mbinit_monitor.
 // ---------------------------------------------------------------------------
 class mbinit_env extends uvm_env;
   `uvm_component_utils(mbinit_env)
@@ -25,6 +33,7 @@ class mbinit_env extends uvm_env;
   mbinit_agent      agent;
   mbinit_scoreboard scoreboard;
   mbinit_coverage   coverage;
+  mbinit_env_cfg    cfg;
 
   // New split drive path (Pass 3)
   mbinit_req_rx_driver     req_rx_driver;
@@ -64,6 +73,11 @@ class mbinit_env extends uvm_env;
 
     // Route the legacy agent's driver to the adapter (must precede agent build).
     mbinit_driver::type_id::set_type_override(mbinit_legacy_adapter::get_type());
+
+    // Publish the env cfg to the scoreboard BEFORE it is built so it can pull
+    // its expect_* defaults. Tests may still mutate env.scoreboard.expect_*.
+    cfg = mbinit_env_cfg::type_id::create("cfg");
+    uvm_config_db#(mbinit_env_cfg)::set(this, "scoreboard", "cfg", cfg);
 
     agent      = mbinit_agent::type_id::create("agent", this);
     scoreboard = mbinit_scoreboard::type_id::create("scoreboard", this);
@@ -105,9 +119,8 @@ class mbinit_env extends uvm_env;
     mbinit_legacy_adapter ad;
     super.connect_phase(phase);
 
-    // Legacy monitor feeds the (unchanged) scoreboard + coverage.
-    agent.monitor.item_collected_port.connect(scoreboard.item_collected_export);
-    agent.monitor.item_collected_port.connect(coverage.analysis_export);
+    // Pass 5: the legacy agent.monitor is intentionally left UNCONNECTED; the
+    // event-driven scoreboard + coverage are fed by the Pass 4 monitors below.
 
     // New drivers <-> their sequencers.
     req_rx_driver.seq_item_port.connect(req_rx_seqr.seq_item_export);
@@ -128,17 +141,25 @@ class mbinit_env extends uvm_env;
     ad.ctrl_seqr   = ctrl_seqr;
     ad.svc_cfg     = svc_cfg;
 
-    // Pass 4: fan all event producers into the single audit subscriber.
-    evt_req_mon.ev_ap.connect       (evt_audit.analysis_export);
-    evt_rsp_mon.ev_ap.connect       (evt_audit.analysis_export);
-    evt_ctrl_mon.ev_ap.connect      (evt_audit.analysis_export);
-    evt_reset_mon.ev_ap.connect     (evt_audit.analysis_export);
-    evt_cal_mon.ev_ap.connect       (evt_audit.analysis_export);
-    evt_pw_mon.ev_ap.connect        (evt_audit.analysis_export);
-    evt_pr_mon.ev_ap.connect        (evt_audit.analysis_export);
-    evt_pttest_req_mon.ev_ap.connect(evt_audit.analysis_export);
-    evt_pttest_rsp_mon.ev_ap.connect(evt_audit.analysis_export);
-    evt_lane_ctrl_mon.ev_ap.connect (evt_audit.analysis_export);
+    // Pass 5: fan all 10 event producers into the scoreboard, coverage, and the
+    // (passive, diagnostic) audit subscriber.
+    connect_event_producer(evt_req_mon.ev_ap);
+    connect_event_producer(evt_rsp_mon.ev_ap);
+    connect_event_producer(evt_ctrl_mon.ev_ap);
+    connect_event_producer(evt_reset_mon.ev_ap);
+    connect_event_producer(evt_cal_mon.ev_ap);
+    connect_event_producer(evt_pw_mon.ev_ap);
+    connect_event_producer(evt_pr_mon.ev_ap);
+    connect_event_producer(evt_pttest_req_mon.ev_ap);
+    connect_event_producer(evt_pttest_rsp_mon.ev_ap);
+    connect_event_producer(evt_lane_ctrl_mon.ev_ap);
+  endfunction
+
+  // Wire one monitor's event port to all three consumers.
+  protected function void connect_event_producer(uvm_analysis_port #(mbinit_event) ap);
+    ap.connect(scoreboard.ev_export);
+    ap.connect(coverage.analysis_export);
+    ap.connect(evt_audit.analysis_export);
   endfunction
 
 endclass

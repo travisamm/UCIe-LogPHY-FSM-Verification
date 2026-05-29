@@ -191,6 +191,15 @@ package mbinit_event_pkg;
     bit           lc_rx_valid_en = 1'b0;
     bit           lc_rx_track_en = 1'b0;
 
+    // Control/state snapshot (Pass 5). Carried on every MB_EVT_STATE event so the
+    // scoreboard/coverage have stable rolling context without peeking at ctrl_vif.
+    // The ctrl monitor emits MB_EVT_STATE whenever currentState or any of these
+    // four change; each event carries the FULL snapshot, not just the delta.
+    bit           using_pw            = 1'b0;  // usingPatternWriter
+    bit           using_pr            = 1'b0;  // usingPatternReader
+    bit           apply_lane_reversal = 1'b0;  // applyLaneReversal (LR-04)
+    bit           local_clock_phase   = 1'b0;  // localPhySettings_clockPhase (RV-01)
+
     // Bookkeeping. tstamp is sim time; seq_num is a per-source counter;
     // lifecycle_id ties an OFFERED event to its later ACCEPTED event.
     real         tstamp       = 0.0;
@@ -221,7 +230,17 @@ package mbinit_event_pkg;
       `uvm_field_int (neg_clock_mode, UVM_ALL_ON)
       `uvm_field_int (neg_clock_phase,UVM_ALL_ON)
       `uvm_field_int (lc_tx_data_en,  UVM_ALL_ON | UVM_HEX)
+      `uvm_field_int (lc_tx_clk_en,   UVM_ALL_ON)
+      `uvm_field_int (lc_tx_valid_en, UVM_ALL_ON)
+      `uvm_field_int (lc_tx_track_en, UVM_ALL_ON)
       `uvm_field_int (lc_rx_data_en,  UVM_ALL_ON | UVM_HEX)
+      `uvm_field_int (lc_rx_clk_en,   UVM_ALL_ON)
+      `uvm_field_int (lc_rx_valid_en, UVM_ALL_ON)
+      `uvm_field_int (lc_rx_track_en, UVM_ALL_ON)
+      `uvm_field_int (using_pw,            UVM_ALL_ON)
+      `uvm_field_int (using_pr,            UVM_ALL_ON)
+      `uvm_field_int (apply_lane_reversal, UVM_ALL_ON)
+      `uvm_field_int (local_clock_phase,   UVM_ALL_ON)
       `uvm_field_real(tstamp,         UVM_ALL_ON)
       `uvm_field_int (seq_num,        UVM_ALL_ON | UVM_DEC)
       `uvm_field_int (lifecycle_id,   UVM_ALL_ON | UVM_DEC)
@@ -239,9 +258,12 @@ package mbinit_event_pkg;
           phase.name(), msg_code, subcode, msg_info, seq_num, lifecycle_id, raw);
       else
         return $sformatf(
-          "%s src=%s dir=%s phase=%s svc=%s state=%0d ptype=%0h pt=0x%04h pr=0x%04h/%0b seq=%0d",
+          "%s src=%s dir=%s phase=%s svc=%s state=%0d pw=%0b pr=%0b alr=%0b lphase=%0b ptype=%0h pt=0x%04h prl=0x%04h/%0b lc(tx=%0b%0b%0b rx=%0b%0b%0b) seq=%0d",
           kind.name(), src.name(), dir.name(), phase.name(), svc_kind.name(),
-          state, pattern_type, pt_results, pr_per_lane, pr_aggregate, seq_num);
+          state, using_pw, using_pr, apply_lane_reversal, local_clock_phase,
+          pattern_type, pt_results, pr_per_lane, pr_aggregate,
+          lc_tx_clk_en, lc_tx_valid_en, lc_tx_track_en,
+          lc_rx_clk_en, lc_rx_valid_en, lc_rx_track_en, seq_num);
     endfunction
 
   endclass

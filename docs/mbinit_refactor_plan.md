@@ -24,7 +24,15 @@
       `svc_kind`, `pr_per_lane`/`pr_aggregate`, and split `MB_SRC_PTTEST` ->
       `_REQ`/`_RSP`. Legacy monitor/scoreboard/coverage untouched and still
       authoritative. Pending user `make mbinit_all` verification.
-- [ ] Pass 5: Event-driven scoreboard and coverage
+- [x] Pass 5: Event-driven scoreboard + coverage (clean cutover). Scoreboard +
+      coverage now consume the single mbinit_event stream via timestamp-bucket
+      processing (Phase A context, Phase B checks); src-qualified witnesses;
+      saw_bad_{req,rsp}_tx preserved; neg_valid tracking; cfg pulled via
+      config_db("scoreboard","cfg"). Event extended with 4 control-snapshot bits
+      + lane-ctrl scalars registered. Legacy mbinit_monitor instantiated but
+      UNCONNECTED (retired Pass 8). Legacy scoreboard backed up at
+      /tmp/mbinit_scoreboard_legacy_backup.sv. Pending user make mbinit_all +
+      cov_mbinit verification.
 - [ ] Pass 6: Reset and assertion layer
 - [ ] Pass 7: MBINIT reference predictor
 - [ ] Pass 8: Test migration after framework

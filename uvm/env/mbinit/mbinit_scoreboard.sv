@@ -1,41 +1,39 @@
 `ifndef MBINIT_SCOREBOARD_SV
 `define MBINIT_SCOREBOARD_SV
 
-// SB field extraction — matches SBMsgCompare in SidebandMessageExchanger.scala (and on-wire
-// tx.bits.data, which is driven straight from io.req.bits): opcode[4:0], msgCode[21:14],
-// msgSubcode[39:32].
-`define MB_OP(d)   d[4:0]
-`define MB_MC(d)   d[21:14]
-`define MB_SC(d)   d[39:32]
-
-// Opcodes
-`define MB_OP_NODATA 5'h12
-`define MB_OP_64DATA 5'h1B
-
-// msgCode conventions
-`define MB_MC_REQ  8'hA5
-`define MB_MC_RESP 8'hAA
-
-// msgSubcodes per vplan
-`define MB_SC_PARAM     8'h00
-`define MB_SC_CAL       8'h02
-`define MB_SC_RCLK_INIT 8'h03
-`define MB_SC_RCLK_RES  8'h04
-`define MB_SC_RCLK_DONE 8'h08
-`define MB_SC_RVAL_INIT 8'h09
-`define MB_SC_RVAL_RES  8'h0A
-`define MB_SC_RVAL_DONE 8'h0C
-`define MB_SC_LR_INIT   8'h0D
-`define MB_SC_LR_CLR    8'h0E
-`define MB_SC_LR_RES    8'h0F
-`define MB_SC_LR_DONE   8'h10
-`define MB_SC_RM_START  8'h11
-`define MB_SC_RM_END    8'h13
-`define MB_SC_RM_APPLY  8'h14
+// ===========================================================================
+// mbinit_scoreboard  (Pass 5: event-driven)
+// ---------------------------------------------------------------------------
+// Consumes the single MBINIT event stream (mbinit_event) produced by the Pass 4
+// monitors instead of the legacy mbinit_transaction snapshots. Same class name,
+// same public expect_* API, and the SAME check_phase requirement errors as the
+// legacy scoreboard, so test pass/fail semantics do not shift.
+//
+// Witnesses (MP/MC/RC/RV/LR/RM/XC-05/pattern-type/RM scenarios) are derived from
+// events, qualified by SOURCE (which lane produced the event), not just by the
+// decoded role:
+//   * requester TX : src=MB_SRC_REQ_LANE && dir=TX && role=REQ
+//   * responder TX : src=MB_SRC_RSP_LANE && dir=TX && role=RESP
+//   * partner resp : src=MB_SRC_REQ_LANE && dir=RX && role=RESP (LR-01)
+// Unrecognized DUT TX (MB_EVT_UNKNOWN on a TX lane) hard-errors, exactly like
+// the legacy scoreboard's saw_bad_{req,rsp}_tx.
+//
+// Same-cycle ordering hazard: STATE / LANE_CTRL / NEG_PARAMS / service / point-
+// test / sideband events can share a timestamp and arrive in either FIFO order.
+// Events are processed in TIMESTAMP BUCKETS: all events at one $realtime are
+// collected, then (Phase A) STATE/NEG_PARAMS/LANE_CTRL update the effective
+// rolling context, then (Phase B) state-dependent checks run against that
+// settled context. The final bucket is flushed (and the FIFO drained) in
+// check_phase.
+//
+// cfg: build_phase copies mbinit_env_cfg defaults into the public expect_*
+// fields; tests may still mutate env.scoreboard.expect_* afterward.
+// ===========================================================================
 
 class mbinit_scoreboard extends uvm_scoreboard;
   `uvm_component_utils(mbinit_scoreboard)
 
+  // MBINIT state encodings (io_currentState).
   localparam logic [2:0] MB_STATE_PARAM      = 3'd0;
   localparam logic [2:0] MB_STATE_CAL        = 3'd1;
   localparam logic [2:0] MB_STATE_REPAIRCLK  = 3'd2;
@@ -44,33 +42,36 @@ class mbinit_scoreboard extends uvm_scoreboard;
   localparam logic [2:0] MB_STATE_REPAIRMB   = 3'd5;
   localparam logic [2:0] MB_STATE_TOMBTRAIN  = 3'd6;
 
-  uvm_analysis_export #(mbinit_transaction) item_collected_export;
-  uvm_tlm_analysis_fifo #(mbinit_transaction) item_collected_fifo;
+  // Pattern types (patternWriter/Reader).
+  localparam logic [1:0] PT_CLKREPAIR = 2'h0;
+  localparam logic [1:0] PT_VALTRAIN  = 2'h1;
+  localparam logic [1:0] PT_PERLANEID = 2'h2;
 
-  // ---- PARAM (MP-01..04, MP-06) ----
-  bit saw_req_tx;          // Any requester sideband TX
-  bit saw_rsp_tx;          // Any responder sideband TX
-  bit saw_bad_req_tx;      // Requester TX did not match any expected MBINIT SB message
-  bit saw_bad_rsp_tx;      // Responder TX did not match any expected MBINIT SB message
-  bit saw_param_req_tx;    // MP-01: DUT requester sent PARAM_CFG_REQ
-  bit saw_param_resp_tx;   // MP-01: DUT responder sent PARAM_CFG_RESP
-  bit mp_02_verified;      // MP-02: negotiated max common data rate observed
-  bit mp_03_verified;      // MP-03: negotiated clock mode matches request
-  bit mp_04_triggered;     // MP-04: interoperableParamsNotFound path
+  // ---- event ingress ----
+  uvm_analysis_export   #(mbinit_event) ev_export;
+  uvm_tlm_analysis_fifo #(mbinit_event) ev_fifo;
 
-  // ---- State transition coverage for CSV exit requirements ----
-  bit saw_state_cal;        // MP-06: PARAM exits to CAL
-  bit saw_state_repairclk;  // MC-02: CAL exits to REPAIRCLK
-  bit saw_state_repairval;  // RC-05: REPAIRCLK exits to REPAIRVAL
-  bit saw_state_reversalmb; // RV-07: REPAIRVAL exits to REVERSALMB
-  bit saw_state_repairmb;   // LR-06: REVERSALMB exits to REPAIRMB
-  bit saw_state_tombtrain;  // RM-08: REPAIRMB exits toward MBTRAIN
+  // ====================== witnesses (names match legacy) ====================
+  bit saw_req_tx;
+  bit saw_rsp_tx;
+  bit saw_bad_req_tx;
+  bit saw_bad_rsp_tx;
+  bit saw_param_req_tx;
+  bit saw_param_resp_tx;
+  bit mp_02_verified;
+  bit mp_03_verified;
+  bit mp_04_triggered;
 
-  // ---- CAL (MC-01/02) ----
-  bit saw_cal_req_tx;      // MC-01: DUT requester sent CAL_DONE_REQ
-  bit saw_cal_resp_tx;     // MC-02: DUT responder sent CAL_DONE_RESP
+  bit saw_state_cal;
+  bit saw_state_repairclk;
+  bit saw_state_repairval;
+  bit saw_state_reversalmb;
+  bit saw_state_repairmb;
+  bit saw_state_tombtrain;
 
-  // ---- REPAIRCLK flow messages; RC-05 is checked through DONE and state exit ----
+  bit saw_cal_req_tx;
+  bit saw_cal_resp_tx;
+
   bit saw_rclk_init_req_tx;
   bit saw_rclk_init_resp_tx;
   bit saw_rclk_res_req_tx;
@@ -78,12 +79,10 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit saw_rclk_done_req_tx;
   bit saw_rclk_done_resp_tx;
 
-  // ---- REPAIRCLK positive witnesses (RC-01 / RC-02) ----
-  bit saw_repairclk_lane_ctrl_good; // RC-01: at least one sample matching XC-05 REPAIRCLK expectations
-  bit saw_repairclk_pw_clkrepair;   // RC-02: patternWriter CLKREPAIR in REPAIRCLK
-  bit saw_repairclk_pr_clkrepair;   // RC-02: patternReader CLKREPAIR req in REPAIRCLK (repair verify path)
+  bit saw_repairclk_lane_ctrl_good;
+  bit saw_repairclk_pw_clkrepair;
+  bit saw_repairclk_pr_clkrepair;
 
-  // ---- REPAIRVAL flow messages; RV-07 is checked through DONE and state exit ----
   bit saw_rval_init_req_tx;
   bit saw_rval_init_resp_tx;
   bit saw_rval_res_req_tx;
@@ -91,347 +90,392 @@ class mbinit_scoreboard extends uvm_scoreboard;
   bit saw_rval_done_req_tx;
   bit saw_rval_done_resp_tx;
 
-  // ---- RV-01 (partial): VALTRAIN in REPAIRVAL + negotiated clock phase vs local ----
-  bit saw_rv01_pw_valtrain;     // patternWriter VALTRAIN req in REPAIRVAL
-  bit saw_rv01_repairval_reader_on; // responder patternReader path active (usingPatternReader)
-  bit saw_rv01_using_pw;        // usingPatternWriter during VALTRAIN beat
-  bit rv01_phase_constraint_violation; // negotiated_phase & ~local_phase (violates AND semantics)
+  bit saw_rv01_pw_valtrain;
+  bit saw_rv01_repairval_reader_on;
+  bit saw_rv01_using_pw;
+  bit rv01_phase_constraint_violation;
 
-  // ---- REVERSALMB flow messages; LR-01/LR-06 map directly to CSV rows ----
   bit saw_lr_init_req_tx;
-  bit saw_lr_init_resp_tx;   // DUT responder → partner (responder TX)
-  bit saw_lr_init_resp_rx;   // Partner → DUT requester (requester RX); LR-01 "wait for resp"
+  bit saw_lr_init_resp_tx;
+  bit saw_lr_init_resp_rx;
   bit saw_lr_res_req_tx;
   bit saw_lr_res_resp_tx;
   bit saw_lr_done_req_tx;
   bit saw_lr_done_resp_tx;
 
-  // ---- REPAIRMB flow messages; RM-08 is checked through END and state exit ----
   bit saw_rm_start_req_tx;
   bit saw_rm_start_resp_tx;
   bit saw_rm_end_req_tx;
   bit saw_rm_end_resp_tx;
 
-  // ---- Terminal ----
   bit saw_fsm_done;
   bit saw_fsm_error;
 
-  // ---- Lane control / pattern type error latches (XC-05, RC-02, RV-03, LR-02, RM-01) ----
   bit lane_ctrl_error;
   bit pattern_type_error;
 
-  // Settable by test to adjust end-of-test checks
+  bit saw_lr03_pattern_reader_reversalmb;
+  bit saw_apply_lane_reversal;
+  bit saw_rm02_heterogeneous_pt_repairmb;
+  bit saw_repairmb_txwidth_pulse;
+  int unsigned repairmb_pt_results_beats;
+
+  // ====================== expect_* (public, test-settable) ==================
   bit expect_param_messages     = 1;
   bit expect_param_common_rate  = 1;
   bit expect_param_negotiation  = 1;
   bit expect_full_mbinit        = 1;
-  // PARAM through CAL exit (MP-06, MC-01, MC-02); use with short seq (no full MBINIT)
   bit expect_mbinit_through_cal = 0;
-  // PARAM through REPAIRCLK exit (RC-01, RC-02, RC-05) + prior CAL/PARAM; use with seq_mbinit_repairclk_only
   bit expect_mbinit_through_repairclk = 0;
-  // RC-03: unrepairable clock — must error before REPAIRVAL
   bit expect_repairclk_rc03      = 0;
   bit expect_interop_failure    = 0;
   bit expect_fsm_done           = 1;
   bit expect_fsm_error          = 0;
   bit expect_lane_ctrl_checks   = 1;
   bit expect_pattern_type_checks = 1;
-  // RV-01: VALTRAIN + patternReader path + negotiated phase ⊆ local (see vplan notes)
   bit expect_rv01_checks         = 1;
-  // LR-03: responder PatternReader active in REVERSALMB (RTL uses ComparisonMode.PERLANE; not on TB pins)
   bit expect_lr03_pattern_reader = 1;
-  bit saw_lr03_pattern_reader_reversalmb;
-  // LR-04: requester asserts applyLaneReversal after failed REVERSALMB RESULT then retry (directed seq)
   bit expect_lr04_apply_lane_reversal = 0;
-  bit saw_apply_lane_reversal;
-  // RM-02: in REPAIRMB, Tx point-test result beat carried mixed per-lane pass/fail bits (TB stub)
   bit expect_rm02_per_lane_reader = 0;
-  bit saw_rm02_heterogeneous_pt_repairmb;
-  // RM-07: unrepairable (all lanes failed) → fsmCtrl_error in REPAIRMB (MBINIT-only TRAINERROR proxy)
   bit expect_rm07_repairmb_unrepairable = 0;
-  // RM-05: witness ≥2 REPAIRMB Tx point-test result beats + txWidthChanged pulse (driver: FF00 then FFFF)
   bit expect_rm05_post_repair_witness = 0;
-  bit saw_repairmb_txwidth_pulse;
-  int unsigned repairmb_pt_results_beats;
+
+  // ====================== rolling effective context =========================
+  protected bit          state_seen;
+  protected logic [2:0]  cur_state;
+  protected bit          lc_seen;
+  protected logic [15:0] lc_tx_data_en;
+  protected logic        lc_tx_clk_en, lc_tx_valid_en, lc_tx_track_en;
+  protected logic [15:0] lc_rx_data_en;
+  protected logic        lc_rx_clk_en, lc_rx_valid_en, lc_rx_track_en;
+  protected bit          cur_using_pw, cur_using_pr, cur_apply_lr, cur_local_phase;
+  protected bit          neg_valid;
+  protected bit          neg_phase;
+
+  // ====================== timestamp-bucket state ============================
+  protected mbinit_event bucket[$];
+  protected real         bucket_t;
+  protected bit          have_bucket;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
   endfunction
 
   function void build_phase(uvm_phase phase);
+    mbinit_env_cfg cfg;
     super.build_phase(phase);
-    item_collected_export = new("item_collected_export", this);
-    item_collected_fifo   = new("item_collected_fifo", this);
+    ev_export = new("ev_export", this);
+    ev_fifo   = new("ev_fifo", this);
+
+    // Pull expectation defaults from cfg (tests may still override afterward).
+    if (uvm_config_db#(mbinit_env_cfg)::get(this, "", "cfg", cfg) && cfg != null) begin
+      expect_param_messages           = cfg.expect_param_messages;
+      expect_param_common_rate        = cfg.expect_param_common_rate;
+      expect_param_negotiation        = cfg.expect_param_negotiation;
+      expect_full_mbinit              = cfg.expect_full_mbinit;
+      expect_mbinit_through_cal       = cfg.expect_mbinit_through_cal;
+      expect_mbinit_through_repairclk = cfg.expect_mbinit_through_repairclk;
+      expect_repairclk_rc03           = cfg.expect_repairclk_rc03;
+      expect_interop_failure          = cfg.expect_interop_failure;
+      expect_fsm_done                 = cfg.expect_fsm_done;
+      expect_fsm_error                = cfg.expect_fsm_error;
+      expect_lane_ctrl_checks         = cfg.expect_lane_ctrl_checks;
+      expect_pattern_type_checks      = cfg.expect_pattern_type_checks;
+      expect_rv01_checks              = cfg.expect_rv01_checks;
+      expect_lr03_pattern_reader      = cfg.expect_lr03_pattern_reader;
+      expect_lr04_apply_lane_reversal = cfg.expect_lr04_apply_lane_reversal;
+      expect_rm02_per_lane_reader     = cfg.expect_rm02_per_lane_reader;
+      expect_rm07_repairmb_unrepairable = cfg.expect_rm07_repairmb_unrepairable;
+      expect_rm05_post_repair_witness = cfg.expect_rm05_post_repair_witness;
+    end
   endfunction
 
   function void connect_phase(uvm_phase phase);
-    item_collected_export.connect(item_collected_fifo.analysis_export);
+    ev_export.connect(ev_fifo.analysis_export);
   endfunction
 
+  // ====================== event consumption (bucketed) ======================
   task run_phase(uvm_phase phase);
-    mbinit_transaction tx;
+    mbinit_event ev;
+    have_bucket = 0;
     forever begin
-      item_collected_fifo.get(tx);
-
-      // Requester TX (DUT → remote)
-      if (tx.tx_valid) begin
-        saw_req_tx = 1;
-        decode_req_tx(tx.tx_data);
+      ev_fifo.get(ev);
+      if (have_bucket && (ev.tstamp != bucket_t)) begin
+        process_bucket();
+        bucket.delete();
       end
-      // Responder TX (DUT → remote)
-      if (tx.rsp_tx_valid) begin
-        saw_rsp_tx = 1;
-        decode_rsp_tx(tx.rsp_tx_data);
-      end
-      // Requester RX (remote / TB → DUT requester) — partner MB messages
-      if (tx.rx_valid)
-        decode_requester_rx(tx.rx_data);
-
-      if (tx.currentState == MB_STATE_CAL)
-        saw_state_cal = 1;
-      if (tx.currentState == MB_STATE_REPAIRCLK)
-        saw_state_repairclk = 1;
-      if (tx.currentState == MB_STATE_REPAIRVAL)
-        saw_state_repairval = 1;
-      if (tx.currentState == MB_STATE_REVERSALMB) begin
-        saw_state_reversalmb = 1;
-        // LR-03: responder PatternReader path active in REVERSALMB (req_valid only pulses in
-        // substates; usingPatternReader is held for the whole layer per MBInitResponder RTL)
-        if (tx.usingPatternReader)
-          saw_lr03_pattern_reader_reversalmb = 1;
-      end
-      if (tx.currentState == MB_STATE_REPAIRMB) begin
-        saw_state_repairmb = 1;
-        if (tx.txPtTest_results_valid)
-          repairmb_pt_results_beats++;
-        if (tx.tx_width_changed_pulse)
-          saw_repairmb_txwidth_pulse = 1;
-        // RM-02: requester Rx path checks per-lane outcomes — witnessed via Tx ptTestResults in TB
-        if (tx.txPtTest_results_valid && (|tx.txPtTest_results_bits) && !(&tx.txPtTest_results_bits))
-          saw_rm02_heterogeneous_pt_repairmb = 1;
-      end
-      if (tx.currentState == MB_STATE_TOMBTRAIN)
-        saw_state_tombtrain = 1;
-
-      check_lane_ctrl(tx);
-      check_pattern_type(tx);
-
-      if (tx.currentState == MB_STATE_REPAIRCLK) begin
-        if (repairclk_lane_ctrl_matches(tx))
-          saw_repairclk_lane_ctrl_good = 1;
-        if (tx.patternWriter_req_valid && tx.patternWriter_patternType == 2'h0)
-          saw_repairclk_pw_clkrepair = 1;
-        if (tx.patternReader_req_valid && tx.patternReader_patternType == 2'h0)
-          saw_repairclk_pr_clkrepair = 1;
-      end
-
-      // RV-01: PatternWriter.scala drives VALTRAIN with forwarded clkP/clkN patterns on mainband;
-      // MBInitSM.scala REPAIRVAL still has TODO for explicit UI centering — we check bus-visible context.
-      if (tx.currentState == MB_STATE_REPAIRVAL) begin
-        if (tx.patternWriter_req_valid && tx.patternWriter_patternType == 2'h1) begin
-          saw_rv01_pw_valtrain = 1;
-          if (tx.usingPatternWriter)
-            saw_rv01_using_pw = 1;
-          if (tx.negotiatedPhySettings_valid &&
-              (tx.observed_negotiated_clockPhase & ~tx.observed_local_clockPhase))
-            rv01_phase_constraint_violation = 1;
-        end
-        if (tx.patternReader_req_valid && tx.patternReader_patternType == 2'h1)
-          saw_rv01_repairval_reader_on = 1;
-        if (tx.usingPatternReader)
-          saw_rv01_repairval_reader_on = 1;
-      end
-
-      if (tx.negotiatedPhySettings_valid) begin
-        if (!mp_02_verified && tx.negotiated_maxDataRate == 4'hF) begin
-          `uvm_info("MB_SB", "MP-02: negotiated max common data rate observed", UVM_LOW)
-          mp_02_verified = 1;
-        end
-        if (!mp_03_verified && tx.negotiated_clockMode == 1'b1) begin
-          `uvm_info("MB_SB", "MP-03: negotiated clock mode matches request", UVM_LOW)
-          mp_03_verified = 1;
-        end
-      end
-
-      // MP-04: interoperable params not found
-      if (tx.interoperableParamsNotFound && !mp_04_triggered) begin
-        `uvm_info("MB_SB", "MP-04: interoperableParamsNotFound asserted", UVM_LOW)
-        mp_04_triggered = 1;
-      end
-
-      if (tx.fsm_done && !saw_fsm_done) begin
-        `uvm_info("MB_SB", "MBINIT fsmCtrl_done asserted", UVM_LOW)
-        saw_fsm_done = 1;
-      end
-      if (tx.fsm_error && !saw_fsm_error) begin
-        `uvm_info("MB_SB", "MBINIT fsmCtrl_error asserted", UVM_LOW)
-        saw_fsm_error = 1;
-      end
-
-      if (tx.applyLaneReversal)
-        saw_apply_lane_reversal = 1;
+      bucket.push_back(ev);
+      bucket_t    = ev.tstamp;
+      have_bucket = 1;
     end
   endtask
 
-  function void decode_req_tx(logic [127:0] d);
-    bit decoded;
-    decoded = 0;
-
-    // PARAM_CFG_REQ (opcode=0x1B, MC=REQ, SC=0x00)
-    if (`MB_OP(d)==`MB_OP_64DATA && `MB_MC(d)==`MB_MC_REQ && `MB_SC(d)==`MB_SC_PARAM) begin
-      decoded = 1;
-      if (!saw_param_req_tx) begin
-        `uvm_info("MB_SB","MP-01: DUT req sent PARAM_CFG_REQ",UVM_LOW)
-        saw_param_req_tx = 1; end
+  // Drain any FIFO remainder + process the final bucket (events written in the
+  // last delta of the run phase may not have been get()'d before kill).
+  protected function void flush_buckets();
+    mbinit_event ev;
+    while (ev_fifo.try_get(ev)) begin
+      if (have_bucket && (ev.tstamp != bucket_t)) begin
+        process_bucket();
+        bucket.delete();
+      end
+      bucket.push_back(ev);
+      bucket_t    = ev.tstamp;
+      have_bucket = 1;
     end
-    if (`MB_OP(d)==`MB_OP_NODATA && `MB_MC(d)==`MB_MC_REQ) begin
-      decoded = 1;
-      case (`MB_SC(d))
-        `MB_SC_CAL: if (!saw_cal_req_tx) begin
-          `uvm_info("MB_SB","MC-01: DUT req sent CAL_DONE_REQ",UVM_LOW)
-          saw_cal_req_tx=1; end
-        `MB_SC_RCLK_INIT: if (!saw_rclk_init_req_tx) begin
-          `uvm_info("MB_SB","REPAIRCLK: DUT req sent REPAIRCLK_INIT_REQ",UVM_LOW)
-          saw_rclk_init_req_tx=1; end
-        `MB_SC_RCLK_RES: if (!saw_rclk_res_req_tx) begin
-          `uvm_info("MB_SB","REPAIRCLK: DUT req sent REPAIRCLK_RESULT_REQ",UVM_LOW)
-          saw_rclk_res_req_tx=1; end
-        `MB_SC_RCLK_DONE: if (!saw_rclk_done_req_tx) begin
-          `uvm_info("MB_SB","RC-05: DUT req sent REPAIRCLK_DONE_REQ",UVM_LOW)
-          saw_rclk_done_req_tx=1; end
-        `MB_SC_RVAL_INIT: if (!saw_rval_init_req_tx) begin
-          `uvm_info("MB_SB","REPAIRVAL: DUT req sent REPAIRVAL_INIT_REQ",UVM_LOW)
-          saw_rval_init_req_tx=1; end
-        `MB_SC_RVAL_RES: if (!saw_rval_res_req_tx) begin
-          `uvm_info("MB_SB","REPAIRVAL: DUT req sent REPAIRVAL_RESULT_REQ",UVM_LOW)
-          saw_rval_res_req_tx=1; end
-        `MB_SC_RVAL_DONE: if (!saw_rval_done_req_tx) begin
-          `uvm_info("MB_SB","RV-07: DUT req sent REPAIRVAL_DONE_REQ",UVM_LOW)
-          saw_rval_done_req_tx=1; end
-        `MB_SC_LR_INIT: if (!saw_lr_init_req_tx) begin
-          `uvm_info("MB_SB","LR-01: DUT req sent REVERSALMB_INIT_REQ",UVM_LOW)
-          saw_lr_init_req_tx=1; end
-        `MB_SC_LR_RES: if (!saw_lr_res_req_tx) begin
-          `uvm_info("MB_SB","REVERSALMB: DUT req sent REVERSALMB_RESULT_REQ",UVM_LOW)
-          saw_lr_res_req_tx=1; end
-        `MB_SC_LR_DONE: if (!saw_lr_done_req_tx) begin
-          `uvm_info("MB_SB","LR-06: DUT req sent REVERSALMB_DONE_REQ",UVM_LOW)
-          saw_lr_done_req_tx=1; end
-        `MB_SC_RM_START: if (!saw_rm_start_req_tx) begin
-          `uvm_info("MB_SB","REPAIRMB: DUT req sent REPAIRMB_START_REQ",UVM_LOW)
-          saw_rm_start_req_tx=1; end
-        `MB_SC_RM_END: if (!saw_rm_end_req_tx) begin
-          `uvm_info("MB_SB","RM-08: DUT req sent REPAIRMB_END_REQ",UVM_LOW)
-          saw_rm_end_req_tx=1; end
-      endcase
-    end
-
-    if (!decoded && !saw_bad_req_tx) begin
-      saw_bad_req_tx = 1;
-      `uvm_error("MB_SB", $sformatf(
-        "Requester TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
-        d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+    if (have_bucket && (bucket.size() > 0)) begin
+      process_bucket();
+      bucket.delete();
+      have_bucket = 0;
     end
   endfunction
 
-  function void decode_rsp_tx(logic [127:0] d);
-    bit decoded;
-    decoded = 0;
-
-    // PARAM_CFG_RESP
-    if (`MB_OP(d)==`MB_OP_64DATA && `MB_MC(d)==`MB_MC_RESP && `MB_SC(d)==`MB_SC_PARAM) begin
-      decoded = 1;
-      if (!saw_param_resp_tx) begin
-        `uvm_info("MB_SB","MP-01: DUT rsp sent PARAM_CFG_RESP",UVM_LOW)
-        saw_param_resp_tx=1; end
-    end
-    if (`MB_OP(d)==`MB_OP_NODATA && `MB_MC(d)==`MB_MC_RESP) begin
-      decoded = 1;
-      case (`MB_SC(d))
-        `MB_SC_CAL: if (!saw_cal_resp_tx) begin
-          `uvm_info("MB_SB","MC-02: DUT rsp sent CAL_DONE_RESP",UVM_LOW)
-          saw_cal_resp_tx=1; end
-        `MB_SC_RCLK_INIT: if (!saw_rclk_init_resp_tx) begin
-          `uvm_info("MB_SB","REPAIRCLK: DUT rsp sent REPAIRCLK_INIT_RESP",UVM_LOW)
-          saw_rclk_init_resp_tx=1; end
-        `MB_SC_RCLK_RES: if (!saw_rclk_res_resp_tx) begin
-          `uvm_info("MB_SB","REPAIRCLK: DUT rsp sent REPAIRCLK_RESULT_RESP",UVM_LOW)
-          saw_rclk_res_resp_tx=1; end
-        `MB_SC_RCLK_DONE: if (!saw_rclk_done_resp_tx) begin
-          `uvm_info("MB_SB","RC-05: DUT rsp sent REPAIRCLK_DONE_RESP",UVM_LOW)
-          saw_rclk_done_resp_tx=1; end
-        `MB_SC_RVAL_INIT: if (!saw_rval_init_resp_tx) begin
-          `uvm_info("MB_SB","REPAIRVAL: DUT rsp sent REPAIRVAL_INIT_RESP",UVM_LOW)
-          saw_rval_init_resp_tx=1; end
-        `MB_SC_RVAL_RES: if (!saw_rval_res_resp_tx) begin
-          `uvm_info("MB_SB","REPAIRVAL: DUT rsp sent REPAIRVAL_RESULT_RESP",UVM_LOW)
-          saw_rval_res_resp_tx=1; end
-        `MB_SC_RVAL_DONE: if (!saw_rval_done_resp_tx) begin
-          `uvm_info("MB_SB","RV-07: DUT rsp sent REPAIRVAL_DONE_RESP",UVM_LOW)
-          saw_rval_done_resp_tx=1; end
-        `MB_SC_LR_INIT: if (!saw_lr_init_resp_tx) begin
-          `uvm_info("MB_SB","LR-01: DUT responder TX REVERSALMB_INIT_RESP",UVM_LOW)
-          saw_lr_init_resp_tx=1; end
-        `MB_SC_LR_RES: if (!saw_lr_res_resp_tx) begin
-          `uvm_info("MB_SB","REVERSALMB: DUT rsp sent REVERSALMB_RESULT_RESP",UVM_LOW)
-          saw_lr_res_resp_tx=1; end
-        `MB_SC_LR_DONE: if (!saw_lr_done_resp_tx) begin
-          `uvm_info("MB_SB","LR-06: DUT rsp sent REVERSALMB_DONE_RESP",UVM_LOW)
-          saw_lr_done_resp_tx=1; end
-        `MB_SC_RM_START: if (!saw_rm_start_resp_tx) begin
-          `uvm_info("MB_SB","REPAIRMB: DUT rsp sent REPAIRMB_START_RESP",UVM_LOW)
-          saw_rm_start_resp_tx=1; end
-        `MB_SC_RM_END: if (!saw_rm_end_resp_tx) begin
-          `uvm_info("MB_SB","RM-08: DUT rsp sent REPAIRMB_END_RESP",UVM_LOW)
-          saw_rm_end_resp_tx=1; end
+  // -------------------------------------------------------------------------
+  // Process one timestamp bucket: Phase A settles context, Phase B checks.
+  // -------------------------------------------------------------------------
+  protected function void process_bucket();
+    mbinit_event ev;
+    // ---- Phase A: settle effective context (state / neg / lane-ctrl) ----
+    foreach (bucket[i]) begin
+      ev = bucket[i];
+      case (ev.kind)
+        MB_EVT_STATE:      apply_state(ev);
+        MB_EVT_NEG_PARAMS: apply_neg(ev);
+        MB_EVT_LANE_CTRL:  apply_lane_ctrl(ev);
+        default: ;
       endcase
     end
 
-    if (!decoded && !saw_bad_rsp_tx) begin
-      saw_bad_rsp_tx = 1;
-      `uvm_error("MB_SB", $sformatf(
-        "Responder TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
-        d, `MB_OP(d), `MB_MC(d), `MB_SC(d)))
+    // XC-05 + RC-01: once context is known, check lane ctrl vs current state.
+    if (state_seen && lc_seen) begin
+      check_lane_ctrl();
+      if (cur_state == MB_STATE_REPAIRCLK && repairclk_lane_ctrl_matches())
+        saw_repairclk_lane_ctrl_good = 1;
     end
-  endfunction
 
-  // Partner → requester SB (TB/remote drives requesterSbLaneIo_rx_*)
-  function void decode_requester_rx(logic [127:0] d);
-    if (`MB_OP(d) == `MB_OP_NODATA && `MB_MC(d) == `MB_MC_RESP) begin
-      case (`MB_SC(d))
-        `MB_SC_LR_INIT:
-          if (!saw_lr_init_resp_rx) begin
-            `uvm_info("MB_SB", "LR-01: REVERSALMB_INIT_RESP on requester RX (partner)", UVM_LOW)
-            saw_lr_init_resp_rx = 1;
+    // ---- Phase B: state-dependent checks against settled context ----
+    foreach (bucket[i]) begin
+      ev = bucket[i];
+      case (ev.kind)
+        MB_EVT_SB_MSG, MB_EVT_UNKNOWN: handle_lane_msg(ev);
+        MB_EVT_PATTERN_WRITER:         handle_pw(ev);
+        MB_EVT_PATTERN_READER:         handle_pr(ev);
+        MB_EVT_PTTEST:                 handle_pttest(ev);
+        MB_EVT_TXWIDTH_CHANGED:
+          if (cur_state == MB_STATE_REPAIRMB) saw_repairmb_txwidth_pulse = 1;
+        MB_EVT_INTEROP_FAIL: begin
+          if (!mp_04_triggered) begin
+            `uvm_info("MB_SB", "MP-04: interoperableParamsNotFound asserted", UVM_LOW)
+            mp_04_triggered = 1;
           end
+        end
+        MB_EVT_FSM_DONE: begin
+          if (!saw_fsm_done) begin
+            `uvm_info("MB_SB", "MBINIT fsmCtrl_done asserted", UVM_LOW)
+            saw_fsm_done = 1;
+          end
+        end
+        MB_EVT_FSM_ERROR: begin
+          if (!saw_fsm_error) begin
+            `uvm_info("MB_SB", "MBINIT fsmCtrl_error asserted", UVM_LOW)
+            saw_fsm_error = 1;
+          end
+        end
         default: ;
       endcase
     end
   endfunction
 
-  // RC-01: XC-05 expectations for REPAIRCLK (same as check_lane_ctrl MB_STATE_REPAIRCLK branch)
-  function bit repairclk_lane_ctrl_matches(mbinit_transaction tx);
-    repairclk_lane_ctrl_matches =
-      (tx.mbLaneCtrl_txDataEn  == 16'h0) &&
-      (tx.mbLaneCtrl_txClkEn   === 1'b1) &&
-      (tx.mbLaneCtrl_txValidEn === 1'b1) &&
-      (tx.mbLaneCtrl_txTrackEn === 1'b1) &&
-      (tx.mbLaneCtrl_rxDataEn  == 16'h0) &&
-      (tx.mbLaneCtrl_rxClkEn   === 1'b1) &&
-      (tx.mbLaneCtrl_rxValidEn === 1'b1) &&
-      (tx.mbLaneCtrl_rxTrackEn === 1'b1);
+  // -------------------------------------------------------------------------
+  // Phase A appliers
+  // -------------------------------------------------------------------------
+  protected function void apply_state(mbinit_event ev);
+    state_seen      = 1;
+    cur_state       = ev.state;
+    cur_using_pw    = ev.using_pw;
+    cur_using_pr    = ev.using_pr;
+    cur_apply_lr    = ev.apply_lane_reversal;
+    cur_local_phase = ev.local_clock_phase;
+
+    case (ev.state)
+      MB_STATE_CAL:        saw_state_cal        = 1;
+      MB_STATE_REPAIRCLK:  saw_state_repairclk  = 1;
+      MB_STATE_REPAIRVAL:  saw_state_repairval  = 1;
+      MB_STATE_REVERSALMB: begin
+        saw_state_reversalmb = 1;
+        if (ev.using_pr) saw_lr03_pattern_reader_reversalmb = 1;  // LR-03
+      end
+      MB_STATE_REPAIRMB:   saw_state_repairmb   = 1;
+      MB_STATE_TOMBTRAIN:  saw_state_tombtrain  = 1;
+      default: ;
+    endcase
+
+    if (ev.apply_lane_reversal) saw_apply_lane_reversal = 1;  // LR-04
   endfunction
 
-  // XC-05: verify mbLaneCtrlIo matches expected values for each MBINIT state
-  function void check_lane_ctrl(mbinit_transaction tx);
+  protected function void apply_neg(mbinit_event ev);
+    neg_valid = 1;
+    neg_phase = ev.neg_clock_phase;
+    if (!mp_02_verified && ev.neg_data_rate == 4'hF) begin
+      `uvm_info("MB_SB", "MP-02: negotiated max common data rate observed", UVM_LOW)
+      mp_02_verified = 1;
+    end
+    if (!mp_03_verified && ev.neg_clock_mode == 1'b1) begin
+      `uvm_info("MB_SB", "MP-03: negotiated clock mode matches request", UVM_LOW)
+      mp_03_verified = 1;
+    end
+  endfunction
+
+  protected function void apply_lane_ctrl(mbinit_event ev);
+    lc_seen        = 1;
+    lc_tx_data_en  = ev.lc_tx_data_en;
+    lc_tx_clk_en   = ev.lc_tx_clk_en;
+    lc_tx_valid_en = ev.lc_tx_valid_en;
+    lc_tx_track_en = ev.lc_tx_track_en;
+    lc_rx_data_en  = ev.lc_rx_data_en;
+    lc_rx_clk_en   = ev.lc_rx_clk_en;
+    lc_rx_valid_en = ev.lc_rx_valid_en;
+    lc_rx_track_en = ev.lc_rx_track_en;
+  endfunction
+
+  // -------------------------------------------------------------------------
+  // Phase B handlers
+  // -------------------------------------------------------------------------
+  // Sideband lane message (or unknown) — qualify by src + dir.
+  protected function void handle_lane_msg(mbinit_event ev);
+    if (ev.src == MB_SRC_REQ_LANE && ev.dir == MB_DIR_TX) begin
+      saw_req_tx = 1;
+      if (ev.kind == MB_EVT_UNKNOWN) begin
+        if (!saw_bad_req_tx) begin
+          saw_bad_req_tx = 1;
+          `uvm_error("MB_SB", $sformatf(
+            "Requester TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
+            ev.raw, ev.opcode, ev.msg_code, ev.subcode))
+        end
+      end
+      else if (ev.role == MB_ROLE_REQ)
+        decode_req_tx(ev.msg_kind);
+    end
+    else if (ev.src == MB_SRC_RSP_LANE && ev.dir == MB_DIR_TX) begin
+      saw_rsp_tx = 1;
+      if (ev.kind == MB_EVT_UNKNOWN) begin
+        if (!saw_bad_rsp_tx) begin
+          saw_bad_rsp_tx = 1;
+          `uvm_error("MB_SB", $sformatf(
+            "Responder TX has unrecognized MBINIT sideband fields: data=%032h op=%02h msgCode[21:14]=%02h msgSubcode[39:32]=%02h",
+            ev.raw, ev.opcode, ev.msg_code, ev.subcode))
+        end
+      end
+      else if (ev.role == MB_ROLE_RESP)
+        decode_rsp_tx(ev.msg_kind);
+    end
+    else if (ev.src == MB_SRC_REQ_LANE && ev.dir == MB_DIR_RX) begin
+      // Partner -> DUT requester. LR-01 "wait for resp": REVERSALMB_INIT_RESP.
+      if (ev.kind == MB_EVT_SB_MSG && ev.role == MB_ROLE_RESP &&
+          ev.msg_kind == MB_MSG_LR_INIT && !saw_lr_init_resp_rx) begin
+        `uvm_info("MB_SB", "LR-01: REVERSALMB_INIT_RESP on requester RX (partner)", UVM_LOW)
+        saw_lr_init_resp_rx = 1;
+      end
+    end
+  endfunction
+
+  protected function void decode_req_tx(mbinit_msg_kind_e mk);
+    case (mk)
+      MB_MSG_PARAM:     if (!saw_param_req_tx)     begin `uvm_info("MB_SB","MP-01: DUT req sent PARAM_CFG_REQ",UVM_LOW)            saw_param_req_tx=1;     end
+      MB_MSG_CAL:       if (!saw_cal_req_tx)       begin `uvm_info("MB_SB","MC-01: DUT req sent CAL_DONE_REQ",UVM_LOW)             saw_cal_req_tx=1;       end
+      MB_MSG_RCLK_INIT: if (!saw_rclk_init_req_tx) begin `uvm_info("MB_SB","REPAIRCLK: DUT req sent REPAIRCLK_INIT_REQ",UVM_LOW)   saw_rclk_init_req_tx=1; end
+      MB_MSG_RCLK_RES:  if (!saw_rclk_res_req_tx)  begin `uvm_info("MB_SB","REPAIRCLK: DUT req sent REPAIRCLK_RESULT_REQ",UVM_LOW) saw_rclk_res_req_tx=1;  end
+      MB_MSG_RCLK_DONE: if (!saw_rclk_done_req_tx) begin `uvm_info("MB_SB","RC-05: DUT req sent REPAIRCLK_DONE_REQ",UVM_LOW)       saw_rclk_done_req_tx=1; end
+      MB_MSG_RVAL_INIT: if (!saw_rval_init_req_tx) begin `uvm_info("MB_SB","REPAIRVAL: DUT req sent REPAIRVAL_INIT_REQ",UVM_LOW)   saw_rval_init_req_tx=1; end
+      MB_MSG_RVAL_RES:  if (!saw_rval_res_req_tx)  begin `uvm_info("MB_SB","REPAIRVAL: DUT req sent REPAIRVAL_RESULT_REQ",UVM_LOW) saw_rval_res_req_tx=1;  end
+      MB_MSG_RVAL_DONE: if (!saw_rval_done_req_tx) begin `uvm_info("MB_SB","RV-07: DUT req sent REPAIRVAL_DONE_REQ",UVM_LOW)       saw_rval_done_req_tx=1; end
+      MB_MSG_LR_INIT:   if (!saw_lr_init_req_tx)   begin `uvm_info("MB_SB","LR-01: DUT req sent REVERSALMB_INIT_REQ",UVM_LOW)      saw_lr_init_req_tx=1;   end
+      MB_MSG_LR_RES:    if (!saw_lr_res_req_tx)    begin `uvm_info("MB_SB","REVERSALMB: DUT req sent REVERSALMB_RESULT_REQ",UVM_LOW) saw_lr_res_req_tx=1;  end
+      MB_MSG_LR_DONE:   if (!saw_lr_done_req_tx)   begin `uvm_info("MB_SB","LR-06: DUT req sent REVERSALMB_DONE_REQ",UVM_LOW)      saw_lr_done_req_tx=1;   end
+      MB_MSG_RM_START:  if (!saw_rm_start_req_tx)  begin `uvm_info("MB_SB","REPAIRMB: DUT req sent REPAIRMB_START_REQ",UVM_LOW)    saw_rm_start_req_tx=1;  end
+      MB_MSG_RM_END:    if (!saw_rm_end_req_tx)    begin `uvm_info("MB_SB","RM-08: DUT req sent REPAIRMB_END_REQ",UVM_LOW)         saw_rm_end_req_tx=1;    end
+      default: ; // LR_CLR / RM_APPLY: recognized but no dedicated req witness (matches legacy)
+    endcase
+  endfunction
+
+  protected function void decode_rsp_tx(mbinit_msg_kind_e mk);
+    case (mk)
+      MB_MSG_PARAM:     if (!saw_param_resp_tx)     begin `uvm_info("MB_SB","MP-01: DUT rsp sent PARAM_CFG_RESP",UVM_LOW)           saw_param_resp_tx=1;     end
+      MB_MSG_CAL:       if (!saw_cal_resp_tx)       begin `uvm_info("MB_SB","MC-02: DUT rsp sent CAL_DONE_RESP",UVM_LOW)            saw_cal_resp_tx=1;       end
+      MB_MSG_RCLK_INIT: if (!saw_rclk_init_resp_tx) begin `uvm_info("MB_SB","REPAIRCLK: DUT rsp sent REPAIRCLK_INIT_RESP",UVM_LOW)  saw_rclk_init_resp_tx=1; end
+      MB_MSG_RCLK_RES:  if (!saw_rclk_res_resp_tx)  begin `uvm_info("MB_SB","REPAIRCLK: DUT rsp sent REPAIRCLK_RESULT_RESP",UVM_LOW) saw_rclk_res_resp_tx=1; end
+      MB_MSG_RCLK_DONE: if (!saw_rclk_done_resp_tx) begin `uvm_info("MB_SB","RC-05: DUT rsp sent REPAIRCLK_DONE_RESP",UVM_LOW)      saw_rclk_done_resp_tx=1; end
+      MB_MSG_RVAL_INIT: if (!saw_rval_init_resp_tx) begin `uvm_info("MB_SB","REPAIRVAL: DUT rsp sent REPAIRVAL_INIT_RESP",UVM_LOW)  saw_rval_init_resp_tx=1; end
+      MB_MSG_RVAL_RES:  if (!saw_rval_res_resp_tx)  begin `uvm_info("MB_SB","REPAIRVAL: DUT rsp sent REPAIRVAL_RESULT_RESP",UVM_LOW) saw_rval_res_resp_tx=1; end
+      MB_MSG_RVAL_DONE: if (!saw_rval_done_resp_tx) begin `uvm_info("MB_SB","RV-07: DUT rsp sent REPAIRVAL_DONE_RESP",UVM_LOW)      saw_rval_done_resp_tx=1; end
+      MB_MSG_LR_INIT:   if (!saw_lr_init_resp_tx)   begin `uvm_info("MB_SB","LR-01: DUT responder TX REVERSALMB_INIT_RESP",UVM_LOW) saw_lr_init_resp_tx=1;  end
+      MB_MSG_LR_RES:    if (!saw_lr_res_resp_tx)    begin `uvm_info("MB_SB","REVERSALMB: DUT rsp sent REVERSALMB_RESULT_RESP",UVM_LOW) saw_lr_res_resp_tx=1; end
+      MB_MSG_LR_DONE:   if (!saw_lr_done_resp_tx)   begin `uvm_info("MB_SB","LR-06: DUT rsp sent REVERSALMB_DONE_RESP",UVM_LOW)     saw_lr_done_resp_tx=1;  end
+      MB_MSG_RM_START:  if (!saw_rm_start_resp_tx)  begin `uvm_info("MB_SB","REPAIRMB: DUT rsp sent REPAIRMB_START_RESP",UVM_LOW)   saw_rm_start_resp_tx=1; end
+      MB_MSG_RM_END:    if (!saw_rm_end_resp_tx)    begin `uvm_info("MB_SB","RM-08: DUT rsp sent REPAIRMB_END_RESP",UVM_LOW)        saw_rm_end_resp_tx=1;   end
+      default: ;
+    endcase
+  endfunction
+
+  // PatternWriter request: RC-02/RV-03/LR-02/RM-01 type check + RC-02/RV-01 witnesses.
+  protected function void handle_pw(mbinit_event ev);
+    if (ev.svc_kind != MB_SVC_REQ) return;
+    check_pattern_type(ev.pattern_type);
+    if (cur_state == MB_STATE_REPAIRCLK && ev.pattern_type == PT_CLKREPAIR)
+      saw_repairclk_pw_clkrepair = 1;
+    if (cur_state == MB_STATE_REPAIRVAL && ev.pattern_type == PT_VALTRAIN) begin
+      saw_rv01_pw_valtrain = 1;
+      if (cur_using_pw) saw_rv01_using_pw = 1;
+      if (neg_valid && (neg_phase & ~cur_local_phase))
+        rv01_phase_constraint_violation = 1;
+    end
+  endfunction
+
+  // PatternReader request: RC-02 / RV-01 reader-active witnesses.
+  protected function void handle_pr(mbinit_event ev);
+    if (ev.svc_kind != MB_SVC_REQ) return;
+    if (cur_state == MB_STATE_REPAIRCLK && ev.pattern_type == PT_CLKREPAIR)
+      saw_repairclk_pr_clkrepair = 1;
+    if (cur_state == MB_STATE_REPAIRVAL && ev.pattern_type == PT_VALTRAIN)
+      saw_rv01_repairval_reader_on = 1;
+    // usingPatternReader in REPAIRVAL also counts (rolling context).
+    if (cur_state == MB_STATE_REPAIRVAL && cur_using_pr)
+      saw_rv01_repairval_reader_on = 1;
+  endfunction
+
+  // Tx point-test result beats in REPAIRMB (RM-02/05).
+  protected function void handle_pttest(mbinit_event ev);
+    if (ev.src != MB_SRC_PTTEST_REQ)   return;
+    if (ev.svc_kind != MB_SVC_RESULT)  return;
+    if (cur_state != MB_STATE_REPAIRMB) return;
+    repairmb_pt_results_beats++;
+    if ((|ev.pt_results) && !(&ev.pt_results))
+      saw_rm02_heterogeneous_pt_repairmb = 1;
+  endfunction
+
+  // -------------------------------------------------------------------------
+  // RC-01: REPAIRCLK lane-ctrl positive witness (same expectation as XC-05).
+  // -------------------------------------------------------------------------
+  protected function bit repairclk_lane_ctrl_matches();
+    repairclk_lane_ctrl_matches =
+      (lc_tx_data_en  == 16'h0) &&
+      (lc_tx_clk_en   === 1'b1) &&
+      (lc_tx_valid_en === 1'b1) &&
+      (lc_tx_track_en === 1'b1) &&
+      (lc_rx_data_en  == 16'h0) &&
+      (lc_rx_clk_en   === 1'b1) &&
+      (lc_rx_valid_en === 1'b1) &&
+      (lc_rx_track_en === 1'b1);
+  endfunction
+
+  // XC-05: verify mbLaneCtrlIo matches expected values for the current state.
+  protected function void check_lane_ctrl();
     bit exp_txData, exp_txClk, exp_txValid, exp_txTrack;
     bit exp_rxData, exp_rxClk, exp_rxValid, exp_rxTrack;
     bit skip_txValid, mismatch;
     skip_txValid = 0;
     mismatch     = 0;
-    // En polarity: 1=enabled/active, 0=disabled. TX expectations are inverted
-    // from the old TriState convention (TriState 1=disabled → En 0=disabled).
-    case (tx.currentState)
+    case (cur_state)
       MB_STATE_PARAM, MB_STATE_CAL: begin
         exp_txData=0; exp_txClk=0; exp_txValid=0; exp_txTrack=0;
         exp_rxData=0; exp_rxClk=0; exp_rxValid=0; exp_rxTrack=0;
@@ -443,7 +487,7 @@ class mbinit_scoreboard extends uvm_scoreboard;
       MB_STATE_REPAIRVAL: begin
         exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=0;
         exp_rxData=0; exp_rxClk=1; exp_rxValid=1; exp_rxTrack=0;
-        skip_txValid = 1; // txValidEn is substate-dependent in REPAIRVAL
+        skip_txValid = 1;
       end
       MB_STATE_REVERSALMB, MB_STATE_REPAIRMB: begin
         exp_txData=1; exp_txClk=1; exp_txValid=1; exp_txTrack=1;
@@ -455,73 +499,73 @@ class mbinit_scoreboard extends uvm_scoreboard;
       end
       default: return;
     endcase
-    if (tx.mbLaneCtrl_txDataEn  !== {16{exp_txData}})  mismatch=1;
-    if (tx.mbLaneCtrl_txClkEn   !== exp_txClk)         mismatch=1;
+    if (lc_tx_data_en  !== {16{exp_txData}})  mismatch=1;
+    if (lc_tx_clk_en   !== exp_txClk)         mismatch=1;
     if (!skip_txValid &&
-        tx.mbLaneCtrl_txValidEn !== exp_txValid)        mismatch=1;
-    if (tx.mbLaneCtrl_txTrackEn !== exp_txTrack)        mismatch=1;
-    if (tx.mbLaneCtrl_rxDataEn  !== {16{exp_rxData}})   mismatch=1;
-    if (tx.mbLaneCtrl_rxClkEn   !== exp_rxClk)          mismatch=1;
-    if (tx.mbLaneCtrl_rxValidEn !== exp_rxValid)         mismatch=1;
-    if (tx.mbLaneCtrl_rxTrackEn !== exp_rxTrack)         mismatch=1;
+        lc_tx_valid_en !== exp_txValid)        mismatch=1;
+    if (lc_tx_track_en !== exp_txTrack)        mismatch=1;
+    if (lc_rx_data_en  !== {16{exp_rxData}})   mismatch=1;
+    if (lc_rx_clk_en   !== exp_rxClk)          mismatch=1;
+    if (lc_rx_valid_en !== exp_rxValid)         mismatch=1;
+    if (lc_rx_track_en !== exp_rxTrack)         mismatch=1;
     if (mismatch && !lane_ctrl_error) begin
       lane_ctrl_error = 1;
       `uvm_error("MB_SB", $sformatf(
         "XC-05: lane ctrl mismatch in state %0d: txData=%04h(exp %04h) txClk=%0b(exp %0b) txValid=%0b(skip=%0b) txTrack=%0b(exp %0b) rxData=%04h(exp %04h) rxClk=%0b(exp %0b) rxValid=%0b(exp %0b) rxTrack=%0b(exp %0b)",
-        tx.currentState,
-        tx.mbLaneCtrl_txDataEn, {16{exp_txData}},
-        tx.mbLaneCtrl_txClkEn, exp_txClk,
-        tx.mbLaneCtrl_txValidEn, skip_txValid,
-        tx.mbLaneCtrl_txTrackEn, exp_txTrack,
-        tx.mbLaneCtrl_rxDataEn, {16{exp_rxData}},
-        tx.mbLaneCtrl_rxClkEn, exp_rxClk,
-        tx.mbLaneCtrl_rxValidEn, exp_rxValid,
-        tx.mbLaneCtrl_rxTrackEn, exp_rxTrack))
+        cur_state,
+        lc_tx_data_en, {16{exp_txData}},
+        lc_tx_clk_en, exp_txClk,
+        lc_tx_valid_en, skip_txValid,
+        lc_tx_track_en, exp_txTrack,
+        lc_rx_data_en, {16{exp_rxData}},
+        lc_rx_clk_en, exp_rxClk,
+        lc_rx_valid_en, exp_rxValid,
+        lc_rx_track_en, exp_rxTrack))
     end
   endfunction
 
-  // RC-02/RV-03/LR-02/RM-01: verify patternWriter pattern type matches state
-  function void check_pattern_type(mbinit_transaction tx);
-    if (!tx.patternWriter_req_valid) return;
-    case (tx.currentState)
+  // RC-02/RV-03/LR-02/RM-01: pattern type vs state (on a patternWriter request).
+  protected function void check_pattern_type(logic [1:0] ptype);
+    case (cur_state)
       MB_STATE_REPAIRCLK: begin
-        if (tx.patternWriter_patternType !== 2'h0 &&
-            tx.patternWriter_patternType !== 2'h1) begin
+        if (ptype !== PT_CLKREPAIR && ptype !== PT_VALTRAIN) begin
           pattern_type_error = 1;
           `uvm_error("MB_SB", $sformatf(
-            "RC-02: patternWriter type=%0h in REPAIRCLK; expected CLKREPAIR(0) or VALTRAIN(1)",
-            tx.patternWriter_patternType))
+            "RC-02: patternWriter type=%0h in REPAIRCLK; expected CLKREPAIR(0) or VALTRAIN(1)", ptype))
         end
       end
       MB_STATE_REPAIRVAL: begin
-        if (tx.patternWriter_patternType !== 2'h1) begin
+        if (ptype !== PT_VALTRAIN) begin
           pattern_type_error = 1;
           `uvm_error("MB_SB", $sformatf(
-            "RV-03: patternWriter type=%0h in REPAIRVAL; expected VALTRAIN(1)",
-            tx.patternWriter_patternType))
+            "RV-03: patternWriter type=%0h in REPAIRVAL; expected VALTRAIN(1)", ptype))
         end
       end
       MB_STATE_REVERSALMB: begin
-        if (tx.patternWriter_patternType !== 2'h2) begin
+        if (ptype !== PT_PERLANEID) begin
           pattern_type_error = 1;
           `uvm_error("MB_SB", $sformatf(
-            "LR-02: patternWriter type=%0h in REVERSALMB; expected PERLANEID(2)",
-            tx.patternWriter_patternType))
+            "LR-02: patternWriter type=%0h in REVERSALMB; expected PERLANEID(2)", ptype))
         end
       end
       MB_STATE_REPAIRMB: begin
-        if (tx.patternWriter_patternType !== 2'h2) begin
+        if (ptype !== PT_PERLANEID) begin
           pattern_type_error = 1;
           `uvm_error("MB_SB", $sformatf(
-            "RM-01: patternWriter type=%0h in REPAIRMB; expected PERLANEID(2)",
-            tx.patternWriter_patternType))
+            "RM-01: patternWriter type=%0h in REPAIRMB; expected PERLANEID(2)", ptype))
         end
       end
       default: ;
     endcase
   endfunction
 
+  // ====================== final requirement checks ==========================
+  // Identical expect_* logic + error messages to the legacy scoreboard, so test
+  // pass/fail semantics are preserved. Flush the bucket/FIFO tail first.
   function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    flush_buckets();
+
     `uvm_info("MB_SB", $sformatf(
       "Summary: req_tx=%0b rsp_tx=%0b bad_req=%0b bad_rsp=%0b param_req=%0b param_resp=%0b mp02=%0b mp03=%0b cal=%0b fsm_done=%0b fsm_err=%0b lane_ctrl_err=%0b pat_type_err=%0b lr03_pr_revmb=%0b apply_lane_rev=%0b",
       saw_req_tx, saw_rsp_tx, saw_bad_req_tx, saw_bad_rsp_tx,
@@ -599,8 +643,6 @@ class mbinit_scoreboard extends uvm_scoreboard;
         `uvm_error("MB_SB","REPAIRCLK FAILED: responder never sent REPAIRCLK_INIT_RESP")
       if (!saw_rclk_res_req_tx)
         `uvm_error("MB_SB","REPAIRCLK FAILED: requester never sent REPAIRCLK_RESULT_REQ")
-      // Responder RESULT_RESP may be muxed with patternReaderIo.resp.valid in RTL — not
-      // guaranteed to appear as a distinct responderSbLaneIo_tx beat for the scoreboard.
       if (!saw_rclk_done_req_tx)
         `uvm_error("MB_SB","RC-05 FAILED: requester never sent REPAIRCLK_DONE_REQ")
       if (!saw_state_repairval)
