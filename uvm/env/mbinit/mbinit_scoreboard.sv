@@ -300,7 +300,14 @@ class mbinit_scoreboard extends uvm_scoreboard;
     case (ev.state)
       MB_STATE_CAL:        saw_state_cal        = 1;
       MB_STATE_REPAIRCLK:  saw_state_repairclk  = 1;
-      MB_STATE_REPAIRVAL:  saw_state_repairval  = 1;
+      MB_STATE_REPAIRVAL: begin
+        saw_state_repairval = 1;
+        // RV-01: responder PatternReader path is level-signalled via
+        // usingPatternReader (held across the layer, not gated on a PR request).
+        // Capture it from the STATE snapshot, mirroring LR-03 below; handle_pr()
+        // also sets it on a VALTRAIN-typed PR request as a redundant witness.
+        if (ev.using_pr) saw_rv01_repairval_reader_on = 1;
+      end
       MB_STATE_REVERSALMB: begin
         saw_state_reversalmb = 1;
         if (ev.using_pr) saw_lr03_pattern_reader_reversalmb = 1;  // LR-03
