@@ -1,0 +1,213 @@
+MBINIT detailed results
+Tests: test_mbinit_decode test_mbinit_sanity test_mbinit_param_mismatch test_mbinit_param_only test_mbinit_cal test_mbinit_repairclk test_mbinit_repairclk_unrep test_mbinit_repairval_unrep test_mbinit_lr04_reversal_apply test_mbinit_lr07_reversal_trainerror test_mbinit_rm02_per_lane_reader test_mbinit_rm07_unrepairable test_mbinit_rm05_post_repair_persist
+
+TEST: test_mbinit_decode
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_decode.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_sanity
+STATUS: FAIL
+LOG: run_logs/mbinit/test_mbinit_sanity.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+84:UVM_ERROR ./env/mbinit/mbinit_scoreboard.sv(716) @ 29535000: uvm_test_top.env.scoreboard [MB_SB] RV-01 FAILED: never observed responder patternReader activity in REPAIRVAL (usingPatternReader / VALTRAIN req)
+149:UVM_ERROR :    1
+LOG_TAIL:
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   32
+UVM_WARNING :    2
+UVM_ERROR :    1
+UVM_FATAL :    0
+** Report counts by id
+[MB_AUDIT]     6
+[MB_COV]     1
+[MB_SB]    22
+[RNTST]     1
+[TEST]     2
+[TEST_DONE]     1
+[TEST_SNAP]     2
+Simulation complete via $finish(1) at time 29535 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_if(logphy_if)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  dutinst  :  mbinit_tb_top(mbinit_tb_top)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_408efce2_66b61e13.ucm
+  data               :  ./cov_work/scope/test/icc_408efce2_66b61e13.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 29, 2026 at 11:35:32 PDT  (total: 00:00:01)
+
+TEST: test_mbinit_param_mismatch
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_param_mismatch.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_param_only
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_param_only.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_cal
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_cal.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_repairclk
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_repairclk.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_repairclk_unrep
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_repairclk_unrep.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_repairval_unrep
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_repairval_unrep.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_lr04_reversal_apply
+STATUS: FAIL
+LOG: run_logs/mbinit/test_mbinit_lr04_reversal_apply.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+82:UVM_ERROR ./env/mbinit/mbinit_scoreboard.sv(716) @ 30455000: uvm_test_top.env.scoreboard [MB_SB] RV-01 FAILED: never observed responder patternReader activity in REPAIRVAL (usingPatternReader / VALTRAIN req)
+147:UVM_ERROR :    1
+LOG_TAIL:
+
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   30
+UVM_WARNING :    2
+UVM_ERROR :    1
+UVM_FATAL :    0
+** Report counts by id
+[MB_AUDIT]     6
+[MB_COV]     1
+[MB_SB]    22
+[RNTST]     1
+[TEST]     2
+[TEST_DONE]     1
+Simulation complete via $finish(1) at time 30455 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_if(logphy_if)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  dutinst  :  mbinit_tb_top(mbinit_tb_top)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_408efce2_66b61e13.ucm (reused)
+  data               :  ./cov_work/scope/test/icc_408efce2_66b61e13.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 29, 2026 at 11:35:38 PDT  (total: 00:00:01)
+
+TEST: test_mbinit_lr07_reversal_trainerror
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_lr07_reversal_trainerror.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_rm02_per_lane_reader
+STATUS: FAIL
+LOG: run_logs/mbinit/test_mbinit_rm02_per_lane_reader.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+82:UVM_ERROR ./env/mbinit/mbinit_scoreboard.sv(716) @ 29535000: uvm_test_top.env.scoreboard [MB_SB] RV-01 FAILED: never observed responder patternReader activity in REPAIRVAL (usingPatternReader / VALTRAIN req)
+147:UVM_ERROR :    1
+LOG_TAIL:
+
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   30
+UVM_WARNING :    2
+UVM_ERROR :    1
+UVM_FATAL :    0
+** Report counts by id
+[MB_AUDIT]     6
+[MB_COV]     1
+[MB_SB]    22
+[RNTST]     1
+[TEST]     2
+[TEST_DONE]     1
+Simulation complete via $finish(1) at time 29535 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_if(logphy_if)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  dutinst  :  mbinit_tb_top(mbinit_tb_top)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_408efce2_66b61e13.ucm (reused)
+  data               :  ./cov_work/scope/test/icc_408efce2_66b61e13.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 29, 2026 at 11:35:40 PDT  (total: 00:00:01)
+
+TEST: test_mbinit_rm07_unrepairable
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_rm07_unrepairable.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_mbinit_rm05_post_repair_persist
+STATUS: PASS
+LOG: run_logs/mbinit/test_mbinit_rm05_post_repair_persist.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+

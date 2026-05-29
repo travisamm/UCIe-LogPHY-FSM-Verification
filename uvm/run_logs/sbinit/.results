@@ -1,0 +1,269 @@
+SBINIT detailed results
+Tests: test_sbinit_decode test_sbinit_sanity test_sbinit_partner_not_ready test_sbinit_early_req test_sbinit_multiple_reqs test_sbinit_timeout test_sbinit_reset test_sbinit_random test_sbinit_req_backpressure test_sbinit_rsp_backpressure
+
+TEST: test_sbinit_random
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_random.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_decode
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_decode.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_sanity
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_sanity.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_partner_not_ready
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_partner_not_ready.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_req_backpressure
+STATUS: FAIL
+LOG: run_logs/sbinit/test_sbinit_req_backpressure.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+59:xmsim: *E,ASRTST (./tb/sbinit/sbinit_persistence_sva.sv,118): (time 275 NS) Assertion logphy_tb_top.u_sbinit_persistence.a_oor_persist_until_detect has failed (2 cycles, starting 265 NS)
+60:UVM_ERROR ./env/sbinit/sbinit_predictor.sv(104) @ 275000: uvm_test_top.env.predictor [SBINIT_REF] reference-model divergence: requester transmitted a corrupted/zero payload while a message was due (ready/valid data-stability bug)
+61:UVM_ERROR @ 275000: reporter [SBINIT_SVA] UCIe 4.5.3.2 Step7: DUT stopped sending {SBINIT Out of Reset} before detecting it on its receiver
+64:xmsim: *E,ASRTST (./tb/sbinit/sbinit_stream_sva.sv,52): (time 575 NS) Assertion logphy_tb_top.req_if.u_req_tx_stability.a_payload_stable has failed (2 cycles, starting 565 NS)
+65:UVM_ERROR @ 575000: reporter [SBINIT_SVA] payload not stable under back-pressure: data changed while valid held and ready low (data=0x600000040244012)
+106:UVM_ERROR :    3
+LOG_TAIL:
+
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   26
+UVM_WARNING :    0
+UVM_ERROR :    3
+UVM_FATAL :    0
+** Report counts by id
+[COVERAGE]     1
+[RNTST]     1
+[SBINIT_REF]     2
+[SBINIT_SB]    20
+[SBINIT_SVA]     2
+[TEST]     2
+[TEST_DONE]     1
+Simulation complete via $finish(1) at time 1425 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_tb_top(logphy_tb_top)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_58e1e36b_2da3f3f8.ucm (reused)
+  data               :  ./cov_work/scope/test/icc_58e1e36b_2da3f3f8.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 26, 2026 at 15:11:27 PDT  (total: 00:00:04)
+
+TEST: test_sbinit_early_req
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_early_req.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_rsp_backpressure
+STATUS: FAIL
+LOG: run_logs/sbinit/test_sbinit_rsp_backpressure.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+53:UVM_ERROR ./env/sbinit/sbinit_predictor.sv(104) @ 455000: uvm_test_top.env.predictor [SBINIT_REF] reference-model divergence: responder transmitted a corrupted/zero payload while a {done resp} was due (ready/valid data-stability bug)
+56:xmsim: *E,ASRTST (./tb/sbinit/sbinit_stream_sva.sv,52): (time 725 NS) Assertion logphy_tb_top.rsp_if.u_rsp_tx_stability.a_payload_stable has failed (2 cycles, starting 715 NS)
+57:UVM_ERROR @ 725000: reporter [SBINIT_SVA] payload not stable under back-pressure: data changed while valid held and ready low (data=0x600000140268012)
+98:UVM_ERROR :    2
+LOG_TAIL:
+
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   26
+UVM_WARNING :    0
+UVM_ERROR :    2
+UVM_FATAL :    0
+** Report counts by id
+[COVERAGE]     1
+[RNTST]     1
+[SBINIT_REF]     2
+[SBINIT_SB]    20
+[SBINIT_SVA]     1
+[TEST]     2
+[TEST_DONE]     1
+Simulation complete via $finish(1) at time 1225 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_tb_top(logphy_tb_top)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_58e1e36b_2da3f3f8.ucm (reused)
+  data               :  ./cov_work/scope/test/icc_58e1e36b_2da3f3f8.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 26, 2026 at 15:11:29 PDT  (total: 00:00:02)
+
+TEST: test_sbinit_multiple_reqs
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_multiple_reqs.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_timeout
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_timeout.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_reset
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_reset.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_random
+STATUS: PASS
+LOG: run_logs/sbinit/test_sbinit_random.log
+SIM_EXIT_STATUS: 0
+REASON: simulator exited 0 and no UVM_ERROR/UVM_FATAL lines were found
+
+TEST: test_sbinit_req_backpressure
+STATUS: FAIL
+LOG: run_logs/sbinit/test_sbinit_req_backpressure.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+51:xmsim: *E,ASRTST (./tb/sbinit/sbinit_persistence_sva.sv,118): (time 275 NS) Assertion logphy_tb_top.u_sbinit_persistence.a_oor_persist_until_detect has failed (2 cycles, starting 265 NS)
+52:UVM_ERROR ./env/sbinit/sbinit_predictor.sv(104) @ 275000: uvm_test_top.env.predictor [SBINIT_REF] reference-model divergence: requester transmitted a corrupted/zero payload while a message was due (ready/valid data-stability bug)
+53:UVM_ERROR @ 275000: reporter [SBINIT_SVA] UCIe 4.5.3.2 Step7: DUT stopped sending {SBINIT Out of Reset} before detecting it on its receiver
+56:xmsim: *E,ASRTST (./tb/sbinit/sbinit_stream_sva.sv,52): (time 575 NS) Assertion logphy_tb_top.req_if.u_req_tx_stability.a_payload_stable has failed (2 cycles, starting 565 NS)
+57:UVM_ERROR @ 575000: reporter [SBINIT_SVA] payload not stable under back-pressure: data changed while valid held and ready low (data=0x600000040244012)
+98:UVM_ERROR :    3
+LOG_TAIL:
+
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   26
+UVM_WARNING :    0
+UVM_ERROR :    3
+UVM_FATAL :    0
+** Report counts by id
+[COVERAGE]     1
+[RNTST]     1
+[SBINIT_REF]     2
+[SBINIT_SB]    20
+[SBINIT_SVA]     2
+[TEST]     2
+[TEST_DONE]     1
+Simulation complete via $finish(1) at time 1425 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_tb_top(logphy_tb_top)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_58e1e36b_2da3f3f8.ucm (reused)
+  data               :  ./cov_work/scope/test/icc_58e1e36b_2da3f3f8.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 26, 2026 at 15:11:33 PDT  (total: 00:00:01)
+
+TEST: test_sbinit_rsp_backpressure
+STATUS: FAIL
+LOG: run_logs/sbinit/test_sbinit_rsp_backpressure.log
+SIM_EXIT_STATUS: 0
+REASON: UVM_ERROR/UVM_FATAL present in log;
+ERROR_EXCERPT:
+49:UVM_ERROR ./env/sbinit/sbinit_predictor.sv(104) @ 455000: uvm_test_top.env.predictor [SBINIT_REF] reference-model divergence: responder transmitted a corrupted/zero payload while a {done resp} was due (ready/valid data-stability bug)
+52:xmsim: *E,ASRTST (./tb/sbinit/sbinit_stream_sva.sv,52): (time 725 NS) Assertion logphy_tb_top.rsp_if.u_rsp_tx_stability.a_payload_stable has failed (2 cycles, starting 715 NS)
+53:UVM_ERROR @ 725000: reporter [SBINIT_SVA] payload not stable under back-pressure: data changed while valid held and ready low (data=0x600000140268012)
+94:UVM_ERROR :    2
+LOG_TAIL:
+
+
+Number of demoted UVM_FATAL reports  :    0
+Number of demoted UVM_ERROR reports  :    0
+Number of demoted UVM_WARNING reports:    0
+Number of caught UVM_FATAL reports   :    0
+Number of caught UVM_ERROR reports   :    0
+Number of caught UVM_WARNING reports :    0
+
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   26
+UVM_WARNING :    0
+UVM_ERROR :    2
+UVM_FATAL :    0
+** Report counts by id
+[COVERAGE]     1
+[RNTST]     1
+[SBINIT_REF]     2
+[SBINIT_SB]    20
+[SBINIT_SVA]     1
+[TEST]     2
+[TEST_DONE]     1
+Simulation complete via $finish(1) at time 1225 NS + 45
+/share/instsww/cadence/XCELIUM2509/tools/methodology/UVM/CDNS-1.1d/sv/src/base/uvm_root.svh:457     $finish;
+xcelium> exit
+xmsim: *N,COVCGN: Coverage configuration file command "set_covergroup -new_instance_reporting" can be specified to improve the scoping and naming of covergroup instances. It may be noted that subsequent merging of a coverage database saved with this command and a coverage database saved without this command is not allowed.
+
+coverage setup:
+  workdir  :  ./cov_work
+  dutinst  :  logphy_tb_top(logphy_tb_top)
+  dutinst  :  mbinit_state_sync_sva(mbinit_state_sync_sva)
+  scope    :  scope
+  testname :  test
+
+coverage files:
+  model(design data) :  ./cov_work/scope/icc_58e1e36b_2da3f3f8.ucm (reused)
+  data               :  ./cov_work/scope/test/icc_58e1e36b_2da3f3f8.ucd
+TOOL:	xrun(64)	25.09-s002: Exiting on May 26, 2026 at 15:11:34 PDT  (total: 00:00:01)
+
